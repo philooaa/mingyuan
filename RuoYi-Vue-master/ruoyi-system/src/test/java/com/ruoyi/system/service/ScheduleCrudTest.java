@@ -27,7 +27,7 @@ public class ScheduleCrudTest {
     EduCourseSchedule current, captured;
     Long[] deleted;
     @BeforeEach void setup() throws Exception {
-        principal(21, "teacher"); db = new FakeDb(); current = course(); current.setScheduleId(10L);
+        principal(21, "admin", "teacher"); db = new FakeDb(); current = course(); current.setScheduleId(10L);
         service = new EduCourseScheduleServiceImpl();
         inject(service, "db", db);
         var availability = new ScheduleAvailabilityService(); inject(availability,"db",db); inject(service,"availability",availability);
@@ -54,6 +54,7 @@ public class ScheduleCrudTest {
         assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch));assertNull(captured);
     }
     @Test void teacherReadAndWriteIsolation() {
+        principal(21,"teacher");
         EduCourseSchedule query = new EduCourseSchedule(); query.getParams().put("teacherUserId", 22L);
         service.selectEduCourseScheduleList(query); assertEquals(21L, captured.getParams().get("teacherUserId"));
         assertThrows(ServiceException.class, () -> service.selectEduCourseScheduleByScheduleId(20L));
@@ -68,6 +69,7 @@ public class ScheduleCrudTest {
         draft.startDate = LocalDate.parse("2026-12-28"); draft.timeSlot="8:00-10:00";
         var slot=new ScheduleAvailabilityService.Slot("8:00-10:00",LocalTime.of(8,0),LocalTime.of(10,0));
         EduCourseSchedule schedule = draft.toSchedule("数学",slot);
+        schedule.setTeacherId(21L);
         assertEquals(1L,schedule.getClassroomId()); assertEquals("",schedule.getLessonLocation());
         assertEquals("周一", schedule.getPeriodName()); assertEquals(LocalTime.of(10,0), schedule.getEndTime());
         assertEquals(draft.startDate,ScheduleCalendar.date(schedule.getEndDate()));
@@ -76,7 +78,8 @@ public class ScheduleCrudTest {
         draft.classroomId=null; assertThrows(ServiceException.class, () -> draft.toSchedule("数学",slot));
         draft.classroomId=1L; assertThrows(ServiceException.class, () -> draft.toSchedule("数学",null));
     }
-    @Test void teacherCanOnlyCreateOneToOneButAdminCanCreateClass() {
+    @Test void teacherCannotCreateButAdminCanCreateClass() {
+        principal(21,"teacher");
         EduCourseSchedule input = course(); input.setClassMode("1");
         assertThrows(ServiceException.class, () -> service.insertEduCourseSchedule(input));
         input.setClassMode(null);
@@ -108,7 +111,7 @@ public class ScheduleCrudTest {
         assertEquals(1, service.updateEduCourseSchedule(input));
         assertNull(captured.getEnrolledCount()); assertNull(captured.getDelFlag()); assertNull(captured.getCreateBy()); assertNull(captured.getScheduleCode());
         EduCourseSchedule other = new EduCourseSchedule(); other.setScheduleId(10L); other.setTeacherId(22L);
-        assertThrows(ServiceException.class, () -> service.updateEduCourseSchedule(other));
+        assertEquals(1, service.updateEduCourseSchedule(other));
     }
     @Test void attendanceHistoryAllowsStoppingButBlocksTimeRewrites() {
         db.attendance = 1;
@@ -178,8 +181,22 @@ public class ScheduleCrudTest {
         input.setScheduleId(10L); input.setEnrolledCount(null);
         assertFalse(cfg.getMappedStatement("com.ruoyi.system.mapper.EduCourseScheduleMapper.updateEduCourseSchedule").getBoundSql(input).getSql().contains("enrolled_count"));
     }
+    @Test void teacherCannotPublishEvenOwnOneToOneCourse() {
+        principal(21,"teacher");
+        assertThrows(ServiceException.class, () -> service.insertEduCourseSchedule(course()));
+        var change=new EduCourseSchedule();change.setScheduleId(10L);change.setStatus("0");
+        assertThrows(ServiceException.class, () -> service.updateEduCourseSchedule(change));
+        assertNull(captured);
+    }
+    @Test void educationCanPlanAtCampusWithoutAssigningAClassroom() {
+        principal(23,"education","teacher");
+        var s=course();s.setClassMode("1");s.setClassroomId(null);s.setCampusName("万达");
+        assertEquals(1,service.insertEduCourseSchedule(s));
+        assertNull(captured.getClassroomId());assertEquals("万达",captured.getCampusName());
+        assertEquals(List.of("teacher:21"),db.locks);
+    }
     static EduCourseSchedule course() {
-        var s = new EduCourseSchedule(); s.setTeacherId(21L); s.setClassroomId(1L); s.setScheduleCode("TEST"); s.setCourseYear(2026L);
+        var s = new EduCourseSchedule(); s.setTeacherId(21L); s.setClassroomId(1L); s.setCampusName("万达"); s.setScheduleCode("TEST"); s.setCourseYear(2026L);
         s.setTermName("秋季"); s.setPeriodName("周六"); s.setTimeSlot("8:00-10:00"); s.setGradeName("一年级"); s.setSubjectName("数学"); s.setCourseClassName("班次");
         s.setClassMode("2"); s.setStatus("0"); s.setRecruitStatus("0"); s.setDelFlag("0");
         s.setStartTime(LocalTime.of(8,0)); s.setEndTime(LocalTime.of(10,0));
@@ -198,6 +215,7 @@ public class ScheduleCrudTest {
         List<Map<String,Object>> conflicts = List.of(); List<String> locks = new ArrayList<>();
         FakeDb() { super(new DriverManagerDataSource()); }
         @Override public List<Map<String,Object>> rows(String sql,Object... args) {
+            if (sql.contains("SELECT DISTINCT campus_name")) return "万达".equals(args[0]) ? List.of(Map.of("campusName","万达")) : List.of();
             if (sql.contains("SELECT u.nick_name")) return List.of(Map.of("nickName","Teacher A","userName","teacher21"));
             if (sql.contains("information_schema")) return List.of(Map.of("tableName","edu_homework"));
             if (sql.contains("FROM edu_course_schedule") && sql.contains("start_time")) return conflicts;
@@ -214,7 +232,7 @@ public class ScheduleCrudTest {
             throw new AssertionError(sql);
         }
         @Override public Map<String,Object> one(String sql,Object... args) {
-            if(sql.contains("FROM edu_classroom")) { if(sql.contains("FOR UPDATE")) locks.add("room:"+args[0]); return Map.of("status","0"); }
+            if(sql.contains("FROM edu_classroom")) { if(sql.contains("FOR UPDATE")) locks.add("room:"+args[0]); return Map.of("status","0","campusName","万达"); }
             if(sql.contains("FOR UPDATE")) { locks.add("teacher:"+args[0]); return Map.of("userId",args[0]); }
             throw new AssertionError(sql);
         }

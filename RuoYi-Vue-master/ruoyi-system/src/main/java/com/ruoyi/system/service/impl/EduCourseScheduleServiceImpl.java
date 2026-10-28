@@ -30,8 +30,12 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     @Autowired private com.ruoyi.system.service.ISysConfigService configService;
 
     private boolean teacherOnly() {
-        return SecurityUtils.hasRole("teacher") && !SecurityUtils.hasRole("admin") && !SecurityUtils.isAdmin();
+        return SecurityUtils.hasRole("teacher") && !planningStaff();
     }
+    private static boolean planningStaff() {
+        return SecurityUtils.isAdmin() || SecurityUtils.hasRole("admin") || SecurityUtils.hasRole("business_admin") || SecurityUtils.hasRole("education");
+    }
+    private static void requirePlanningStaff() { require(planningStaff(), "课程由教务或管理员统一安排，教师不能发布或修改排课"); }
     private void own(EduCourseSchedule schedule) {
         require(schedule != null, "排课不存在或已删除");
         if (teacherOnly()) require(Objects.equals(schedule.getTeacherId(), SecurityUtils.getUserId()), "无权操作其他教师的排课");
@@ -64,6 +68,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
      */
     @Override @Transactional(rollbackFor = Exception.class)
     public int swapClassrooms(Long courseYear, String termName, String periodName, Long classroomIdA, Long classroomIdB) {
+        requirePlanningStaff();
         require(classroomIdA != null && classroomIdB != null, "请选择要交换的两个教室");
         require(!Objects.equals(classroomIdA, classroomIdB), "两个教室不能相同");
         require(!blank(termName) && !blank(periodName), "请先选择学期和期次");
@@ -73,8 +78,8 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public int insertEduCourseSchedule(EduCourseSchedule schedule) {
+        requirePlanningStaff();
         require(schedule != null && schedule.getScheduleId() == null, "新增排课不能指定排课ID");
-        if (teacherOnly()) require("2".equals(schedule.getClassMode()), "教师只能新增一对一课程");
         bindTeacher(schedule, null);
         if ("2".equals(schedule.getClassMode())) schedule.setSubjectName(singleService.subject(schedule.getTeacherId()));
         if (blank(schedule.getScheduleCode())) schedule.setScheduleCode("SCH" + UUID.randomUUID().toString().replace("-", "").substring(0, 28));
@@ -95,6 +100,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public int updateEduCourseSchedule(EduCourseSchedule input) {
+        requirePlanningStaff();
         require(input != null && input.getScheduleId() != null, "请选择排课");
         EduCourseSchedule before = selectEduCourseScheduleByScheduleId(input.getScheduleId());
         bindTeacher(input, before);
@@ -111,6 +117,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         }
         EduCourseSchedule effective = merge(current, input);
         validate(effective);
+        input.setCampusName(effective.getCampusName());
         if ("2".equals(effective.getClassMode()) && (singleResourcesChanged(current,effective) || !"2".equals(current.getClassMode()) || (!"0".equals(current.getStatus()) && "0".equals(effective.getStatus())))) {
             availability.validateSingle(effective);
             input.setLessonLocation(""); effective.setLessonLocation("");
@@ -120,6 +127,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         if (hasAttendance(current.getScheduleId()) || !db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND class_date IS NOT NULL FOR UPDATE", current.getScheduleId()).isEmpty()) {
             require(Objects.equals(current.getTeacherId(), effective.getTeacherId())
                 && Objects.equals(current.getClassroomId(), effective.getClassroomId())
+                && Objects.equals(current.getCampusName(), effective.getCampusName())
                 && Objects.equals(current.getClassMode(), effective.getClassMode())
                 && Objects.equals(current.getLessonLocation(), effective.getLessonLocation())
                 && Objects.equals(current.getSubjectName(), effective.getSubjectName())
@@ -143,6 +151,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public int deleteEduCourseScheduleByScheduleIds(Long[] ids) {
+        requirePlanningStaff();
         require(ids != null && ids.length > 0 && Arrays.stream(ids).noneMatch(Objects::isNull), "请选择要删除的排课");
         List<EduCourseSchedule> courses = Arrays.stream(ids).distinct().sorted().map(this::selectEduCourseScheduleByScheduleId).toList();
         lockResources(courses);
@@ -207,7 +216,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         availability.lockResources(courses);
     }
     private static boolean singleResourcesChanged(EduCourseSchedule a,EduCourseSchedule b) {
-        return !Objects.equals(a.getClassroomId(),b.getClassroomId()) || !Objects.equals(a.getStartTime(),b.getStartTime()) || !Objects.equals(a.getEndTime(),b.getEndTime())
+        return !Objects.equals(a.getCampusName(),b.getCampusName()) || !Objects.equals(a.getClassroomId(),b.getClassroomId()) || !Objects.equals(a.getStartTime(),b.getStartTime()) || !Objects.equals(a.getEndTime(),b.getEndTime())
             || !Objects.equals(ScheduleCalendar.date(a.getStartDate()),ScheduleCalendar.date(b.getStartDate())) || !Objects.equals(ScheduleCalendar.date(a.getEndDate()),ScheduleCalendar.date(b.getEndDate()))
             || !Objects.equals(a.getClassPattern(),b.getClassPattern()) || !Objects.equals(a.getPeriodName(),b.getPeriodName()) || !Objects.equals(a.getTimeSlot(),b.getTimeSlot()) || !Objects.equals(a.getLessonLocation(),b.getLessonLocation());
     }
@@ -215,8 +224,11 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         required(s.getScheduleCode(), 32, "排课编码"); required(s.getTermName(), 20, "学期"); required(s.getPeriodName(), 20, "期次或上课日");
         required(s.getTimeSlot(), 30, "时段"); required(s.getGradeName(), 20, "年级"); required(s.getSubjectName(), 20, "学科");
         required(s.getCourseClassName(), 100, "课程班名称");
-        if ("1".equals(s.getClassMode())) require(s.getClassroomId() != null, "请选择教室");
-        else if (s.getClassroomId() == null) required(s.getLessonLocation(), 255, "上课地点");
+        if (s.getClassroomId() == null) {
+            required(s.getCampusName(), 50, "校区");
+            s.setCampusName(s.getCampusName().trim());
+            require(!db.rows("SELECT DISTINCT campus_name FROM edu_classroom WHERE campus_name=? AND status='0'",s.getCampusName()).isEmpty(), "请选择启用的校区");
+        }
         require(s.getCourseYear() != null && s.getCourseYear() >= 2000 && s.getCourseYear() <= 2100, "课程年份应为2000至2100");
         require(s.getStartTime() != null && s.getEndTime() != null && s.getStartTime().isBefore(s.getEndTime()), "请填写正确的开始、结束时间，结束必须晚于开始");
         require(List.of("1", "2").contains(s.getClassMode()), "授课形式无效");
@@ -231,7 +243,8 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
             require(List.of("WEEKLY", "DAILY_5_1").contains(s.getClassPattern() == null ? "" : s.getClassPattern()), "请明确上课模式");
             if ("WEEKLY".equals(s.getClassPattern())) require(ScheduleCalendar.weekday(s.getPeriodName()) > 0, "每周排课需明确周一至周日的上课星期");
         }
-        Map<String,Object> classroom = s.getClassroomId() == null ? Map.of("status","0") : db.one("SELECT status FROM edu_classroom WHERE classroom_id=?", s.getClassroomId());
+        Map<String,Object> classroom = s.getClassroomId() == null ? Map.of("status","0") : db.one("SELECT status,campus_name FROM edu_classroom WHERE classroom_id=?", s.getClassroomId());
+        if (s.getClassroomId() != null && classroom.get("campusName") != null) s.setCampusName(String.valueOf(classroom.get("campusName")));
         if ("0".equals(s.getStatus())) require("0".equals(classroom.get("status")), "所选教室已停用");
         long enrolled = s.getScheduleId() == null ? 0 : db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND del_flag='0' AND class_date IS NULL AND enrollment_status NOT IN('2','3','已取消') FOR UPDATE", s.getScheduleId()).size();
         // 教室容量不作为排课硬约束（报名不按教室容量卡名额），仅保留一对一「最多 1 名有效学员」的校验。
@@ -377,6 +390,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     private EduCourseSchedule merge(EduCourseSchedule old, EduCourseSchedule in) {
         EduCourseSchedule s = new EduCourseSchedule(); s.setScheduleId(old.getScheduleId()); s.setScheduleCode(old.getScheduleCode());
         s.setLessonLocation(in.getLessonLocation() == null ? old.getLessonLocation() : in.getLessonLocation());
+        s.setCampusName(in.getCampusName() == null ? old.getCampusName() : in.getCampusName());
         s.setTeacherId(in.getTeacherId()); s.setTeacherName(in.getTeacherName()); s.setClassroomId(in.getClassroomId());
         s.setCourseYear(in.getCourseYear() == null ? old.getCourseYear() : in.getCourseYear());
         s.setTermName(in.getTermName() == null ? old.getTermName() : in.getTermName()); s.setPeriodName(in.getPeriodName() == null ? old.getPeriodName() : in.getPeriodName());

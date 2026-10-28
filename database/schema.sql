@@ -96,9 +96,10 @@ CREATE TABLE `edu_classroom` (
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `edu_course_schedule` (
+  `campus_name` varchar(50) DEFAULT NULL COMMENT '排课校区，教室可后续分配',
   `schedule_id` bigint NOT NULL AUTO_INCREMENT COMMENT '排课ID',
   `schedule_code` varchar(32) NOT NULL COMMENT '排课编码',
-  `classroom_id` bigint NOT NULL COMMENT '教室ID',
+  `classroom_id` bigint DEFAULT NULL COMMENT '教室ID，排课时可暂不分配',
   `course_year` int DEFAULT '2026' COMMENT '课程年份',
   `term_name` varchar(20) NOT NULL COMMENT '学期（暑假/秋季）',
   `period_name` varchar(20) NOT NULL COMMENT '期次或上课日',

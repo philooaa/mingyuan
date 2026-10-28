@@ -17,6 +17,10 @@ import com.ruoyi.common.core.domain.BaseEntity;
  */
 public class EduCourseSchedule extends BaseEntity
 {
+    /** 排课时选择的校区；classroomId 可稍后由教室分配功能填写。 */
+    private String campusName;
+    public String getCampusName() { return campusName; }
+    public void setCampusName(String campusName) { this.campusName = campusName; }
     private static final long serialVersionUID = 1L;
 
     /** 排课ID */

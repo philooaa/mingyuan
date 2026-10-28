@@ -30,7 +30,7 @@
                s.start_date as startDate, s.end_date as endDate,
                s.class_pattern as classPattern, s.recruit_status as recruitStatus,
                s.status, ifnull(s.enrolled_count, 0) as enrolledCount,
-               c.classroom_name as classroomName, c.campus_name as campusName
+               c.classroom_name as classroomName, COALESCE(NULLIF(s.campus_name,''),c.campus_name) as campusName
         from edu_course_schedule s
         left join sys_user teacher on teacher.user_id = s.teacher_id
         left join edu_classroom c on c.classroom_id = s.classroom_id

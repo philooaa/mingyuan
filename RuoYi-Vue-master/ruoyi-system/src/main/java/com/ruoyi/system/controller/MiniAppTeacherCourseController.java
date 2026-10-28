@@ -53,6 +53,7 @@ public class MiniAppTeacherCourseController extends BaseController
     }
 
     @PostMapping("/schedule")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "教师新增排课", businessType = BusinessType.INSERT)
     public AjaxResult add(@RequestBody com.ruoyi.system.domain.TeacherOneToOneDraft draft)
     {
@@ -63,6 +64,7 @@ public class MiniAppTeacherCourseController extends BaseController
     }
 
     @PutMapping("/schedule")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "教师修改排课", businessType = BusinessType.UPDATE)
     public AjaxResult edit(@RequestBody EduCourseSchedule input)
     {
@@ -74,6 +76,7 @@ public class MiniAppTeacherCourseController extends BaseController
     }
 
     @DeleteMapping("/schedule/{scheduleId}")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "教师删除排课", businessType = BusinessType.DELETE)
     public AjaxResult remove(@PathVariable Long scheduleId)
     {

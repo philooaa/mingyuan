@@ -70,7 +70,7 @@ const roleProfiles = {
       { key:'studentSignReview', title:'学生出勤', icon:'勤', tone:'cyan', route:'/pages/sign-review/sign-review' },
       { title: '打卡复核', icon: '核', tone: 'blue', route: '/pages/admin-checkin-review/admin-checkin-review' },
       { title: '课程报名', icon: '招', tone: 'blue', route: '/pages/admin-enrollment/admin-enrollment' },
-      { title: '排课管理', icon: '排', tone: 'orange' },
+      { title: '排课管理', icon: '排', tone: 'orange', route: '/pages/admin-schedule/admin-schedule' },
       { title: '教室管理', icon: '室', tone: 'cyan', route: '/pages/admin-classrooms/admin-classrooms' },
       { title: '学生档案', icon: '档', tone: 'green', route: '/pages/admin-students/admin-students' },
       { key:'personalAccount', title: '交易管理', icon: '交', tone: 'gold', route: '/pages/admin-transactions/admin-transactions' },
@@ -92,10 +92,10 @@ const roleProfiles = {
   }
 }
 
-// Education is a real authenticated role, never a development login option.
+// 工作台只展示后端实际授予的身份。
 roleProfiles.education = {
   name: '教务', tag: '全校区教务管理', eyebrow: '教务端', title: '课程出勤、收费与退费初审',
-  stats: [], actions: roleProfiles.admin.actions.filter(a => ['教室管理', '学生档案', '收费财务', '退费管理', '学生出勤'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
+  stats: [], actions: roleProfiles.admin.actions.filter(a => ['排课管理', '教室管理', '学生档案', '收费财务', '退费管理', '学生出勤'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
 }
 
 function normalizeRole(roleKey) {
@@ -318,7 +318,7 @@ Page({
     const role = getRoleFromStorage(info.roles || [])
     const financeAllowed = access.staff() && access.can('system:tuition:list')
     this._teacherLoadVersion = (this._teacherLoadVersion || 0) + 1
-    this.setData({ teacherDataMessage: '',currentChild:null,parentChildren:[],childLoading:false,childError:'',showChildPicker:false,parentScheduleError:'', roleLocked: workspaces.length < 2, developmentLoginEnabled: access.developmentTool() && !!wx.getStorageSync('devSessionVersion'), ...buildRoleState(role, workspaces) })
+    this.setData({ teacherDataMessage: '',currentChild:null,parentChildren:[],childLoading:false,childError:'',showChildPicker:false,parentScheduleError:'', roleLocked: workspaces.length < 2, developmentLoginEnabled: false, ...buildRoleState(role, workspaces) })
     if(role==='education')this.loadSignReviewPending()
     if(role==='parent' || role==='admin') { this.loadAccountPending();if(role==='admin'){this.loadReferralPending();this.loadSignReviewPending()};this._accountTimer=setInterval(()=>{this.loadAccountPending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending()}},30000) }
 

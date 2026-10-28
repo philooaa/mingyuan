@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/register/register",
+    "pages/admin-schedule/admin-schedule",
     "pages/index/index",
     "pages/parent-referral/parent-referral",
     "pages/admin-referral/admin-referral",

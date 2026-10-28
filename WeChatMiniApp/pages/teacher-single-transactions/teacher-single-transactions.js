@@ -128,13 +128,6 @@ Page({
   shiftWeek(days) { this.refreshWeek(calendar.formatDate(calendar.addDays(calendar.weekStart(this.data.weekStart),days))) },
   currentWeek() { this.refreshWeek(calendar.formatDate(new Date())) },
   chooseDate(e) { this.refreshWeek(e.detail.value) },
-  addSchedule() { if (this.ready()) wx.navigateTo({url:'/pages/teacher-schedule-create/teacher-schedule-create'}) },
-  editSchedule(e) {
-    if (!this.ready()) return
-    const id = String(e.currentTarget.dataset.id)
-    if (!(this._courses || []).some(course=>String(course.scheduleId)===id)) return
-    wx.navigateTo({url:`/pages/teacher-schedule-edit/teacher-schedule-edit?id=${id}`})
-  },
   openStudents(e) {
     if (!this.ready()) return
     const id = e.currentTarget.dataset.id

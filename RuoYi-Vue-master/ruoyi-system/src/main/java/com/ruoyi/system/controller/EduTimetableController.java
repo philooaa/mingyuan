@@ -71,7 +71,7 @@ public class EduTimetableController extends BaseController
      * 菜单权限：system:courseschedule:list（与列表页共用同一权限标识，减少额外菜单配置）
      * 同时允许 teacher 角色直接调用（hasAnyRoles）
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:list') or @ss.hasAnyPermi('system:schedule:list,system:schedule:add,system:schedule:edit') or @ss.hasAnyRoles('admin,teacher')")
+    @PreAuthorize("@ss.hasPermi('system:courseschedule:list') or @ss.hasAnyPermi('system:schedule:list,system:schedule:add,system:schedule:edit') or @ss.hasAnyRoles('admin,education,teacher')")
     @GetMapping("/dimensions")
     public AjaxResult dimensions()
     {
@@ -278,10 +278,10 @@ public class EduTimetableController extends BaseController
 
     /**
      * 新增排课
-     * 权限：admin 任意新增；teacher 只能为自己排课（归属一律按 teacherId 判定，不看姓名）。
+     * 权限：仅教务、管理员可新增排课。
      * 落库的 teacher_name 统一写真名(user_name)，昵称只用于显示层兜底，不参与权限判定。
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:add') or @ss.hasAnyRoles('admin,teacher')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-新增", businessType = BusinessType.INSERT)
     @PostMapping
     public AjaxResult add(@RequestBody EduCourseSchedule schedule)
@@ -297,9 +297,9 @@ public class EduTimetableController extends BaseController
 
     /**
      * 修改排课
-     * 权限：admin 任意改；teacher 仅能改自己 teacher_id 对应的记录，且 teacherName 不能改成别人
+     * 权限：仅教务、管理员可修改排课。
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:edit') or @ss.hasAnyRoles('admin,teacher')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-修改", businessType = BusinessType.UPDATE)
     @PutMapping
     public AjaxResult edit(@RequestBody EduCourseSchedule schedule)
@@ -315,30 +315,14 @@ public class EduTimetableController extends BaseController
 
     /**
      * 删除排课
-     * 权限：admin 任意删；teacher 仅能删自己 create_by 的记录
+     * 权限：仅教务、管理员可删除无报名或历史关联的排课。
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:remove') or @ss.hasAnyRoles('admin,teacher')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-删除", businessType = BusinessType.DELETE)
     @DeleteMapping("/{scheduleIds}")
     public AjaxResult remove(@PathVariable Long[] scheduleIds)
     {
-        if (SecurityUtils.isAdmin() || SecurityUtils.hasRole("admin") || SecurityUtils.hasPermi(Constants.ALL_PERMISSION)) {
-            return toAjax(scheduleService.deleteEduCourseScheduleByScheduleIds(scheduleIds));
-        }
-        // teacher：逐条校验 create_by
-        List<Long> allowed = new ArrayList<>();
-        for (Long id : scheduleIds) {
-            EduCourseSchedule old = scheduleService.selectEduCourseScheduleByScheduleId(id);
-            if (old != null && Objects.equals(SecurityUtils.getUserId(), old.getTeacherId())) {
-                allowed.add(id);
-            } else if (old == null) {
-                // 不存在跳过
-            } else {
-                throw new ServiceException("无权删除其他教师的排课：" + old.getScheduleId());
-            }
-        }
-        if (allowed.isEmpty()) return success(0);
-        return toAjax(scheduleService.deleteEduCourseScheduleByScheduleIds(allowed.toArray(new Long[0])));
+        return toAjax(scheduleService.deleteEduCourseScheduleByScheduleIds(scheduleIds));
     }
 
     /**
@@ -351,7 +335,7 @@ public class EduTimetableController extends BaseController
      * 请求体：{ courseYear, termName, periodName, classroomIdA, classroomIdB }
      * 返回：{ swapped: 受影响条数, classroomIdA, classroomIdB, termName, periodName }
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:edit') or @ss.hasRole('admin')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-交换教室列", businessType = BusinessType.UPDATE)
     @PostMapping("/swapClassrooms")
     public AjaxResult swapClassrooms(@RequestBody Map<String, Object> body)
@@ -396,7 +380,7 @@ public class EduTimetableController extends BaseController
      * 因此日期按「学期」分别设置，通过 dateRanges 传入（JSON 数组，见 parseDateRanges）。
      * 不传日期也能预览：此时返回 datePlans，由前端逐学期补填后再确认导入。
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:add') or @ss.hasRole('admin')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-导入预览", businessType = BusinessType.IMPORT)
     @PostMapping("/importPreview")
     public AjaxResult importPreview(@RequestParam("file") MultipartFile file,
@@ -416,7 +400,7 @@ public class EduTimetableController extends BaseController
      * 只有显式传 updateSupport=false 才退回旧行为（跳过已存在的格子、且不做清空）。
      * dateRanges 形如 [{ termName: "寒假", startDate: "2027-01-20", endDate: "2027-02-05" }, ...]
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:add') or @ss.hasRole('admin')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-导入", businessType = BusinessType.IMPORT)
     @PostMapping("/importConfirm")
     public AjaxResult importConfirm(@RequestBody Map<String, Object> body)
@@ -433,7 +417,7 @@ public class EduTimetableController extends BaseController
      * 课表导入-一键：上传矩阵式 xlsx，自动同步教师/教室/字典并落库（整体事务）。
      * 日期同样按学期分别设置（dateRanges），未设置日期的学期落库后保持「待排」。
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:add') or @ss.hasRole('admin')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-一键导入", businessType = BusinessType.IMPORT)
     @PostMapping("/importOneClick")
     public AjaxResult importOneClick(@RequestParam("file") MultipartFile file,
@@ -527,7 +511,7 @@ public class EduTimetableController extends BaseController
      *
      * 请求体：{ date: "yyyy-MM-dd", reason: "国庆节" }
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:edit') or @ss.hasAnyRoles('admin,teacher')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-停课", businessType = BusinessType.UPDATE)
     @PostMapping("/{scheduleId}/occurrences/cancel")
     public AjaxResult cancelOccurrence(@PathVariable Long scheduleId, @RequestBody Map<String, Object> body)
@@ -563,7 +547,7 @@ public class EduTimetableController extends BaseController
      *
      * 请求体：{ date: "yyyy-MM-dd" }
      */
-    @PreAuthorize("@ss.hasPermi('system:courseschedule:edit') or @ss.hasAnyRoles('admin,teacher')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-恢复课次", businessType = BusinessType.UPDATE)
     @PostMapping("/{scheduleId}/occurrences/restore")
     public AjaxResult restoreOccurrence(@PathVariable Long scheduleId, @RequestBody Map<String, Object> body)
@@ -599,7 +583,7 @@ public class EduTimetableController extends BaseController
      */
     private void checkScheduleEditPermission(EduCourseSchedule s)
     {
-        if (SecurityUtils.isAdmin() || SecurityUtils.hasRole("admin")) return;
+        if (SecurityUtils.isAdmin() || SecurityUtils.hasRole("admin") || SecurityUtils.hasRole("education")) return;
         if (SecurityUtils.hasPermi(Constants.ALL_PERMISSION)) return;
         if (!SecurityUtils.hasRole("teacher")) throw new ServiceException("当前用户不具备调课权限");
         if (!Objects.equals(s.getTeacherId(), SecurityUtils.getUserId())) throw new ServiceException("教师仅能调整本人负责的排课");
@@ -719,31 +703,14 @@ public class EduTimetableController extends BaseController
     }
 
     /**
-     * 新增/修改前检查 teacher 角色是否越权
+     * 新增/修改前检查教务、管理员身份
      * @param input  本次提交的排课对象
      * @param old    数据库里已有对象（新增时为 null）
      * @param isNew  true=新增 / false=修改
      */
     private void checkEditablePermission(EduCourseSchedule input, EduCourseSchedule old, boolean isNew)
     {
-        // admin 一律放行
-        if (SecurityUtils.isAdmin() || SecurityUtils.hasRole("admin")) return;
-        // 有通配权限也放行
-        if (SecurityUtils.hasPermi(Constants.ALL_PERMISSION)) return;
-
-        if (!SecurityUtils.hasRole("teacher")) {
-            throw new ServiceException("当前用户不具备排课编辑权限");
-        }
-
-        if (!isNew && !Objects.equals(old.getTeacherId(), SecurityUtils.getUserId())) {
-            throw new ServiceException("教师仅能修改本人负责的排课");
-        }
-        if (input.getTeacherId() != null && !Objects.equals(input.getTeacherId(), SecurityUtils.getUserId())) {
-            throw new ServiceException("教师仅能为自己排课");
-        }
-        input.setTeacherId(SecurityUtils.getUserId());
-        // teacher_name 统一写真名，与 bindTeacher 口径一致（不要写昵称，昵称只用于显示层兜底）
-        SysUser self = SecurityUtils.getLoginUser().getUser();
-        input.setTeacherName(StringUtils.isNotEmpty(self.getUserName()) ? self.getUserName() : self.getNickName());
+        if (SecurityUtils.isAdmin() || SecurityUtils.hasRole("admin") || SecurityUtils.hasRole("education")) return;
+        throw new ServiceException("课程由教务或管理员统一安排，教师不能发布或修改排课");
     }
 }

@@ -124,7 +124,7 @@ test('multi-role switching keeps the token, refuses an unassigned role and clear
 test('staff menu permissions are respected and a missing role never falls back to parent', async () => {
   const h = harness('index', ['education'], []); h.p.onLoad(); await h.p.applyLoginRole()
   // Attendance review is role-authorized, like the existing miniapp check-in review; finance still requires menu permissions.
-  assert.deepEqual(Array.from(h.p.data.quickActions, a => a.route), ['/pages/sign-review/sign-review'])
+  assert.deepEqual(Array.from(h.p.data.quickActions, a => a.route), ['/pages/sign-review/sign-review', '/pages/admin-schedule/admin-schedule'])
   h.state.roles = []; await h.p.applyLoginRole()
   assert.equal(h.p.data.currentRole, ''); assert.equal(h.p.data.roles.length, 0)
   assert.equal(h.calls.some(o => o.url.startsWith('/miniapp/parent')), false)
@@ -182,4 +182,20 @@ test('code rejection and an abandoned login never replace an active session', as
   const work = h.p.handlePhoneCodeLogin(); h.store.set('token', 'another-session'); complete({ token: 'late-token' }); await work
   assert.equal(h.store.get('token'), 'another-session')
   assert.equal(h.calls.some(o => o.url === '/getInfo'), false)
+})
+
+
+test('login screen is phone-only and the homepage uses the assigned-role action sheet', async () => {
+  const registerMarkup = fs.readFileSync(path.join(root, 'pages/register/register.wxml'), 'utf8')
+  const homeMarkup = fs.readFileSync(path.join(root, 'pages/index/index.wxml'), 'utf8')
+  assert.match(registerMarkup, /open-type="getPhoneNumber"/)
+  assert.doesNotMatch(registerMarkup, /本地测试|选择测试账号|chooseDevRole|handleDevLogin/)
+  assert.match(homeMarkup, /bindtap="openRoleMenu"/)
+  assert.doesNotMatch(homeMarkup, /workspace-tabs|switchTestAccount|切换测试账号/)
+  const h = harness('register', [], [], o => o.url === '/miniapp/dev/session' ? { data: { version: 'local' } } : undefined)
+  h.store.delete('token'); h.p.onLoad()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(h.p.data.developmentLoginEnabled, false)
+  assert.equal(h.calls.some(o => o.url === '/miniapp/dev/session'), false)
+  h.p.onUnload()
 })
