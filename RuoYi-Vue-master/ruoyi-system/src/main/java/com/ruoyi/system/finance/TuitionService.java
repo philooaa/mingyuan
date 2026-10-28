@@ -80,7 +80,7 @@ public class TuitionService {
     if (fm.isBlank()) fm = "REAL";
     require(
         Set.of("REAL", "MOCK").contains(fm) && (!fm.equals("MOCK") || mockEnabled), "模拟统计仅限本地测试");
-    String where = " WHERE e.finance_mode=?";
+    String where = " WHERE e.finance_mode=? AND e.bill_type<>'COURSE_ITEM'";
     List<Object> args = new ArrayList<>(List.of(fm));
     for (var filter :
         Map.of(
@@ -218,7 +218,7 @@ public class TuitionService {
     var e = enrollment(enrollment, actor, admin, false);
     if (CreditPackageService.isPackage(e))
       db.one("SELECT account_id FROM edu_student_lesson_account WHERE account_id=? AND parent_id=? FOR UPDATE",e.get("lessonAccountId"),e.get("parentId"));
-    else if (!"LESSON_PACKAGE".equals(e.get("billType")))
+    else if (!"LESSON_PACKAGE".equals(e.get("billType")) && e.get("scheduleId") != null)
       db.one(
           "SELECT schedule_id FROM edu_course_schedule WHERE schedule_id=? FOR UPDATE",
           e.get("scheduleId"));
@@ -338,7 +338,8 @@ public class TuitionService {
 
   public Map<String, Object> listBills(long actor, boolean admin, Map<String, String> q) {
     actor(actor, admin);
-    String where = " WHERE 1=1";
+    // 购物车订单里的单门课程不单独成账单，收款统一记在订单主账单上。
+    String where = " WHERE e.bill_type<>'COURSE_ITEM'";
     List<Object> a = new ArrayList<>();
     if(!str(q,"accountId").isEmpty()) {
       long account=id(q.get("accountId"));
@@ -420,9 +421,12 @@ public class TuitionService {
 
   public Map<String, Object> bill(long enrollment, long actor, boolean admin) {
     actor(actor, admin);
-    enrollment(enrollment, actor, admin, false);
+    var raw = enrollment(enrollment, actor, admin, false);
+    require(!"COURSE_ITEM".equals(str(raw, "billType")),
+        "这门课属于购物车订单，请在订单主账单里核价收款");
     var e = amounts(db.one(BILL_SELECT + BILL_FROM + " WHERE e.enrollment_id=?", enrollment));
     if(CreditPackageService.isPackage(e))e.put("packageSnapshot",CreditPackageService.snapshot(e));
+    if("CART_ORDER".equals(str(e, "billType")))e.put("items", orderItems(enrollment));
     e.put(
         "payments",
         db.rows(
@@ -452,8 +456,22 @@ public class TuitionService {
       e.remove("reservedAmount");
       e.remove("refundableAmount");
     }
-    e.put("coupons", coupons.available(e));
+    // 购物车订单没有单一排课，优惠券按课程绑定无法套用，只支持教务手工填优惠。
+    e.put("coupons", "CART_ORDER".equals(str(e, "billType")) ? List.of() : coupons.available(e));
     return e;
+  }
+
+  /** 购物车订单里的课程明细。 */
+  private List<Map<String, Object>> orderItems(long orderId) {
+    return db.rows(
+        "SELECT e.enrollment_id,e.enrollment_code,e.schedule_id,e.student_name,e.enrollment_status,"
+            + "e.original_amount,e.fee_title_snapshot,s.course_class_name,s.grade_name,s.subject_name,"
+            + "s.term_name,s.period_name,s.unit_price,s.lesson_count,"
+            + "COALESCE(NULLIF(s.campus_name,''),c.campus_name) campus_name,c.classroom_name "
+            + "FROM edu_enrollment e LEFT JOIN edu_course_schedule s ON s.schedule_id=e.schedule_id "
+            + "LEFT JOIN edu_classroom c ON c.classroom_id=s.classroom_id "
+            + "WHERE e.order_enrollment_id=? AND e.del_flag='0' ORDER BY e.enrollment_id",
+        orderId);
   }
 
   public void initializeBill(long enrollment, long actor) {
@@ -495,10 +513,11 @@ public class TuitionService {
 
   public Map<String, Object> price(long enrollment, long actor, Map<String, Object> b) {
     tuitionStaff(db, actor);
-    BigDecimal original = money(b.get("originalAmount"));
     return tx(
         () -> {
           var e = lockEnrollment(enrollment, actor, true);
+          require(!"COURSE_ITEM".equals(str(e, "billType")),
+              "这门课属于购物车订单，请到订单主账单核价");
           require(!CreditPackageService.isPackage(e),"课包按年级和包数自动计价，不能人工改价；请取消未收款订单后重新购买");
           require(!"P".equals(e.get("settlementMethod")), "课包报名通过课次账户结算，不能登记单次现金收款");
           version(e, b);
@@ -513,6 +532,30 @@ public class TuitionService {
                       enrollment)
                   .isEmpty(),
               "PAYMENT_ALREADY_EXISTS: 已有有效付款记录不能调价");
+
+          // 购物车订单：原价由订单内课程总价决定，教务只填优惠，实收 = 原价 − 优惠。
+          if ("CART_ORDER".equals(str(e, "billType"))) {
+            BigDecimal gross = money(e.get("originalAmount"));
+            BigDecimal discount = b.containsKey("discountAmount") ? money(b.get("discountAmount")) : money("0");
+            require(discount.compareTo(gross) <= 0, "优惠金额不能超过课程总价 " + gross.toPlainString() + " 元");
+            String reason = str(b, "discountReason");
+            require(discount.signum() == 0 || !reason.isBlank(), "请填写优惠原因");
+            updateBill(
+                enrollment,
+                e,
+                values(
+                    "billing_status", "OPEN",
+                    "discount_amount", discount,
+                    "payable_amount", gross.subtract(discount),
+                    "user_coupon_id", null,
+                    "price_confirmed_by", actor,
+                    "price_confirmed_time", now(),
+                    "remark", reason.isBlank() ? e.get("remark") : reason),
+                actor);
+            return bill(enrollment, actor, true);
+          }
+
+          BigDecimal original = money(b.get("originalAmount"));
           String fm = str(b, "financeMode");
           if (fm.isEmpty()) fm = str(e, "financeMode");
           require(
@@ -566,6 +609,17 @@ public class TuitionService {
     require(
         "OPEN".equals(e.get("billingStatus")) && e.get("originalAmount") != null,
         "BILL_NOT_PRICED: 请等待核价或历史核验");
+    if ("CART_ORDER".equals(str(e, "billType"))) {
+      BigDecimal gross = money(e.get("originalAmount"));
+      BigDecimal discount = e.get("discountAmount") == null ? money("0") : money(e.get("discountAmount"));
+      return values(
+          "originalAmount", gross.toPlainString(),
+          "discountAmount", discount.toPlainString(),
+          "payableAmount", gross.subtract(discount).toPlainString(),
+          "financialVersion", e.get("financialVersion"),
+          "userCouponId", null,
+          "coupons", List.of());
+    }
     Long coupon=selectedCoupon(e,b);
     BigDecimal discount = CreditPackageService.bulkDiscount(e).add(
         coupon==null
@@ -619,6 +673,30 @@ public class TuitionService {
         "userCouponId",
         e.get("userCouponId"));
     if(CreditPackageService.isPackage(e)){snap.put("billType",CreditPackageService.TYPE);snap.put("packageSnapshot",CreditPackageService.snapshot(e));}
+    // 购物车订单：把车内课程固化进快照，收据／凭证才能看清这一单收了哪几门课。
+    if ("CART_ORDER".equals(str(e, "billType"))) {
+      snap.put("billType", "CART_ORDER");
+      var items = new ArrayList<Map<String, Object>>();
+      for (var it :
+          db.rows(
+              "SELECT e.enrollment_id,e.fee_title_snapshot,e.original_amount,e.payable_amount,"
+                  + "s.grade_name,s.subject_name,s.lesson_count,s.unit_price"
+                  + " FROM edu_enrollment e"
+                  + " LEFT JOIN edu_course_schedule s ON s.schedule_id=e.schedule_id"
+                  + " WHERE e.order_enrollment_id=? AND e.del_flag='0' ORDER BY e.enrollment_id",
+              e.get("enrollmentId"))) {
+        items.add(
+            values(
+                "enrollmentId", it.get("enrollmentId"),
+                "courseName", it.get("feeTitleSnapshot"),
+                "gradeName", it.get("gradeName"),
+                "subjectName", it.get("subjectName"),
+                "lessonCount", it.get("lessonCount"),
+                "unitPrice", it.get("unitPrice"),
+                "amount", it.get("payableAmount")));
+      }
+      snap.put("orderItems", items);
+    }
     return snap;
   }
 
@@ -630,7 +708,8 @@ public class TuitionService {
   public Map<String, Object> createPayment(
       long enrollment, long actor, boolean admin, Map<String, Object> b) {
     require(admin, "FORBIDDEN: 课程费用请联系教务线下缴纳");
-    actor(actor, admin);
+    // 收款登记与确认只归管理员；教务只保留核价权限。
+    coupons.admin(actor);
     String key = key(b),
         hash =
             fingerprint(
@@ -676,8 +755,12 @@ public class TuitionService {
                           enrollment)
                       .isEmpty(),
                   "PAYMENT_ALREADY_EXISTS: 已有有效缴费记录");
-              Long coupon = selectedCoupon(e,b);
-              BigDecimal discount = CreditPackageService.bulkDiscount(e).add(coupon == null ? money("0") : coupons.discount(coupon, e, true)),
+              // 购物车订单的优惠是教务在核价时填的固定金额，不再叠加优惠券。
+              boolean cartOrder = "CART_ORDER".equals(str(e, "billType"));
+              Long coupon = cartOrder ? null : selectedCoupon(e,b);
+              BigDecimal discount = cartOrder
+                      ? (e.get("discountAmount") == null ? money("0") : money(e.get("discountAmount")))
+                      : CreditPackageService.bulkDiscount(e).add(coupon == null ? money("0") : coupons.discount(coupon, e, true)),
                   amount = money(e.get("originalAmount")).subtract(discount);
               require(
                   amount.compareTo(money(b.get("expectedPayableAmount"))) == 0,
@@ -882,11 +965,18 @@ public class TuitionService {
                       enrollment)
               == 1,
           "锁定优惠券不一致");
-    updateBill(
-        enrollment,
-        e,
-        values("pay_status", money(p.get("amount")).signum() == 0 ? "已减免" : "已支付"),
-        actor);
+    String payState = money(p.get("amount")).signum() == 0 ? "已减免" : "已支付";
+    updateBill(enrollment, e, values("pay_status", payState), actor);
+    // 一车一单：订单收款成功后，订单里的每门课程同步为已支付／已减免。
+    if ("CART_ORDER".equals(str(e, "billType")))
+      db.jdbc()
+          .update(
+              "UPDATE edu_enrollment SET pay_status=?,update_by=?,update_time=? "
+                  + "WHERE order_enrollment_id=? AND del_flag='0'",
+              payState,
+              coupons.username(actor),
+              now(),
+              enrollment);
     p.put(
         "paidTime",
         paid.toLocalDateTime()
@@ -971,7 +1061,8 @@ public class TuitionService {
   public Map<String, Object> confirmPayment(
       long payment, long actor, boolean admin, Map<String, Object> b) {
     require(admin, "FORBIDDEN: 家长不能确认课程收款");
-    actor(actor, admin);
+    // 确认收款即生成收据，只归管理员；教务只保留核价权限。
+    coupons.admin(actor);
     long[] receipt = {0};
     var result =
         tx(
@@ -1675,6 +1766,14 @@ public class TuitionService {
               close(p, actor, reason);
             }
           }
+          // 一车一单：取消订单要连带取消订单里的每一门课程，并各自释放名额。
+          if ("CART_ORDER".equals(str(e, "billType")))
+            for (var item :
+                db.rows(
+                    "SELECT * FROM edu_enrollment WHERE order_enrollment_id=? AND del_flag='0'"
+                        + " AND enrollment_status NOT IN ('2','已取消') FOR UPDATE",
+                    enrollment))
+              withdraw(id(item.get("enrollmentId")), item, actor, reason);
           withdraw(enrollment, enrollment(enrollment, actor, admin, true), actor, reason);
           return bill(enrollment, actor, admin);
         });

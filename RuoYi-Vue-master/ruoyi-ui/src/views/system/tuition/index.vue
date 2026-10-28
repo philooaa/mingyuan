@@ -174,6 +174,30 @@
               {{ money(detail[col.key]) }} 元
             </el-descriptions-item>
           </el-descriptions>
+          <template v-if="detail.billType === 'CART_ORDER'">
+            <el-alert
+              :title="'购物车订单：一个订单 ' + (detail.items || []).length + ' 门课程，一次收款一张收据'"
+              type="info"
+              :closable="false"
+              class="mb8"
+            />
+            <el-table :data="detail.items || []" size="small" border class="mb8">
+              <el-table-column label="课程" prop="courseClassName" min-width="180" show-overflow-tooltip />
+              <el-table-column label="年级 / 学科" width="130">
+                <template slot-scope="s">{{ s.row.gradeName }} · {{ s.row.subjectName }}</template>
+              </el-table-column>
+              <el-table-column label="学期 / 期次" width="140">
+                <template slot-scope="s">{{ s.row.termName }} · {{ s.row.periodName }}</template>
+              </el-table-column>
+              <el-table-column label="课次" width="70" align="center" prop="lessonCount" />
+              <el-table-column label="单价" width="90" align="right">
+                <template slot-scope="s">{{ money(s.row.unitPrice) }}</template>
+              </el-table-column>
+              <el-table-column label="课程总价" width="110" align="right">
+                <template slot-scope="s">{{ money(s.row.originalAmount) }}</template>
+              </el-table-column>
+            </el-table>
+          </template>
           <template v-if="detail.billType === 'CREDIT_PACKAGE'">
             <el-alert :title="detail.packageCreditedTime ? '课包已入账：' + detail.packageCreditedTime : detail.billingStatus === 'CLOSED' ? '课包订单已取消' : '课包待确认：确认线下收款后一次性增加孩子额度'" type="info" :closable="false" class="mb8" />
             <el-descriptions v-if="detail.packageSnapshot" :column="3" border size="small">
@@ -367,12 +391,36 @@
     >
       <el-alert v-if="formError" :title="formError" type="error" :closable="false" class="mb8" />
       <el-form :model="form" label-width="125px" size="small" :disabled="saving">
-        <template v-if="operation === 'price' || operation === 'history'">
+        <template v-if="isCartOrder && operation === 'price'">
+          <el-form-item label="课程总价（元）">
+            <span class="cart-gross">{{ money(detail.originalAmount) }}</span>
+            <span class="cart-hint">由订单内各课程单价 × 课次数自动汇总</span>
+          </el-form-item>
+          <el-form-item label="优惠金额（元）">
+            <el-input
+              v-model="form.discountAmount"
+              placeholder="教务按实际情况填写，可填 0"
+            />
+          </el-form-item>
+          <el-form-item label="实际应收（元）">
+            <span class="cart-payable">{{ cartPayable }}</span>
+          </el-form-item>
+          <el-form-item label="优惠原因">
+            <el-input
+              v-model="form.discountReason"
+              type="textarea"
+              maxlength="200"
+              show-word-limit
+              placeholder="优惠不为 0 时必填，例如：老生续费优惠、多科联报"
+            />
+          </el-form-item>
+        </template>
+        <template v-else-if="operation === 'price' || operation === 'history'">
           <el-form-item label="课程原价（元）">
             <el-input v-model="form.originalAmount" placeholder="明确金额，最多两位小数" />
           </el-form-item>
         </template>
-        <el-form-item v-if="operation === 'price'" label="资金模式">
+        <el-form-item v-if="operation === 'price' && !isCartOrder" label="资金模式">
           <el-select
             v-model="form.financeMode"
             :disabled="!!(detail && detail.payments && detail.payments.length)"
@@ -418,7 +466,7 @@
             <el-select
               v-model="form.userCouponId"
               clearable
-              :disabled="quoteLoading || (detail && detail.billType === 'CREDIT_PACKAGE')"
+              :disabled="quoteLoading || isCartOrder || (detail && detail.billType === 'CREDIT_PACKAGE')"
               @change="refreshQuote"
             >
               <el-option
@@ -593,6 +641,16 @@ export default {
     }
   },
   computed: {
+    isCartOrder() {
+      return !!this.detail && this.detail.billType === 'CART_ORDER'
+    },
+    cartPayable() {
+      const gross = Number((this.detail && this.detail.originalAmount) || 0)
+      const discount = Number(this.form.discountAmount || 0)
+      if (!Number.isFinite(discount) || discount < 0) return '请输入有效优惠金额'
+      if (discount > gross) return '优惠不能超过课程总价'
+      return (gross - discount).toFixed(2)
+    },
     showEvidence() {
       return (
         this.operation === 'history' ||
@@ -692,6 +750,8 @@ export default {
       this.availableCoupons = []
       this.form = {
         originalAmount: this.detail.originalAmount,
+        discountAmount: this.detail.discountAmount || '0.00',
+        discountReason: '',
         financialVersion: this.detail.financialVersion,
         financeMode: this.detail.financeMode || 'REAL',
         userCouponId: this.detail.billType === 'CREDIT_PACKAGE' ? (this.detail.packageSnapshot || {}).userCouponId || null : null,
@@ -758,13 +818,25 @@ export default {
         const id = this.detail.enrollmentId
         if (this.operation === 'price') {
           if (!canPrice(this.detail)) throw new Error('已有有效收款，不能核价')
-          if (this.form.financeMode === 'MOCK' && this.detail.mockPricingAllowed !== true)
-            throw new Error('仅后端允许的本地环境可核价为模拟账单')
-          await priceTuition(id, {
-            originalAmount: amount(this.form.originalAmount),
-            financialVersion: this.detail.financialVersion,
-            financeMode: this.form.financeMode,
-          })
+          if (this.isCartOrder) {
+            const gross = Number(this.detail.originalAmount || 0)
+            const discount = amount(this.form.discountAmount)
+            if (Number(discount) > gross) throw new Error('优惠金额不能超过课程总价')
+            if (Number(discount) > 0) required(this.form.discountReason, '优惠原因')
+            await priceTuition(id, {
+              discountAmount: discount,
+              discountReason: this.form.discountReason || '',
+              financialVersion: this.detail.financialVersion,
+            })
+          } else {
+            if (this.form.financeMode === 'MOCK' && this.detail.mockPricingAllowed !== true)
+              throw new Error('仅后端允许的本地环境可核价为模拟账单')
+            await priceTuition(id, {
+              originalAmount: amount(this.form.originalAmount),
+              financialVersion: this.detail.financialVersion,
+              financeMode: this.form.financeMode,
+            })
+          }
         }
         if (this.operation === 'history') {
           const paid = amount(this.form.historyPaidAmount)
@@ -904,5 +976,20 @@ export default {
   font-size: 19px;
   color: #303133;
   font-weight: 600;
+}
+.cart-gross {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-right: 8px;
+}
+.cart-hint {
+  font-size: 12px;
+  color: #909399;
+}
+.cart-payable {
+  font-size: 18px;
+  font-weight: 700;
+  color: #c0392b;
 }
 </style>

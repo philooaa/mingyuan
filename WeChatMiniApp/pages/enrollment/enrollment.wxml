@@ -58,6 +58,7 @@
           <view class="meta">{{item.gradeText}} · {{item.subjectText}} · {{item.teacherName || '教师待配置'}}</view>
           <view class="ui-time">{{item.periodName}} {{item.clockText}}</view>
           <view class="meta">{{item.dateRangeText}}</view><view class="meta">{{item.placeText}}</view>
+          <view class="meta price-text" wx:if="{{item.priceText}}">{{item.priceText}}</view>
           <view class="date-toggle">可报名{{item.availableLessonCount}}个日期 · {{item.expanded ? '收起日期' : '选择日期'}}　{{item.expanded ? '⌃' : '⌄'}}</view>
         </view>
         <view class="single-date-list" wx:if="{{item.expanded}}">
@@ -70,10 +71,12 @@
         <view class="meta">{{item.gradeText}} · {{item.subjectText}} · {{item.teacherName || '教师待配置'}}</view>
         <view class="ui-time">{{item.timeText}}</view>
         <view class="meta">{{item.placeText}}</view>
+        <view class="meta price-text">{{item.priceText}}</view>
       </view>
       <view class="card-side">
         <view class="count">{{item.countText}}</view>
         <view class="status {{item.statusClass}}">{{item.statusText}}</view>
+        <view class="cart-add {{item.inCart ? 'in' : ''}}" data-key="{{item.viewKey}}" catchtap="addToCart">{{item.inCart ? '已在购物车' : '加入购物车'}}</view>
       </view>
     </view>
       </block>
@@ -94,30 +97,62 @@
       <view><view class="done">{{item.statusText}}</view>
         <view class="meta" wx:if="{{item.cancelRequestStatus === '1'}}">取消申请待处理</view>
         <button size="mini" wx:if="{{item.canRequestCancel}}" data-id="{{item.enrollmentId}}" bindtap="requestCancel" disabled="{{submitting}}">申请取消</button>
-      <button wx:if="{{item.settlementMethod != 'P'}}" size="mini" data-id="{{item.enrollmentId}}" bindtap="openTuition">缴费 / 退费</button>
+      <button wx:if="{{item.settlementMethod != 'P' && item.billType !== 'COURSE_ITEM'}}" size="mini" data-id="{{item.enrollmentId}}" bindtap="openTuition">缴费 / 退费</button>
         <button size="mini" wx:if="{{item.classDate}}" data-id="{{item.enrollmentId}}" bindtap="viewHistory">操作历史</button></view>
+    </view>
+  </view>
+
+  <view class="cart-bar" wx:if="{{cartCount > 0 && !showSheet}}">
+    <view class="cart-bar-info" bindtap="toggleCart">
+      <view class="cart-bar-count">购物车 {{cartCount}} 门课程</view>
+      <view class="cart-bar-total">合计 {{cartTotal}} 元</view>
+    </view>
+    <view class="cart-bar-actions">
+      <view class="cart-bar-clear" catchtap="clearCart">清空</view>
+      <view class="cart-bar-go" bindtap="openCart">去结算</view>
     </view>
   </view>
 
   <view class="mask" wx:if="{{showSheet}}" bindtap="closeEnroll"></view>
   <view class="sheet" wx:if="{{showSheet}}">
-    <view class="sheet-title">确认报名</view>
-    <view class="sheet-course">{{selectedSchedule.courseClassName}}</view>
-    <view class="sheet-meta">授课教师：{{selectedSchedule.teacherName || '教师待配置'}}</view>
-    <view class="sheet-meta">{{selectedSchedule.timeText}}</view>
-    <view class="sheet-meta">{{selectedSchedule.placeText}}</view>
-    <view class="settlement-options" wx:if="{{selectedSchedule.classDate}}"><view class="settlement-option {{settlementMethod === 'C' ? 'selected' : ''}}" bindtap="chooseSettlement" data-method="C">单次付费</view><view class="settlement-option {{settlementMethod === 'P' ? 'selected' : ''}}" bindtap="chooseSettlement" data-method="P">使用课包</view></view>
-    <view class="meta" wx:if="{{selectedSchedule.classDate && settlementMethod === 'C'}}">由管理员登记线下付款；可以先提交报名，等待老师确认。</view>
+    <view class="sheet-title">{{cartMode ? '确认下单' : '确认报名'}}</view>
+    <block wx:if="{{cartMode}}">
+      <view class="cart-list">
+        <view class="cart-item" wx:for="{{cart}}" wx:key="scheduleId">
+          <view class="cart-item-main">
+            <view class="course-name">{{item.courseClassName}}</view>
+            <view class="meta">{{item.gradeText}} · {{item.subjectText}} · {{item.teacherName}}</view>
+            <view class="meta">{{item.timeText}} · {{item.placeText}}</view>
+            <view class="meta">{{item.unitPrice}} 元/节 × {{item.lessonCount}} 节</view>
+          </view>
+          <view class="cart-item-side">
+            <view class="cart-item-amount">{{item.amount}}</view>
+            <view class="cart-item-remove" data-id="{{item.scheduleId}}" bindtap="removeFromCart">移除</view>
+          </view>
+        </view>
+      </view>
+      <view class="cart-total-row"><text>课程总价</text><text class="cart-total-value">{{cartTotal}} 元</text></view>
+      <view class="meta">一个购物车生成一个订单。提交后由教务核定优惠，管理员确认收款并开具收据。</view>
+    </block>
+    <block wx:else>
+      <view class="sheet-course">{{selectedSchedule.courseClassName}}</view>
+      <view class="sheet-meta">授课教师：{{selectedSchedule.teacherName || '教师待配置'}}</view>
+      <view class="sheet-meta">{{selectedSchedule.timeText}}</view>
+      <view class="sheet-meta">{{selectedSchedule.placeText}}</view>
+      <view class="sheet-meta" wx:if="{{selectedSchedule.priceText}}">课程价格：{{selectedSchedule.priceText}}</view>
+      <view class="settlement-options" wx:if="{{selectedSchedule.classDate}}"><view class="settlement-option {{settlementMethod === 'C' ? 'selected' : ''}}" bindtap="chooseSettlement" data-method="C">单次付费</view><view class="settlement-option {{settlementMethod === 'P' ? 'selected' : ''}}" bindtap="chooseSettlement" data-method="P">使用课包</view></view>
+      <view class="meta" wx:if="{{selectedSchedule.classDate && settlementMethod === 'C'}}">由管理员登记线下付款；可以先提交报名，等待老师确认。</view>
+    </block>
     <view class="field"><view class="label">报名孩子</view><picker range="{{lessonAccountOptions}}" value="{{lessonAccountIndex}}" bindchange="chooseLessonAccount" disabled="{{submitting || accountsLoading || accountsError || scopeAccountId}}"><view>{{lessonAccountOptions[lessonAccountIndex] || '加载孩子资料…'}}　›</view></picker><view class="meta" bindtap="manageChildren">管理孩子信息 ›</view><view class="meta" wx:if="{{accountsError || childMissing}}" bindtap="loadLessonAccounts">{{accountsError || '孩子资料已变化，请重新选择'}} · 点击重试</view></view>
-    <view class="field" wx:if="{{newChild}}"><view class="label">孩子姓名</view><input class="input" value="{{form.studentName}}" data-field="studentName" bindinput="handleFormInput" maxlength="30" placeholder="请输入孩子姓名" disabled="{{submitting}}"/><view class="meta">年级：{{selectedSchedule.gradeText}}。报名成功后同步到孩子信息，自动建立零余额账户。</view></view>
-    <view class="meta" wx:if="{{selectedSchedule.classDate && settlementMethod === 'P'}}">请选择已有课包余额的孩子；普通／精英教师占1次，资深教师占2次，课后正式消耗。</view>
+    <view class="field" wx:if="{{newChild}}"><view class="label">孩子姓名</view><input class="input" value="{{form.studentName}}" data-field="studentName" bindinput="handleFormInput" maxlength="30" placeholder="请输入孩子姓名" disabled="{{submitting}}"/><view class="meta">年级：{{cartMode ? '按所报课程' : selectedSchedule.gradeText}}。报名成功后同步到孩子信息，自动建立零余额账户。</view></view>
+    <view class="meta" wx:if="{{!cartMode && selectedSchedule.classDate && settlementMethod === 'P'}}">请选择已有课包余额的孩子；普通／精英教师占1次，资深教师占2次，课后正式消耗。</view>
     <view class="field">
       <view class="label">联系电话</view>
       <input class="input" type="number" maxlength="11" value="{{form.contactPhone}}" data-field="contactPhone" bindinput="handleFormInput" placeholder="默认使用家长手机号" />
     </view>
     <view class="sheet-actions">
       <button class="cancel-btn" bindtap="closeEnroll">取消</button>
-      <button class="submit-btn" loading="{{submitting}}" bindtap="submitEnroll">提交报名</button>
+      <button class="submit-btn" loading="{{submitting}}" bindtap="submitEnroll">{{cartMode ? '提交订单' : '提交报名'}}</button>
     </view>
   </view>
 </view>
