@@ -9,7 +9,10 @@ App({
 
   onLaunch() {
     const platform = wx.getDeviceInfo ? wx.getDeviceInfo().platform : ''
-    if (platform === 'devtools') this.globalData.baseUrl = 'http://127.0.0.1:8080'
+    // 真机调试时可通过登录页长按 logo 写入 backendOverride，指向本机后端。
+    const override = wx.getStorageSync('backendOverride')
+    if (override) this.globalData.baseUrl = String(override).replace(/\/+$/, '')
+    else if (platform === 'devtools') this.globalData.baseUrl = 'http://127.0.0.1:8080'
     const previousBackend = wx.getStorageSync('backendBaseUrl')
     if (previousBackend !== this.globalData.baseUrl && (previousBackend || platform === 'devtools')) {
       // 不将服务器会话带入本地库，或将本地会话带回服务器。

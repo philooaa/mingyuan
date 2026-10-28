@@ -13,7 +13,7 @@ function billingStep(detail) {
 }
 Page({
   // Keep the same yyyy-MM-dd HH:mm:ss value used by the web form and API.
-  data: { loading: false, submitting: false, error: '', rows: [], total: 0, pageNum: 1, searchText: '', filterIndex: 0, filters: ['全部账单', '待核价', '已核价', '历史待核验', '已关闭'], detail: null, allowed: {}, price: '', modeIndex: 0, modes: ['REAL', 'MOCK'], modeLabels: ['真实线下收费', '本地模拟（仅本地可用）'], channelIndex: 0, channels: ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: ['现金', '银行转账', '微信线下收款'], payerName: '', providerTradeNo: '', paidTime: '', evidenceKey: '', evidenceName: '', closeReason: '' },
+  data: { loading: false, submitting: false, error: '', rows: [], total: 0, pageNum: 1, searchText: '', filterIndex: 0, filters: ['全部账单', '待核价', '已核价', '历史待核验', '已关闭'], detail: null, allowed: {}, price: '', discountAmount: '', discountReason: '', priceBaseText: '待填写', priceDiscountText: '¥0.00', pricePayableText: '待填写', modeIndex: 0, modes: ['REAL', 'MOCK'], modeLabels: ['真实线下收费', '本地模拟（仅本地可用）'], channelIndex: 0, channels: ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: ['现金', '银行转账', '微信线下收款'], payerName: '', providerTradeNo: '', paidTime: '', evidenceKey: '', evidenceName: '', closeReason: '' },
   onLoad(options) {
     this.id = String(options.id || ''); this._visit = 0
     this.setData({ quote: null, quoteLoading: false, quoteError: '', couponOptions: ['不使用优惠券'], availableCoupons: [], couponIndex: 0, selectedCouponId: null })
@@ -48,7 +48,8 @@ Page({
         if (!this._active || visit !== this._visit || sequence !== this._loadSequence) return
         const detail = t.bill(res.data), pending = t.savedIntent('admin-payment', this.id)
         this.setData({ billingStep: billingStep(detail), retryPayment: !!pending, allowed: { ...allowed, price: allowed.price && detail.billType !== 'CREDIT_PACKAGE' } })
-        this.setData({ detail, price: detail.originalAmount || '', modeIndex: detail.financeMode === 'MOCK' ? 1 : 0, channels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['MOCK'] : ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['本地模拟'] : ['现金', '银行转账', '微信线下收款'], channelIndex: 0, ...(pending ? { payerName: pending.payerName, providerTradeNo: pending.providerTradeNo || '', paidTime: pending.paidTime || '', evidenceKey: pending.evidenceKey || '', evidenceName: pending.evidenceKey ? '已上传凭证（待确认绑定）' : '' } : {}) })
+        this.setData({ detail, price: detail.originalAmount || '', discountAmount: detail.discountAmount ? String(detail.discountAmount) : '', discountReason: detail.remark || '', modeIndex: detail.financeMode === 'MOCK' ? 1 : 0, channels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['MOCK'] : ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['本地模拟'] : ['现金', '银行转账', '微信线下收款'], channelIndex: 0, ...(pending ? { payerName: pending.payerName, providerTradeNo: pending.providerTradeNo || '', paidTime: pending.paidTime || '', evidenceKey: pending.evidenceKey || '', evidenceName: pending.evidenceKey ? '已上传凭证（待确认绑定）' : '' } : {}) })
+        this.pricePreview()
         if (pending) this.setPaidTime(pending.paidTime || '')
         this.setData({ selectedCouponId: detail.billType === 'CREDIT_PACKAGE' ? detail.userCouponId || null : selectedCouponId || null, couponIndex: 0, availableCoupons: [], couponOptions: ['不使用优惠券'] })
         if (detail.canPay && allowed.collect && !pending) await this.refreshQuote(true)
@@ -82,7 +83,17 @@ Page({
     this.setData({ couponIndex: index, selectedCouponId: index ? String(this.data.availableCoupons[index - 1].userCouponId) : null })
     return this.refreshQuote()
   },
-  input(e) { const field = e.currentTarget.dataset.field; if (!this.data.submitting && ['searchText', 'price', 'payerName', 'providerTradeNo', 'paidTime', 'closeReason'].includes(field)) this.setData({ [field]: e.detail.value }) },
+  pricePreview() {
+    const detail = this.data.detail || {}
+    const cartOrder = detail.billType === 'CART_ORDER'
+    const parse = value => { const text = String(value === null || value === undefined ? '' : value).trim(); return /^\d{1,8}(\.\d{1,2})?$/.test(text) ? Number(text) : null }
+    const base = cartOrder ? parse(detail.originalAmount) : parse(this.data.price)
+    const discountText = String(this.data.discountAmount === null || this.data.discountAmount === undefined ? '' : this.data.discountAmount).trim()
+    const discount = discountText === '' ? 0 : parse(discountText)
+    const payable = base === null || discount === null ? null : Math.round((base - discount) * 100) / 100
+    this.setData({ priceBaseText: base === null ? '待填写' : `¥${base.toFixed(2)}`, priceDiscountText: discount === null ? '待填写' : `¥${discount.toFixed(2)}`, pricePayableText: payable === null ? '待填写' : `¥${payable.toFixed(2)}` })
+  },
+  input(e) { const field = e.currentTarget.dataset.field; if (!this.data.submitting && ['searchText', 'price', 'discountAmount', 'discountReason', 'payerName', 'providerTradeNo', 'paidTime', 'closeReason'].includes(field)) { this.setData({ [field]: e.detail.value }); if (field === 'price' || field === 'discountAmount') this.pricePreview() } },
   setPaidTime(value) {
     this.setData({ paidTime: value, paidDate: value.slice(0, 10), paidClock: value.slice(11), ...(value ? { timeIndex: value.slice(11).split(':').map(Number) } : {}) })
   },
@@ -116,14 +127,29 @@ Page({
   },
   async savePrice() {
     if (!this._active || this.data.submitting || !this.permitted('price') || !this.data.detail) return
-    if (this.data.detail.billType === 'CREDIT_PACKAGE') return
-    const visit = this._visit, detail = this.data.detail
+    const detail = this.data.detail
+    if (detail.billType === 'CREDIT_PACKAGE') return
+    const visit = this._visit
     if (detail.billingStatus === 'HISTORY_PENDING') { t.message(new Error('历史账单请在管理网页凭证核验')); return }
     this.setData({ submitting: true })
     try {
-      const originalAmount = t.amount(this.data.price), financeMode = this.data.modes[this.data.modeIndex]
-      if (!await t.confirm('核定账单', `${t.money(originalAmount)} · ${financeMode === 'MOCK' ? '本地模拟，不涉及真实资金' : '真实线下收费'}，确认核价？`) || !this._active || visit !== this._visit) return
-      await t.request({ url: `${t.adminUrl}/${encodeURIComponent(this.id)}/price`, method: 'PUT', data: { originalAmount, financialVersion: detail.financialVersion, financeMode } })
+      const cartOrder = detail.billType === 'CART_ORDER'
+      // 购物车订单原价由订单内课程总价决定，教务只填优惠；普通课程由教务核定原价后再填优惠。
+      const originalAmount = cartOrder ? t.amount(detail.originalAmount) : t.amount(this.data.price)
+      const discountAmount = String(this.data.discountAmount === null || this.data.discountAmount === undefined ? '' : this.data.discountAmount).trim() === '' ? '0.00' : t.amount(this.data.discountAmount)
+      const discountReason = String(this.data.discountReason || '').trim()
+      if (t.cents(discountAmount) > t.cents(originalAmount)) throw new Error(`优惠金额不能超过${cartOrder ? '课程总价' : '课程原价'} ${t.money(originalAmount)}`)
+      // 优惠金额被改动时必须说明原因；沿用原优惠（金额未变）可保留账单上已登记的原因。
+      const stored = Number(detail.discountAmount)
+      const unchanged = Number.isFinite(stored) && Math.round(stored * 100) === t.cents(discountAmount)
+      if (t.cents(discountAmount) > 0 && !discountReason && !unchanged) throw new Error('请填写优惠原因')
+      const payableAmount = ((t.cents(originalAmount) - t.cents(discountAmount)) / 100).toFixed(2)
+      const financeMode = this.data.modes[this.data.modeIndex]
+      const summary = t.cents(discountAmount) > 0 ? `${t.money(originalAmount)} − 优惠 ${t.money(discountAmount)} = 实际应收 ${t.money(payableAmount)}` : t.money(originalAmount)
+      const data = { discountAmount, discountReason, financialVersion: detail.financialVersion }
+      if (!cartOrder) { data.originalAmount = originalAmount; data.financeMode = financeMode }
+      if (!await t.confirm('核定账单', `${summary} · ${financeMode === 'MOCK' ? '本地模拟，不涉及真实资金' : '真实线下收费'}，确认核价？`) || !this._active || visit !== this._visit) return
+      await t.request({ url: `${t.adminUrl}/${encodeURIComponent(this.id)}/price`, method: 'PUT', data })
       if (this._active && visit === this._visit) {
         await this.load()
         if (this._active && visit === this._visit && !this.data.error) this.nextStep('核价成功，请登记实际收款', '#collection-form')

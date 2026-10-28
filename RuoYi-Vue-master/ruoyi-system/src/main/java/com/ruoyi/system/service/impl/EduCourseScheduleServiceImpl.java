@@ -240,7 +240,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
             LocalDate start = ScheduleCalendar.date(s.getStartDate()), end = ScheduleCalendar.date(s.getEndDate());
             require(start != null && end != null && !start.isAfter(end), "结课日期不能早于开课日期");
             require(java.time.temporal.ChronoUnit.DAYS.between(start, end) <= 3660, "排课跨度不能超过10年");
-            require(List.of("WEEKLY", "DAILY_5_1").contains(s.getClassPattern() == null ? "" : s.getClassPattern()), "请明确上课模式");
+            require(ScheduleCalendar.isValid(s.getClassPattern()), "请明确上课模式");
             if ("WEEKLY".equals(s.getClassPattern())) require(ScheduleCalendar.weekday(s.getPeriodName()) > 0, "每周排课需明确周一至周日的上课星期");
         }
         Map<String,Object> classroom = s.getClassroomId() == null ? Map.of("status","0") : db.one("SELECT status,campus_name FROM edu_classroom WHERE classroom_id=?", s.getClassroomId());

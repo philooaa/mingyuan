@@ -180,4 +180,88 @@ public class ScheduleDateRuleTest {
         var dates = ScheduleCalendar.dates(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 6), pattern, "一期", List.of());
         assertEquals(5, dates.size());
     }
+
+    // ---------- 寒暑假 4 种日循环：连上无假期 / 上5休1 / 上6休1 / 上5休2 ----------
+
+    @Test
+    void dailyModesDeclareExpectedCycleAndStudyDays() {
+        assertEquals(1, ScheduleCalendar.cycle(ScheduleCalendar.DAILY));
+        assertEquals(1, ScheduleCalendar.studyDays(ScheduleCalendar.DAILY));
+        assertEquals(6, ScheduleCalendar.cycle(ScheduleCalendar.DAILY_5_1));
+        assertEquals(5, ScheduleCalendar.studyDays(ScheduleCalendar.DAILY_5_1));
+        assertEquals(7, ScheduleCalendar.cycle(ScheduleCalendar.DAILY_6_1));
+        assertEquals(6, ScheduleCalendar.studyDays(ScheduleCalendar.DAILY_6_1));
+        assertEquals(7, ScheduleCalendar.cycle(ScheduleCalendar.DAILY_5_2));
+        assertEquals(5, ScheduleCalendar.studyDays(ScheduleCalendar.DAILY_5_2));
+        assertTrue(ScheduleCalendar.isDaily(ScheduleCalendar.DAILY));
+        assertTrue(ScheduleCalendar.isDaily(ScheduleCalendar.DAILY_5_2));
+        assertFalse(ScheduleCalendar.isDaily(ScheduleCalendar.WEEKLY));
+        assertTrue(ScheduleCalendar.isValid(ScheduleCalendar.DAILY_6_1));
+        assertFalse(ScheduleCalendar.isValid("DAILY_7_1"));
+    }
+
+    @Test
+    void continuousModeHasNoRestDay() {
+        // 连上无假期：区间内每天都上课
+        var dates = ScheduleCalendar.dates(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 10), ScheduleCalendar.DAILY, "一期", List.of());
+        assertEquals(10, dates.size());
+        assertEquals(LocalDate.of(2026, 1, 1), dates.first());
+        assertEquals(LocalDate.of(2026, 1, 10), dates.last());
+    }
+
+    @Test
+    void sixOnOneOffRestsEverySeventhDay() {
+        // 2026-01-01 起 14 天：上 6 天（1/1~1/6）、休 1 天（1/7）、上 6 天（1/8~1/13）、休 1 天（1/14）
+        var dates = ScheduleCalendar.dates(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 14), ScheduleCalendar.DAILY_6_1, "一期", List.of());
+        assertEquals(12, dates.size());
+        assertFalse(dates.contains(LocalDate.of(2026, 1, 7)));
+        assertFalse(dates.contains(LocalDate.of(2026, 1, 14)));
+        assertTrue(dates.contains(LocalDate.of(2026, 1, 6)));
+        assertTrue(dates.contains(LocalDate.of(2026, 1, 13)));
+    }
+
+    @Test
+    void fiveOnTwoOffRestsTwoDaysPerRound() {
+        // 2026-01-01 起 14 天：上 5 天（1/1~1/5）、休 2 天（1/6~1/7）、上 5 天（1/8~1/12）、休 2 天（1/13~1/14）
+        var dates = ScheduleCalendar.dates(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 14), ScheduleCalendar.DAILY_5_2, "一期", List.of());
+        assertEquals(10, dates.size());
+        assertFalse(dates.contains(LocalDate.of(2026, 1, 6)));
+        assertFalse(dates.contains(LocalDate.of(2026, 1, 7)));
+        assertFalse(dates.contains(LocalDate.of(2026, 1, 13)));
+        assertTrue(dates.contains(LocalDate.of(2026, 1, 5)));
+        assertTrue(dates.contains(LocalDate.of(2026, 1, 12)));
+    }
+
+    @Test
+    void explicitPatternOverridesTermDefault() {
+        // 导入时按期次指定模式，优先于学期默认（寒暑假默认上5休1）
+        assertEquals(ScheduleCalendar.DAILY_6_1, ScheduleCalendar.patternFor("寒假", "一期", ScheduleCalendar.DAILY_6_1));
+        assertEquals(ScheduleCalendar.DAILY, ScheduleCalendar.patternFor("暑假", "二期", ScheduleCalendar.DAILY));
+        assertEquals(ScheduleCalendar.DAILY_5_2, ScheduleCalendar.patternFor("暑假", "三期", ScheduleCalendar.DAILY_5_2));
+        assertEquals(ScheduleCalendar.DAILY_5_1, ScheduleCalendar.patternFor("寒假", "一期", null));
+        assertEquals(ScheduleCalendar.DAILY_5_1, ScheduleCalendar.patternFor("寒假", "一期", "  "));
+        // 春秋季固定每周：日循环覆盖无效，仍按每周；期次不是星期则无法判定
+        assertEquals(ScheduleCalendar.WEEKLY, ScheduleCalendar.patternFor("秋季", "周六", ScheduleCalendar.DAILY_6_1));
+        assertNull(ScheduleCalendar.patternFor("秋季", "一期", ScheduleCalendar.DAILY_6_1));
+        // 未识别学期即使指定了模式也不猜
+        assertNull(ScheduleCalendar.patternFor("未识别学期", "一期", ScheduleCalendar.DAILY));
+    }
+
+    @Test
+    void importPatternMapFallsBackFromPeriodToTerm() {
+        Map<String, String> patterns = new HashMap<>();
+        patterns.put("寒假", ScheduleCalendar.DAILY_6_1);
+        assertEquals(ScheduleCalendar.DAILY_6_1,
+                com.ruoyi.system.timetable.TimetableImportService.patternOf(patterns, "寒假", "一期"));
+        patterns.put("寒假|二期", ScheduleCalendar.DAILY_5_2);
+        // 更具体的「学期|期次」优先
+        assertEquals(ScheduleCalendar.DAILY_5_2,
+                com.ruoyi.system.timetable.TimetableImportService.patternOf(patterns, "寒假", "二期"));
+        // 没配的期次回退到学期级
+        assertEquals(ScheduleCalendar.DAILY_6_1,
+                com.ruoyi.system.timetable.TimetableImportService.patternOf(patterns, "寒假", "三期"));
+        // 完全没有配置 → 学期默认上5休1
+        assertEquals(ScheduleCalendar.DAILY_5_1,
+                com.ruoyi.system.timetable.TimetableImportService.patternOf(null, "寒假", "一期"));
+    }
 }

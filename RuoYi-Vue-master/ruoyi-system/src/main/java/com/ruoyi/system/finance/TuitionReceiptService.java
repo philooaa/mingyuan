@@ -143,7 +143,7 @@ public class TuitionReceiptService {
   }
 
   public Map<String, Object> issue(long paymentId, long actor) {
-    new CouponService(db).admin(actor);
+    new CouponService(db).strictAdmin(actor);
     long id =
         db.transactions()
             .execute(
@@ -211,14 +211,14 @@ public class TuitionReceiptService {
   }
 
   public Map<String, Object> retry(long id, long actor) {
-    new CouponService(db).admin(actor);
+    new CouponService(db).strictAdmin(actor);
     receipt(id, actor, true);
     generatePending(id);
     return receipt(id, actor, true);
   }
 
   public Map<String, Object> replace(long id, long actor, String reason) {
-    new CouponService(db).admin(actor);
+    new CouponService(db).strictAdmin(actor);
     if (reason == null || reason.isBlank() || reason.length() > 255)
       throw new ServiceException("请填写255字以内的作废补开原因");
     long replacement =

@@ -394,11 +394,15 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         }
         else
         {
+            // 日循环：连上无假期(1/1) / 上5休1(5/6) / 上6休1(6/7) / 上5休2(5/7)，按 ScheduleCalendar 统一口径递推
+            int cycle = com.ruoyi.system.service.ScheduleCalendar.cycle(pattern);
+            int study = com.ruoyi.system.service.ScheduleCalendar.studyDays(pattern);
+            if (cycle <= 0 || study <= 0) return dates;
             LocalDate cur = start;
             int i = 0;
             while (!cur.isAfter(end))
             {
-                if (i % 6 < 5)
+                if (i % cycle < study)
                 {
                     dates.add(cur);
                 }

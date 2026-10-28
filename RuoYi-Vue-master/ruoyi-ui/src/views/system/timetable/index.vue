@@ -245,9 +245,9 @@
         </el-form-item>
         <el-form-item label="递推规则">
           <div style="color:#606266;font-size:12px;line-height:1.9">
-            <div><b>寒假 / 暑假</b>：上 5 休 1 —— 从起始日期起连续上 5 天、第 6 天休息，循环递推到结课日期</div>
+            <div><b>寒假 / 暑假</b>：可选 4 种日循环 —— <b>连上无假期</b>（每天上课）、<b>上5休1</b>（上 5 天休 1 天）、<b>上6休1</b>（上 6 天休 1 天）、<b>上5休2</b>（上 5 天休 2 天，7 天一轮），从起始日期起循环递推到结课日期</div>
             <div><b>春季 / 秋季</b>：按课表里的「周六课表 / 周日课表」分类 —— 期次为周六则每周六上课、为周日则每周日上课</div>
-            <div style="color:#e6a23c">上课日期按「学期 + 期次」分别设置：解析预览后，在下方为每个期次（如寒假一期/二期、春季周六/周日）单独填写起止日期；未填的期次保持「待排」</div>
+            <div style="color:#e6a23c">上课日期与递推规则按「学期 + 期次」分别设置：解析预览后，在下方为每个期次（如寒假一期/二期、春季周六/周日）单独选择递推规则并填写起止日期；未填的期次保持「待排」</div>
           </div>
         </el-form-item>
         <el-form-item label="课表文件">
@@ -300,9 +300,17 @@
           <el-table-column label="课程数" width="62" align="center">
             <template slot-scope="s">{{ s.row.rowCount }}</template>
           </el-table-column>
-          <el-table-column label="递推规则" width="110" show-overflow-tooltip>
+          <el-table-column label="递推规则" width="150">
             <template slot-scope="s">
-              <span v-if="s.row.schedulable">{{ s.row.patternNote }}</span>
+              <el-select
+                v-if="s.row.schedulable && (s.row.dailyPatterns || []).length"
+                :value="patternValue(s.row)"
+                @change="onPatternChange(s.row, $event)"
+                size="mini"
+                style="width:132px">
+                <el-option v-for="p in s.row.dailyPatterns" :key="p" :label="patternLabel(p)" :value="p" />
+              </el-select>
+              <span v-else-if="s.row.schedulable">{{ s.row.patternNote }}</span>
               <el-tooltip v-else :content="s.row.patternNote" placement="top">
                 <span style="color:#e6a23c">无法判定 <i class="el-icon-question"></i></span>
               </el-tooltip>
@@ -347,7 +355,7 @@
         <el-table-column label="日期规则" width="120">
           <template slot-scope="s">
             <span v-if="s.row.plannedPattern === 'WEEKLY'">每周{{ s.row.periodName }}</span>
-            <span v-else-if="s.row.plannedPattern === 'DAILY_5_1'">上5休1</span>
+            <span v-else-if="s.row.plannedPattern">{{ s.row.plannedPatternLabel || patternLabel(s.row.plannedPattern) }}</span>
             <el-tooltip v-else :content="s.row.datePlanNote || '无法套用日期规则，将保持待排'" placement="top">
               <span style="color:#e6a23c">待排 <i class="el-icon-question"></i></span>
             </el-tooltip>
@@ -465,7 +473,7 @@
           <span class="occ-title">{{ occ.courseClassName || '课程' }}</span>
           <span v-if="occ.startDate" class="occ-tip">
             {{ occ.startDate }} ~ {{ occ.endDate }}，
-            递推规则：<b>{{ occ.classPattern === 'DAILY_5_1' ? '上5休1' : (occ.classPattern === 'WEEKLY' ? '每周' + occ.periodName : '未设置') }}</b>
+            递推规则：<b>{{ occ.classPattern === 'WEEKLY' ? '每周' + occ.periodName : (occ.classPattern ? patternLabel(occ.classPattern) : '未设置') }}</b>
           </span>
         </div>
 
@@ -905,6 +913,23 @@ export default {
     planKey(row) {
       return (row && (row.key || row.termName)) || ''
     },
+    /** 递推模式的中文名（与后端 ScheduleCalendar.label 一致） */
+    patternLabel(p) {
+      return { DAILY: '连上无假期', DAILY_5_1: '上5休1', DAILY_6_1: '上6休1', DAILY_5_2: '上5休2', WEEKLY: '每周固定星期' }[p] || p || ''
+    },
+    /** 当前选中的递推模式：用户改过就用改过的，否则用后端按学期推出的默认（寒暑假=上5休1） */
+    patternValue(row) {
+      const r = (this.imp.termRanges || {})[this.planKey(row)]
+      return (r && r.pattern) || (row && row.pattern) || ''
+    },
+    /** 切换某「学期|期次」的递推模式：只改日期递推规则，不动已填的起止日期 */
+    onPatternChange(row, value) {
+      const key = this.planKey(row)
+      if (!key) return
+      let r = this.imp.termRanges[key]
+      if (!r) { r = { startDate: '', endDate: '', pattern: '' }; this.$set(this.imp.termRanges, key, r) }
+      this.$set(r, 'pattern', value || '')
+    },
     /** 读取某「学期|期次」已填的日期；键不存在时返回空串（不抛错，避免整块数据行渲染失败） */
     rangeValue(row, field) {
       const r = (this.imp.termRanges || {})[this.planKey(row)]
@@ -915,7 +940,7 @@ export default {
       const key = this.planKey(row)
       if (!key) return
       let r = this.imp.termRanges[key]
-      if (!r) { r = { startDate: '', endDate: '' }; this.$set(this.imp.termRanges, key, r) }
+      if (!r) { r = { startDate: '', endDate: '', pattern: '' }; this.$set(this.imp.termRanges, key, r) }
       this.$set(r, field, value || '')
     },
     /**
@@ -941,7 +966,7 @@ export default {
           this.$message.warning(`${label}的结课日期不能早于起始日期`)
           return null
         }
-        out.push({ termName: p.termName, periodName: p.periodName || '', startDate: s, endDate: e })
+        out.push({ termName: p.termName, periodName: p.periodName || '', startDate: s, endDate: e, pattern: r.pattern || p.pattern || '' })
       }
       return out
     },
@@ -952,7 +977,11 @@ export default {
         const key = this.planKey(p)
         if (!key) return
         const old = this.imp.termRanges[key] || {}
-        next[key] = { startDate: old.startDate || p.startDate || '', endDate: old.endDate || p.endDate || '' }
+        next[key] = {
+          startDate: old.startDate || p.startDate || '',
+          endDate: old.endDate || p.endDate || '',
+          pattern: old.pattern || p.pattern || ''
+        }
       })
       this.imp.termRanges = next
     },
@@ -1065,7 +1094,7 @@ export default {
       let msg = `新增 ${d.inserted || 0} 条，覆盖更新 ${d.updated || 0} 条，跳过 ${d.skipped || 0} 条。`
       if (d.restored) msg += `\n其中 ${d.restored} 条原先因「教师未绑定」被停用的排课，本次已匹配到教师并恢复为正常，课表上可以直接看到。`
       if (d.incomplete) msg += `\n其中 ${d.incomplete} 条为格式未识别：已按原文保留（学期/期次/时段/年级/科目用「未识别xx」占位），课表上用红色感叹号标出，请核对后修正。`
-      if (d.dated) msg += `\n已为 ${d.dated} 条排课写入上课日期与递推模式（寒假/暑假=上5休1，春季/秋季=每周周六或周日）。`
+      if (d.dated) msg += `\n已为 ${d.dated} 条排课写入上课日期与递推模式（寒暑假可选 连上无假期 / 上5休1 / 上6休1 / 上5休2，春季/秋季=每周周六或周日）。`
       if (d.undated) {
         const terms = (d.undatedTerms || []).filter(Boolean)
         msg += `\n${d.undated} 条未写入日期，仍保持「待排」${terms.length ? '（涉及：' + terms.join('、') + '）' : ''}：请确认已在导入时按「学期 / 期次」填写起止日期；若学期/期次写法无法判定上课模式，可在课表中编辑该排课补充起止日期。`

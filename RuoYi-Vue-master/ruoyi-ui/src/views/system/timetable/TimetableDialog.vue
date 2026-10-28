@@ -104,7 +104,10 @@
           <el-form-item label="上课模式" prop="classPattern">
             <el-select v-model="form.classPattern" placeholder="请选择上课模式" style="width:100%">
               <el-option label="每周一次" value="WEEKLY" />
+              <el-option label="连上无假期（每天上课）" value="DAILY" />
               <el-option label="上5天休1天" value="DAILY_5_1" />
+              <el-option label="上6天休1天" value="DAILY_6_1" />
+              <el-option label="上5天休2天" value="DAILY_5_2" />
             </el-select>
           </el-form-item>
         </el-col>

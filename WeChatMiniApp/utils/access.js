@@ -24,6 +24,7 @@ const routePermissions = {
   '/pages/admin-transactions/admin-transactions': 'edu:transaction:manage',
   '/pages/admin-tuition/admin-tuition': 'system:tuition:list',
   '/pages/admin-tuition-refunds/admin-tuition-refunds': 'system:tuitionRefund:list',
+  '/pages/admin-course-price/admin-course-price': 'system:coursePrice:list',
   '/pages/admin-referral/admin-referral': 'system:coupon:list',
   '/pages/admin-teachers/admin-teachers': 'system:salaryConfig:list',
   '/pages/material-upload/material-upload': 'system:material:list'
@@ -32,6 +33,9 @@ function actions(items, role) {
   return items.filter(item => item.route && (!['admin', 'education'].includes(role) || !routePermissions[item.route] || can(routePermissions[item.route])))
 }
 function developmentTool() {
-  try { return wx.getDeviceInfo().platform === 'devtools' } catch (_) { return false }
+  try {
+    if (wx.getDeviceInfo) return wx.getDeviceInfo().platform === 'devtools'
+    return wx.getSystemInfoSync().platform === 'devtools'
+  } catch (_) { return false }
 }
 module.exports = { roles, has, staff, can, options, selected, select, allowed, actions, developmentTool }

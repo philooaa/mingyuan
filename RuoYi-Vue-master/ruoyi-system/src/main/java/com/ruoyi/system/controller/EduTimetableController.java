@@ -519,7 +519,8 @@ public class EduTimetableController extends BaseController
                                     @RequestParam(value = "endDate", required = false) String endDate)
     {
         if (courseYear == null) courseYear = (long) Calendar.getInstance().get(Calendar.YEAR);
-        return success(timetableImportService.preview(file, courseYear, parseDateRanges(dateRanges, startDate, endDate)));
+        return success(timetableImportService.preview(file, courseYear,
+                parseDateRanges(dateRanges, startDate, endDate), parsePatterns(dateRanges, null)));
     }
 
     /**
@@ -539,7 +540,8 @@ public class EduTimetableController extends BaseController
         Object us = body.get("updateSupport");
         boolean updateSupport = us == null || !"false".equalsIgnoreCase(String.valueOf(us).trim());
         Map<String, LocalDate[]> ranges = parseDateRanges(body.get("dateRanges"), body.get("startDate"), body.get("endDate"));
-        return success(timetableImportService.confirm(rows, updateSupport, SecurityUtils.getUsername(), ranges));
+        return success(timetableImportService.confirm(rows, updateSupport, SecurityUtils.getUsername(), ranges,
+                parsePatterns(body.get("dateRanges"), body.get("classPattern"))));
     }
 
     /**
@@ -558,7 +560,7 @@ public class EduTimetableController extends BaseController
     {
         if (courseYear == null) courseYear = (long) Calendar.getInstance().get(Calendar.YEAR);
         return success(timetableImportService.oneClickImport(file, courseYear, updateSupport, SecurityUtils.getUsername(),
-                parseDateRanges(dateRanges, startDate, endDate)));
+                parseDateRanges(dateRanges, startDate, endDate), parsePatterns(dateRanges, null)));
     }
 
     /**
@@ -763,6 +765,55 @@ public class EduTimetableController extends BaseController
         {
             LocalDate[] range = requireRange(legacyStart, legacyEnd, "上课日期");
             if (range != null) out.put(TimetableImportService.RANGE_ALL, range);
+        }
+        return out;
+    }
+
+    /**
+     * 解析「按学期+期次分别设置」的递推模式，与 dateRanges 共用同一份数组，元素多一个 pattern 字段：
+     * { "termName": "寒假", "periodName": "一期", "startDate": "...", "endDate": "...", "pattern": "DAILY_6_1" }
+     * <p>
+     * 寒暑假可选 {@code DAILY}（连上无假期）、{@code DAILY_5_1}（上5休1）、{@code DAILY_6_1}（上6休1）、
+     * {@code DAILY_5_2}（上5休2）；春秋季固定 {@code WEEKLY}。不传则按学期默认（寒暑假=上5休1）。
+     * 兼容旧的整份统一参数 classPattern。
+     */
+    private static Map<String, String> parsePatterns(Object dateRanges, Object legacyPattern)
+    {
+        Map<String, String> out = new LinkedHashMap<>();
+        List<?> list = null;
+        if (dateRanges instanceof String s)
+        {
+            if (StringUtils.isNotEmpty(s.trim()))
+            {
+                try { list = com.alibaba.fastjson2.JSON.parseArray(s, Map.class); }
+                catch (RuntimeException e) { throw new ServiceException("按学期设置的日期格式不正确：" + e.getMessage()); }
+            }
+        }
+        else if (dateRanges instanceof List<?> l)
+        {
+            list = l;
+        }
+        if (list != null)
+        {
+            for (Object o : list)
+            {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                String term = m.get("termName") == null ? "" : String.valueOf(m.get("termName")).trim();
+                if (term.isEmpty()) continue;
+                String period = m.get("periodName") == null ? "" : String.valueOf(m.get("periodName")).trim();
+                String pattern = m.get("pattern") == null ? "" : String.valueOf(m.get("pattern")).trim();
+                if (pattern.isEmpty()) continue;
+                if (!ScheduleCalendar.isValid(pattern))
+                    throw new ServiceException("不支持的递推模式：" + pattern + "（可选：连上无假期、上5休1、上6休1、上5休2、每周固定星期）");
+                out.put(TimetableImportService.rangeKey(term, period), pattern);
+            }
+        }
+        String legacy = legacyPattern == null ? "" : String.valueOf(legacyPattern).trim();
+        if (out.isEmpty() && !legacy.isEmpty())
+        {
+            if (!ScheduleCalendar.isValid(legacy))
+                throw new ServiceException("不支持的递推模式：" + legacy + "（可选：连上无假期、上5休1、上6休1、上5休2、每周固定星期）");
+            out.put(TimetableImportService.RANGE_ALL, legacy);
         }
         return out;
     }

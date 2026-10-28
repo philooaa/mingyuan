@@ -337,7 +337,7 @@
           </el-col>
           <el-col :span="24"><el-form-item label="开课日期"><el-date-picker v-model="form.startDate" type="date" value-format="yyyy-MM-dd" placeholder="待配置" /></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="结课日期"><el-date-picker v-model="form.endDate" type="date" value-format="yyyy-MM-dd" placeholder="待配置" /></el-form-item></el-col>
-          <el-col :span="24"><el-form-item label="上课模式"><el-select v-model="form.classPattern" clearable><el-option label="每周一次（周六／周日）" value="WEEKLY" /><el-option label="上5天休1天" value="DAILY_5_1" /></el-select></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="上课模式"><el-select v-model="form.classPattern" clearable><el-option label="每周一次（周六／周日）" value="WEEKLY" /><el-option label="连上无假期（每天上课）" value="DAILY" /><el-option label="上5天休1天" value="DAILY_5_1" /><el-option label="上6天休1天" value="DAILY_6_1" /><el-option label="上5天休2天" value="DAILY_5_2" /></el-select></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="招生状态"><el-select v-model="form.recruitStatus"><el-option label="可报名" value="0" /><el-option label="停招" value="1" /><el-option label="满班" value="2" /></el-select></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="排课状态"><el-select v-model="form.status"><el-option label="正常" value="0" /><el-option label="停用" value="1" /></el-select></el-form-item></el-col>
           <el-col :span="24">

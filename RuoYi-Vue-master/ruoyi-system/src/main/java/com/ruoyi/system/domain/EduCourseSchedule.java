@@ -76,8 +76,8 @@ public class EduCourseSchedule extends BaseEntity
     @Excel(name = "结课日期", width = 30, dateFormat = "yyyy-MM-dd")
     private Date endDate;
 
-    /** 上课模式（WEEKLY每周/DAILY_5_1上5休1） */
-    @Excel(name = "上课模式", readConverterExp = "WEEKLY=每周一次,DAILY_5_1=上5天休1天")
+    /** 上课模式（WEEKLY每周 / DAILY连上无假期 / DAILY_5_1上5休1 / DAILY_6_1上6休1 / DAILY_5_2上5休2） */
+    @Excel(name = "上课模式", readConverterExp = "WEEKLY=每周一次,DAILY=连上无假期,DAILY_5_1=上5天休1天,DAILY_6_1=上6天休1天,DAILY_5_2=上5天休2天")
     private String classPattern;
 
     /** 年级 */

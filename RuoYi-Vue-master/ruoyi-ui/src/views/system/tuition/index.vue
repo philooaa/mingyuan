@@ -391,15 +391,18 @@
     >
       <el-alert v-if="formError" :title="formError" type="error" :closable="false" class="mb8" />
       <el-form :model="form" label-width="125px" size="small" :disabled="saving">
-        <template v-if="isCartOrder && operation === 'price'">
-          <el-form-item label="课程总价（元）">
+        <template v-if="operation === 'price'">
+          <el-form-item v-if="isCartOrder" label="课程总价（元）">
             <span class="cart-gross">{{ money(detail.originalAmount) }}</span>
             <span class="cart-hint">由订单内各课程单价 × 课次数自动汇总</span>
+          </el-form-item>
+          <el-form-item v-else label="课程原价（元）">
+            <el-input v-model="form.originalAmount" placeholder="明确金额，最多两位小数" />
           </el-form-item>
           <el-form-item label="优惠金额（元）">
             <el-input
               v-model="form.discountAmount"
-              placeholder="教务按实际情况填写，可填 0"
+              placeholder="教务按实际情况直接填写优惠多少钱，可填 0"
             />
           </el-form-item>
           <el-form-item label="实际应收（元）">
@@ -415,7 +418,7 @@
             />
           </el-form-item>
         </template>
-        <template v-else-if="operation === 'price' || operation === 'history'">
+        <template v-if="operation === 'history'">
           <el-form-item label="课程原价（元）">
             <el-input v-model="form.originalAmount" placeholder="明确金额，最多两位小数" />
           </el-form-item>
@@ -645,7 +648,11 @@ export default {
       return !!this.detail && this.detail.billType === 'CART_ORDER'
     },
     cartPayable() {
-      const gross = Number((this.detail && this.detail.originalAmount) || 0)
+      const gross = Number(
+        (this.isCartOrder
+          ? this.detail && this.detail.originalAmount
+          : this.form.originalAmount) || 0
+      )
       const discount = Number(this.form.discountAmount || 0)
       if (!Number.isFinite(discount) || discount < 0) return '请输入有效优惠金额'
       if (discount > gross) return '优惠不能超过课程总价'
@@ -831,8 +838,15 @@ export default {
           } else {
             if (this.form.financeMode === 'MOCK' && this.detail.mockPricingAllowed !== true)
               throw new Error('仅后端允许的本地环境可核价为模拟账单')
+            const original = amount(this.form.originalAmount)
+            const discount = amount(this.form.discountAmount)
+            if (Number(discount) > Number(original))
+              throw new Error('优惠金额不能超过课程原价')
+            if (Number(discount) > 0) required(this.form.discountReason, '优惠原因')
             await priceTuition(id, {
-              originalAmount: amount(this.form.originalAmount),
+              originalAmount: original,
+              discountAmount: discount,
+              discountReason: this.form.discountReason || '',
               financialVersion: this.detail.financialVersion,
               financeMode: this.form.financeMode,
             })
