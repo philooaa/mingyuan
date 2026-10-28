@@ -1,11 +1,17 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="100px">
-      <el-form-item label="排课ID" prop="scheduleId">
+      <el-form-item label="学期" prop="termName">
+        <el-select v-model="queryParams.termName" placeholder="全部学期" clearable style="width: 140px;">
+          <el-option v-for="dict in dict.type.edu_term" :key="dict.value" :label="dict.label" :value="dict.label" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="期次" prop="periodName">
         <el-input
-          v-model="queryParams.scheduleId"
-          placeholder="请输入排课ID"
+          v-model="queryParams.periodName"
+          placeholder="如 周六"
           clearable
+          style="width: 120px;"
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
@@ -15,14 +21,6 @@
           type="date"
           value-format="yyyy-MM-dd"
           placeholder="请选择原上课日期">
-        </el-date-picker>
-      </el-form-item>
-      <el-form-item label="调整后日期" prop="adjustedDate">
-        <el-date-picker clearable
-          v-model="queryParams.adjustedDate"
-          type="date"
-          value-format="yyyy-MM-dd"
-          placeholder="请选择调整后日期">
         </el-date-picker>
       </el-form-item>
       <el-form-item label="调课原因" prop="reason">
@@ -87,13 +85,21 @@
 
     <el-table v-loading="loading" :data="scheduleAdjustmentList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="调课ID" align="center" prop="adjustmentId" width="80" />
-      <el-table-column label="排课ID" align="center" prop="scheduleId" width="80" />
-      <el-table-column label="原上课日期" align="center" prop="originalDate" width="120" />
-      <el-table-column label="调整后日期" align="center" prop="adjustedDate" width="120">
+      <el-table-column label="学期" align="center" prop="termName" width="100" />
+      <el-table-column label="期次" align="center" prop="periodName" width="100" />
+      <el-table-column label="原上课日期" align="center" prop="originalDate" width="130" />
+      <el-table-column label="调整后日期" align="center" prop="adjustedDate" width="130">
         <template slot-scope="scope">
           <span v-if="scope.row.adjustedDate">{{ scope.row.adjustedDate }}</span>
           <el-tag v-else type="danger">停课</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="涉及课程" align="center" width="110">
+        <template slot-scope="scope">
+          <el-tag v-if="scope.row.scheduleId === 0" type="success" size="mini">
+            {{ scope.row.courseCount ? scope.row.courseCount + ' 门' : '整期次' }}
+          </el-tag>
+          <span v-else style="color: #909399;">单课</span>
         </template>
       </el-table-column>
       <el-table-column label="调课原因" align="center" prop="reason" :show-overflow-tooltip="true" />
@@ -101,6 +107,7 @@
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="160">
         <template slot-scope="scope">
           <el-button
+            v-if="scope.row.scheduleId !== 0"
             size="mini"
             type="text"
             icon="el-icon-edit"
@@ -136,7 +143,7 @@
         </el-form-item>
         <template v-if="form.adjustmentId == null && modeType === 'batch'">
           <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px;"
-            title="按学期+期次选中全部匹配排课，把日期范围内的每个上课日统一调整或停课" />
+            title="按学期+期次把日期范围内的每个上课日统一调整或停课；每个上课日只生成一条记录，管当天该期次的全部课程" />
           <el-form-item label="学期" required>
             <el-select v-model="batchForm.termName" placeholder="请选择学期" style="width: 100%;" @change="handleBatchTermChange">
               <el-option v-for="dict in dict.type.edu_term" :key="dict.value" :label="dict.label" :value="dict.label" />
@@ -156,6 +163,7 @@
             <el-select v-model="batchForm.subjectName" placeholder="全部科目（可选）" clearable style="width: 100%;">
               <el-option v-for="dict in dict.type.edu_subject" :key="dict.value" :label="dict.label" :value="dict.label" />
             </el-select>
+            <div style="color: #909399; font-size: 12px; margin-top: 4px;">留空＝整期次一起调，一天只记一条；选了年级/科目就只调这部分课，按课程单独记录</div>
           </el-form-item>
           <el-form-item label="原上课日期" required>
             <el-date-picker v-model="batchForm.dateRange" type="daterange" value-format="yyyy-MM-dd"
@@ -252,9 +260,9 @@ export default {
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        scheduleId: null,
+        termName: null,
+        periodName: null,
         originalDate: null,
-        adjustedDate: null,
         reason: null
       },
       form: {},

@@ -115,3 +115,12 @@ export function restoreTimetableOccurrence(scheduleId, data) {
     data
   })
 }
+
+// 可视化课表：日历（哪些日期有课 + 每天的课程清单）
+export function getTimetableCalendar(params) {
+  return request({
+    url: '/system/courseTimetable/calendar',
+    method: 'get',
+    params
+  })
+}

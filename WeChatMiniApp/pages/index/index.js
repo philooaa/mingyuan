@@ -72,6 +72,7 @@ const roleProfiles = {
       { title: '课程报名', icon: '招', tone: 'blue', route: '/pages/admin-enrollment/admin-enrollment' },
       { title: '排课管理', icon: '排', tone: 'orange' },
       { title: '教室管理', icon: '室', tone: 'cyan', route: '/pages/admin-classrooms/admin-classrooms' },
+      { title: '教室分配', icon: '分', tone: 'cyan', route: '/pages/admin-room-assign/admin-room-assign' },
       { title: '学生档案', icon: '档', tone: 'green', route: '/pages/admin-students/admin-students' },
       { key:'personalAccount', title: '交易管理', icon: '交', tone: 'gold', route: '/pages/admin-transactions/admin-transactions' },
       { key:'referral', title: '优惠券管理', icon: '券', tone: 'violet', route: '/pages/admin-referral/admin-referral' },
@@ -95,7 +96,7 @@ const roleProfiles = {
 // Education is a real authenticated role, never a development login option.
 roleProfiles.education = {
   name: '教务', tag: '全校区教务管理', eyebrow: '教务端', title: '课程出勤、收费与退费初审',
-  stats: [], actions: roleProfiles.admin.actions.filter(a => ['教室管理', '学生档案', '收费财务', '退费管理', '学生出勤'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
+  stats: [], actions: roleProfiles.admin.actions.filter(a => ['教室管理', '教室分配', '学生档案', '收费财务', '退费管理', '学生出勤'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
 }
 
 function normalizeRole(roleKey) {
