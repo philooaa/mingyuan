@@ -1,0 +1,190 @@
+<view class="page">
+  <view class="tabs">
+    <view class="tab {{tab==='review'?'on':''}}" data-tab="review" bindtap="switchTab">打卡复核</view>
+    <view class="tab {{tab==='stats'?'on':''}}" data-tab="stats" bindtap="switchTab">打卡统计表</view>
+  </view>
+
+  <block wx:if="{{tab==='review'}}">
+    <view class="top-bar">
+      <picker mode="date" value="{{date}}" bindchange="onDate">
+        <view class="date-pick">{{date}} ▾</view>
+      </picker>
+      <text class="count-text">正常 {{okCount}} · 异常 {{missCount}}</text>
+    </view>
+
+    <view wx:if="{{loading}}" class="tip">加载中…</view>
+
+    <view wx:else class="groups">
+      <view class="room" wx:for="{{rows}}" wx:key="teacherId" wx:for-item="r">
+        <view class="room-main">
+          <view class="room-name">{{r.teacherName}}
+            <text class="st st-ok" wx:if="{{r.status==='normal'}}">正常</text>
+            <text class="st st-miss" wx:elif="{{r.status==='absent'}}">缺卡</text>
+            <text class="st st-part" wx:else>{{r.status==='missing_in'?'缺上班卡':'缺下班卡'}}</text>
+          </view>
+          <view class="punch-line">
+            <text class="pl-label">上班</text>
+            <block wx:if="{{r.inId}}">
+              <text class="pl-time">{{r.inTime}}</text>
+              <text class="pl-meta">{{r.inCampus}}{{r.inSsid ? ' · ' + r.inSsid : ''}}</text>
+              <text class="op" data-id="{{r.inId}}" bindtap="openEdit">修改</text>
+              <text class="op del" data-id="{{r.inId}}" data-name="{{r.teacherName}}" data-type="上班" bindtap="markMissing">转缺卡</text>
+            </block>
+            <block wx:else>
+              <text class="pl-time none">未打卡</text>
+              <text class="op add" data-teacher-id="{{r.teacherId}}" data-type="in" data-name="{{r.teacherName}}" bindtap="markNormal">补卡</text>
+            </block>
+          </view>
+          <view class="punch-line">
+            <text class="pl-label">下班</text>
+            <block wx:if="{{r.outId}}">
+              <text class="pl-time">{{r.outTime}}</text>
+              <text class="pl-meta">{{r.outCampus}}{{r.outSsid ? ' · ' + r.outSsid : ''}}</text>
+              <text class="op" data-id="{{r.outId}}" bindtap="openEdit">修改</text>
+              <text class="op del" data-id="{{r.outId}}" data-name="{{r.teacherName}}" data-type="下班" bindtap="markMissing">转缺卡</text>
+            </block>
+            <block wx:else>
+              <text class="pl-time none">未打卡</text>
+              <text class="op add" data-teacher-id="{{r.teacherId}}" data-type="out" data-name="{{r.teacherName}}" bindtap="markNormal">补卡</text>
+            </block>
+          </view>
+          <view class="room-sub" wx:if="{{r.inRemark || r.outRemark}}">备注：{{r.inRemark}}{{r.outRemark ? '／' + r.outRemark : ''}}</view>
+        </view>
+      </view>
+      <view wx:if="{{rows.length === 0}}" class="section-empty">暂无教师</view>
+    </view>
+
+    <button class="add-entry" bindtap="openAdd">＋ 手动补卡</button>
+  </block>
+
+  <block wx:if="{{tab==='stats'}}">
+    <view class="top-bar">
+      <picker mode="date" fields="month" value="{{statsMonth}}" bindchange="onStatsMonth">
+        <view class="date-pick">{{statsMonth}} ▾</view>
+      </picker>
+      <text class="count-text">应打卡 {{statsRequiredDays}} 天（工作日，法定节假日除外）</text>
+    </view>
+
+    <view wx:if="{{statsLoading}}" class="tip">统计中…</view>
+
+    <view wx:else class="stats-table">
+      <view class="tr th">
+        <text class="td tname">教师</text>
+        <text class="td tnum">出勤天数</text>
+        <text class="td tnum">上班卡</text>
+        <text class="td tnum">下班卡</text>
+        <text class="td tnum">明细</text>
+      </view>
+      <view class="tr tr-link" wx:for="{{statsRows}}" wx:key="teacherId" data-teacher-id="{{item.teacherId}}" data-teacher-name="{{item.teacherName}}" bindtap="openTeacherDetail">
+        <text class="td tname">{{item.teacherName}}</text>
+        <text class="td tnum">{{item.workDays}}</text>
+        <text class="td tnum">{{item.inCount}}</text>
+        <text class="td tnum">{{item.outCount}}</text>
+        <text class="td tnum arrow">›</text>
+      </view>
+      <view wx:if="{{statsRows.length === 0}}" class="section-empty">所选区间暂无打卡记录</view>
+      <view wx:if="{{statsRows.length > 0}}" class="tr total">
+        <text class="td tname">合计</text>
+        <text class="td tnum">{{statsTotals.workDays}}</text>
+        <text class="td tnum">{{statsTotals.inCount}}</text>
+        <text class="td tnum">{{statsTotals.outCount}}</text>
+        <text class="td tnum"></text>
+      </view>
+      <view class="stats-hint">点击教师行可查看每次打卡时间</view>
+    </view>
+  </block>
+
+  <view wx:if="{{editVisible}}" class="mask" bindtap="closeEdit">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">修改{{editForm.typeText}}打卡 · {{editForm.teacherName}}</text>
+        <text class="sheet-close" bindtap="closeEdit">取消</text>
+      </view>
+      <view class="form-item">
+        <text class="form-label">打卡日期</text>
+        <picker class="form-picker" mode="date" value="{{editForm.d}}" bindchange="onEditDate">
+          <view class="picker-val">{{editForm.d}}</view>
+        </picker>
+      </view>
+      <view class="form-item">
+        <text class="form-label">打卡时间</text>
+        <picker class="form-picker" mode="time" value="{{editForm.time}}" bindchange="onEditTime">
+          <view class="picker-val">{{editForm.time}}</view>
+        </picker>
+      </view>
+      <view class="form-item"><text class="form-label">备注</text><input class="form-input" data-field="remark" value="{{editForm.remark}}" placeholder="选填" bindinput="onField"/></view>
+      <button class="btn-primary" bindtap="saveEdit">保存</button>
+    </view>
+  </view>
+
+  <view wx:if="{{addVisible}}" class="mask" bindtap="closeAdd">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">手动补卡</text>
+        <text class="sheet-close" bindtap="closeAdd">取消</text>
+      </view>
+      <view class="form-item">
+        <text class="form-label">教师</text>
+        <picker class="form-picker" range="{{teacherNames}}" value="{{addForm.teacherIndex}}" bindchange="onTeacher">
+          <view class="picker-val">{{teacherNames[addForm.teacherIndex] || '加载中…'}}</view>
+        </picker>
+      </view>
+      <view class="form-item">
+        <text class="form-label">类型</text>
+        <picker class="form-picker" range="{{typeLabels}}" value="{{addForm.typeIndex}}" bindchange="onAddType">
+          <view class="picker-val">{{typeLabels[addForm.typeIndex]}}</view>
+        </picker>
+      </view>
+      <view class="form-item">
+        <text class="form-label">校区</text>
+        <picker class="form-picker" range="{{campusLabels}}" value="{{addForm.campusIndex < 0 ? 0 : addForm.campusIndex}}" bindchange="onAddCampus">
+          <view class="picker-val">{{addForm.campusIndex >= 0 ? campusLabels[addForm.campusIndex] : '不指定'}}</view>
+        </picker>
+      </view>
+      <view class="form-item">
+        <text class="form-label">打卡日期</text>
+        <picker class="form-picker" mode="date" value="{{addForm.d}}" bindchange="onAddDate">
+          <view class="picker-val">{{addForm.d}}</view>
+        </picker>
+      </view>
+      <view class="form-item">
+        <text class="form-label">打卡时间</text>
+        <picker class="form-picker" mode="time" value="{{addForm.time}}" bindchange="onAddTime">
+          <view class="picker-val {{addForm.time ? '' : 'ph'}}">{{addForm.time || '请选择'}}</view>
+        </picker>
+      </view>
+      <view class="form-item"><text class="form-label">备注</text><input class="form-input" data-field="remark" value="{{addForm.remark}}" placeholder="选填" bindinput="onAddField"/></view>
+      <button class="btn-primary" bindtap="submitAdd">提交补卡</button>
+    </view>
+  </view>
+
+  <view wx:if="{{detailVisible}}" class="mask" bindtap="closeTeacherDetail">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">{{detailTeacherName}} · {{statsMonth}}打卡明细</text>
+        <text class="sheet-close" bindtap="closeTeacherDetail">关闭</text>
+      </view>
+      <view wx:if="{{detailLoading}}" class="tip">加载中…</view>
+      <view wx:elif="{{detailDays.length === 0}}" class="tip">本月暂无打卡记录</view>
+      <view wx:else>
+        <view class="detail-day" wx:for="{{detailDays}}" wx:key="date">
+          <view class="detail-date">
+            <text>{{item.date}}</text>
+            <text class="st st-ok" wx:if="{{item.status==='normal'}}">正常</text>
+            <text class="st st-part" wx:else>{{item.status==='missing_in'?'缺上班卡':'缺下班卡'}}</text>
+          </view>
+          <view class="detail-line">
+            <text class="pl-label">上班</text>
+            <text class="pl-time {{item.inTime ? '' : 'none'}}">{{item.inTime || '未打卡'}}</text>
+            <text class="pl-meta">{{item.inCampus}}{{item.inRemark ? ' · ' + item.inRemark : ''}}</text>
+          </view>
+          <view class="detail-line">
+            <text class="pl-label">下班</text>
+            <text class="pl-time {{item.outTime ? '' : 'none'}}">{{item.outTime || '未打卡'}}</text>
+            <text class="pl-meta">{{item.outCampus}}{{item.outRemark ? ' · ' + item.outRemark : ''}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,9 +1,8 @@
 const { request } = require('../../utils/request')
-const app = getApp()
-
-// Development only: role tabs request a matching backend token.
-// Set this to false before production release.
-const DEV_ROLE_SWITCH_ENABLED = true
+const devSession = require('../../utils/dev-session')
+const courseState = require('../../utils/teacher-course-state')
+const childContext = require('../../utils/child-context')
+const access = require('../../utils/access')
 
 const roleProfiles = {
   parent: {
@@ -12,28 +11,27 @@ const roleProfiles = {
     eyebrow: '家长端',
     title: '课程报名、课表与上课记录',
     stats: [
-      { label: '剩余课时', value: '18', suffix: '节' },
-      { label: '待上课程', value: '3', suffix: '节' },
-      { label: '已上课程', value: '0', suffix: '节' }
+      { label: '可用额度', value: '—', suffix: '' },
+      { label: '已报课程', value: '—', suffix: '门' },
+      { label: '待办事项', value: '—', suffix: '项' }
     ],
     actions: [
       { title: '课程报名', icon: '报', tone: 'blue', route: '/pages/enrollment/enrollment' },
       { title: '我的课表', icon: '课', tone: 'orange', route: '/pages/timetable/timetable' },
       { title: '考勤记录', icon: '勤', tone: 'cyan', route: '/pages/attendance/attendance' },
-      { title: '请假申请', icon: '假', tone: 'violet' },
+      { title: '请假申请', icon: '假', tone: 'violet', route: '/pages/parent-leave/parent-leave' },
       { title: '资料商城', icon: '资', tone: 'indigo', route: '/pages/material/material' },
       { title: '我的资料', icon: '料', tone: 'green', route: '/pages/material-orders/material-orders' },
       { title: '我的作业', icon: '作', tone: 'violet', route: '/pages/homework/homework' },
       { title: '我的缴费', icon: '费', tone: 'blue', route: '/pages/tuition-list/tuition-list' },
       { title: '我的收据', icon: '据', tone: 'cyan', route: '/pages/tuition-receipt/tuition-receipt' },
       { title: '退费记录', icon: '退', tone: 'orange', route: '/pages/tuition-refund/tuition-refund' },
-      { title: '我的优惠券', icon: '券', tone: 'indigo', route: '/pages/my-coupons/my-coupons' }
+      { title: '我的优惠券', icon: '券', tone: 'indigo', route: '/pages/my-coupons/my-coupons' },
+      { title: '邀请好友', icon: '邀', tone: 'violet', route: '/pages/parent-referral/parent-referral' },
+      { key:'personalAccount', title:'我的账户', icon:'账', tone:'gold', route:'/pages/parent-account/parent-account' }
     ],
     agendaTitle: '我的课程',
-    schedule: [
-      { time: '16:30', name: '五年级数学提高班', room: '万达24-5', teacher: '徐老师', status: '待上课' },
-      { time: '18:40', name: '英语阅读专项课', room: '百家湖A', teacher: '张老师', status: '已预约' }
-    ]
+    schedule: []
   },
   teacher: {
     name: '教师',
@@ -41,29 +39,22 @@ const roleProfiles = {
     eyebrow: '教师端',
     title: '上课、点名与班级管理',
     stats: [
-      { label: '今日排课', value: '4', suffix: '节' },
-      { label: '待点名', value: '2', suffix: '班' },
-      { label: '待处理', value: '7', suffix: '项' }
+      { key: 'teacherClasses', label: '负责班级', value: '—', suffix: '班', linkText: '查看学员', route: '/pages/teacher-students/teacher-students' },
+      { key: 'teacherMyCourses', label: '我的课程', value: '—', suffix: '班', linkText: '查看课程', route: '/pages/teacher-single-transactions/teacher-single-transactions' },
+      { key: 'teacherHomework', label: '我的作业', value: '—', suffix: '项', linkText: '查看作业', route: '/pages/teacher-homework/teacher-homework' },
+      { key: 'teacherSinglePending', label: '一对一事务', value: '—', suffix: '项', linkText: '去处理', route: '/pages/teacher-single-transactions/teacher-single-transactions?tab=bookings' }
     ],
     actions: [
-      { title: '上课签到', icon: '签', tone: 'blue', route: '/pages/sign-in/sign-in' },
-      { title: '我的课表', icon: '课', tone: 'orange' },
-      { title: '考勤点名', icon: '勤', tone: 'cyan' },
-      { title: '请假审核', icon: '假', tone: 'violet' },
-      { title: '学生档案', icon: '档', tone: 'green' },
-      { title: '成长报告', icon: '评', tone: 'blue' },
-      { title: '班级名单', icon: '班', tone: 'indigo' },
-      { title: '排课统计', icon: '统', tone: 'gold' },
-      { title: 'WiFi打卡', icon: '卡', tone: 'red' },
-      { title: '资料商城', icon: '资', tone: 'indigo', route: '/pages/material/material' },
+      { key:'teacherAttendance', title: '学生出勤', icon: '签', tone: 'blue', route: '/pages/sign-in/sign-in' },
+      { key: 'teacherCourses', title: '我的课程', icon: '课', tone: 'orange', route: '/pages/teacher-single-transactions/teacher-single-transactions' },
+      { key: 'teacherLeave', title: '请假审核', icon: '假', tone: 'violet', route: '/pages/teacher-leave/teacher-leave' },
+      { title: '班级学员', icon: '班', tone: 'green', route: '/pages/teacher-students/teacher-students' },
+      { title: 'WiFi打卡', icon: '卡', tone: 'red', route: '/pages/teacher-wifi-checkin/teacher-wifi-checkin' },
       { title: '我的资料', icon: '料', tone: 'green', route: '/pages/material-upload/material-upload' },
       { title: '作业管理', icon: '作', tone: 'violet', route: '/pages/teacher-homework/teacher-homework' }
     ],
-    agendaTitle: '今日排课',
-    schedule: [
-      { time: '15:20', name: '三年级数学思维班', room: '百家湖3', teacher: '22人', status: '待点名' },
-      { time: '19:00', name: '初一数学提高班', room: '万达21-4', teacher: '18人', status: '待上课' }
-    ]
+    agendaTitle: '我的班级',
+    schedule: []
   },
   admin: {
     name: '管理员',
@@ -76,17 +67,22 @@ const roleProfiles = {
       { label: '续费率', value: '83', suffix: '%' }
     ],
     actions: [
-      { title: '签到复核', icon: '核', tone: 'blue', route: '/pages/sign-review/sign-review' },
-      { title: '课程报名', icon: '招', tone: 'blue' },
+      { key:'studentSignReview', title:'学生出勤', icon:'勤', tone:'cyan', route:'/pages/sign-review/sign-review' },
+      { title: '打卡复核', icon: '核', tone: 'blue', route: '/pages/admin-checkin-review/admin-checkin-review' },
+      { title: '课程报名', icon: '招', tone: 'blue', route: '/pages/admin-enrollment/admin-enrollment' },
       { title: '排课管理', icon: '排', tone: 'orange' },
-      { title: '教室管理', icon: '室', tone: 'cyan' },
-      { title: '学生档案', icon: '档', tone: 'green' },
-      { title: '教师管理', icon: '师', tone: 'indigo' },
+      { title: '教室管理', icon: '室', tone: 'cyan', route: '/pages/admin-classrooms/admin-classrooms' },
+      { title: '学生档案', icon: '档', tone: 'green', route: '/pages/admin-students/admin-students' },
+      { key:'personalAccount', title: '交易管理', icon: '交', tone: 'gold', route: '/pages/admin-transactions/admin-transactions' },
+      { key:'referral', title: '优惠券管理', icon: '券', tone: 'violet', route: '/pages/admin-referral/admin-referral' },
+      { title: '教师管理', icon: '师', tone: 'indigo', route: '/pages/admin-teachers/admin-teachers' },
       { title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' },
+      { title: '退费管理', icon: '退', tone: 'orange', route: '/pages/admin-tuition-refunds/admin-tuition-refunds' },
       { title: '薪资核算', icon: '薪', tone: 'red' },
       { title: '运营分析', icon: '析', tone: 'violet' },
       { title: '资料商城', icon: '资', tone: 'indigo', route: '/pages/material/material' },
-      { title: '资料管理', icon: '料', tone: 'green', route: '/pages/material-upload/material-upload' }
+      { title: '资料管理', icon: '料', tone: 'green', route: '/pages/material-upload/material-upload' },
+      { title: 'WiFi配置', icon: '网', tone: 'red', route: '/pages/admin-wifi-config/admin-wifi-config' }
     ],
     agendaTitle: '管理待办',
     schedule: [
@@ -96,11 +92,11 @@ const roleProfiles = {
   }
 }
 
-const roleOptions = Object.keys(roleProfiles).map((key) => ({
-  key,
-  name: roleProfiles[key].name,
-  className: ''
-}))
+// Education is a real authenticated role, never a development login option.
+roleProfiles.education = {
+  name: '教务', tag: '全校区教务管理', eyebrow: '教务端', title: '课程出勤、收费与退费初审',
+  stats: [], actions: roleProfiles.admin.actions.filter(a => ['教室管理', '学生档案', '收费财务', '退费管理', '学生出勤'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
+}
 
 function normalizeRole(roleKey) {
   return roleProfiles[roleKey] ? roleKey : 'parent'
@@ -139,6 +135,7 @@ function weekdayShort(d) {
 
 // 按排课信息计算下一次上课日期（与 timetable 页面算法一致）
 function computeNextDate(item) {
+  if(item.classDate){const d=parseDate(item.classDate);if(!d)return null;const clock=String(item.startTime||'').split(':');d.setHours(Number(clock[0])||0,Number(clock[1])||0,0,0);return d>new Date()?{date:fmtDate(d),weekday:weekdayShort(d)}:{date:'已结课',weekday:''}}
   const start = parseDate(item.startDate)
   const end = parseDate(item.endDate)
   if (!start || !end) return null
@@ -204,15 +201,15 @@ function computeNextDate(item) {
   if (!result.length) return null
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const future = result.find((d) => d >= today)
-  if (future) return { date: fmtDate(future).slice(5), weekday: weekdayShort(future) } // 只显示 MM-DD
+  const future = result.find(d=>{const clock=String(item.startTime||'').split(':');const start=new Date(d);start.setHours(Number(clock[0])||0,Number(clock[1])||0,0,0);return start>new Date()})
+  if (future) return { date: fmtDate(future), weekday: weekdayShort(future) } // 只显示 MM-DD
   return { date: '已结课', weekday: '' }
 }
 
 function buildRoleState(roleKey, visibleRoles) {
   const normalizedRole = normalizeRole(roleKey)
   const profile = roleProfiles[normalizedRole]
-  const roles = visibleRoles || roleOptions
+  const roles = visibleRoles || []
   return {
     currentRole: normalizedRole,
     currentRoleName: profile.name,
@@ -230,59 +227,231 @@ function buildRoleState(roleKey, visibleRoles) {
   }
 }
 
-function getRoleFromStorage() {
-  const roles = wx.getStorageSync('roles') || []
-  if (roles.includes('admin')) return 'admin'
-  if (roles.includes('teacher')) return 'teacher'
-  return 'parent'
-}
+function getRoleFromStorage(roles = wx.getStorageSync('roles') || []) { return access.selected(roles) }
 
 Page({
   data: {
     logoUrl: '/images/logo.png',
-    roleLocked: false,
+    roleLocked: true,
+    developmentLoginEnabled: false,
     roleSwitching: false,
-    roles: roleOptions,
-    ...buildRoleState('parent')
+    teacherDataMessage: '',
+    coursePendingCount: null,
+    coursePendingError: '',
+    parentChildren: [], currentChild: null, childLoading:false, childError:'', showChildPicker:false, parentScheduleError:'',
+    roles: [],
+    ...buildRoleState('parent', []),
+    quickActions: [], stats: [], schedule: []
   },
 
   onLoad() {
-    this.applyLoginRole()
+    this._unloaded = false
+    this._visible = false
   },
 
   onShow() {
+    this._visible = true
     this.applyLoginRole()
   },
 
-  applyLoginRole() {
+  onHide() {
+    this._visible = false
+    this.stopCoursePendingRefresh()
+    this.stopAccountRefresh()
+  },
+
+  onUnload() {
+    this._unloaded = true
+    this._visible = false
+    this.stopCoursePendingRefresh()
+    this.stopAccountRefresh()
+    this._teacherLoadVersion = (this._teacherLoadVersion || 0) + 1
+    this._roleLoadVersion = (this._roleLoadVersion || 0) + 1
+  },
+
+  async applyLoginRole() {
+    this.stopCoursePendingRefresh()
+    this.stopAccountRefresh()
+    this.setCoursePending(null)
+    const loadVersion = this._roleLoadVersion = (this._roleLoadVersion || 0) + 1
     const token = wx.getStorageSync('token')
     if (!token) {
       wx.reLaunch({ url: '/pages/register/register' })
       return
     }
 
-    const role = getRoleFromStorage()
-    if (DEV_ROLE_SWITCH_ENABLED) {
-      this.setData({
-        roleLocked: false,
-        ...buildRoleState(role, roleOptions)
-      })
-    } else {
-      this.setData({
-        roleLocked: true,
-        ...buildRoleState(role, [{ key: role, name: roleProfiles[role].name, className: 'active' }])
-      })
+    if (wx.getStorageSync('devSessionVersion')) {
+      try {
+        const checked = await devSession.checkBackendSession()
+        if (this._unloaded || loadVersion !== this._roleLoadVersion) return
+        if (checked.restarted || wx.getStorageSync('token') !== token) {
+          if (!wx.getStorageSync('token')) wx.reLaunch({ url: '/pages/register/register' })
+          return
+        }
+      } catch (error) {
+        if (!this._unloaded && loadVersion === this._roleLoadVersion) {
+          wx.showToast({ title: error.message || '后端暂时无法连接', icon: 'none' })
+        }
+        return
+      }
     }
+    // Only getInfo grants the finance entry; cached roles and role tabs cannot do so.
+    this.setData({ quickActions: [], stats: [], schedule: [], roles: [] })
+    let info
+    try {
+      info = await request({ url: '/getInfo' })
+      if (this._unloaded || loadVersion !== this._roleLoadVersion || wx.getStorageSync('token') !== token) return
+      getApp().globalData.roles = info.roles || []
+      getApp().globalData.permissions = info.permissions || []
+      if (info.user) getApp().globalData.userInfo = info.user
+    } catch (error) {
+      if (!this._unloaded && loadVersion === this._roleLoadVersion) wx.showToast({ title: error.message || '身份核对失败，请重新登录', icon: 'none' })
+      return
+    }
+    wx.setStorageSync('roles', info.roles || [])
+    if (info.user) wx.setStorageSync('userInfo', info.user)
+    const workspaces = access.options(info.roles || [])
+    if (!workspaces.length) {
+      this.setData({ roles: [], quickActions: [], stats: [], schedule: [], roleLocked: true, currentRole: '', currentRoleName: '', title: '此账号尚未分配小程序角色', tag: '请联系管理员授权' })
+      return
+    }
+    const role = getRoleFromStorage(info.roles || [])
+    const financeAllowed = access.staff() && access.can('system:tuition:list')
+    this._teacherLoadVersion = (this._teacherLoadVersion || 0) + 1
+    this.setData({ teacherDataMessage: '',currentChild:null,parentChildren:[],childLoading:false,childError:'',showChildPicker:false,parentScheduleError:'', roleLocked: workspaces.length < 2, developmentLoginEnabled: access.developmentTool() && !!wx.getStorageSync('devSessionVersion'), ...buildRoleState(role, workspaces) })
+    if(role==='education')this.loadSignReviewPending()
+    if(role==='parent' || role==='admin') { this.loadAccountPending();if(role==='admin'){this.loadReferralPending();this.loadSignReviewPending()};this._accountTimer=setInterval(()=>{this.loadAccountPending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending()}},30000) }
+
+    const actions = this.data.quickActions.filter(a => a.route !== '/pages/admin-tuition/admin-tuition')
+    if (financeAllowed && ['admin', 'education'].includes(role)) actions.push({ title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' })
+    this.setData({ quickActions: access.actions(actions, role) })
 
     if (role === 'parent') {
-      this.loadParentTag()
-      this.loadParentSchedule()
+      await this.loadParentTag()
+    } else if (role === 'teacher') {
+      const user = wx.getStorageSync('userInfo') || {}
+      this.setData({ tag: user.nickName || user.userName || '教师工作台' })
+      this.loadTeacherData()
+      this.loadLeavePending()
+      this._coursePendingOwnerToken = token
+      this.loadCoursePending()
+      this.startCoursePendingRefresh()
     }
   },
 
-  async loadParentSchedule() {
+  async loadLeavePending() {
+    if(this._leavePendingLoading || this._unloaded || !this._visible || this.data.currentRole!=='teacher' || getRoleFromStorage()!=='teacher')return
+    const token=wx.getStorageSync('token'),version=this._roleLoadVersion
+    const requestVersion=this._leavePendingVersion=(this._leavePendingVersion || 0)+1
+    this._leavePendingLoading=true
     try {
-      const res = await request({ url: '/miniapp/parent/timetable' })
+      const r=await request({url:'/miniapp/teacher/leave',data:{state:'PENDING'},timeout:15000})
+      if(this._unloaded || !this._visible || requestVersion!==this._leavePendingVersion || version!==this._roleLoadVersion || this.data.currentRole!=='teacher' || getRoleFromStorage()!=='teacher' || wx.getStorageSync('token')!==token)return
+      this.setData({quickActions:this.data.quickActions.map(a=>a.key==='teacherLeave'?{...a,badgeText:courseState.badgeText(Number((r.data || {}).pendingCount))}:a)})
+    } catch(e) { /* 审核页提供失败提示及重试，首页不把加载失败当作0。 */ }
+    finally {if(requestVersion===this._leavePendingVersion)this._leavePendingLoading=false}
+  },
+
+  async loadSignReviewPending() {
+    const role=this.data.currentRole
+    if(this._signReviewLoading||this._unloaded||!this._visible||!['admin','education'].includes(role)||getRoleFromStorage()!==role)return
+    const token=wx.getStorageSync('token'),roleVersion=this._roleLoadVersion,version=this._signReviewVersion=(this._signReviewVersion||0)+1
+    this._signReviewLoading=true
+    try {
+      const r=await request({url:'/miniapp/education/sign/list',timeout:15000})
+      if(this._unloaded||!this._visible||version!==this._signReviewVersion||roleVersion!==this._roleLoadVersion||this.data.currentRole!==role||getRoleFromStorage()!==role||wx.getStorageSync('token')!==token)return
+      const count=new Set((r.data||[]).filter(x=>String(x.reviewStatus||'0')!=='1').map(x=>`${x.scheduleId}:${String(x.classDate).slice(0,10)}`)).size
+      this.setData({quickActions:this.data.quickActions.map(a=>a.key==='studentSignReview'?{...a,badgeText:courseState.badgeText(count)}:a)})
+    }catch(e){}finally{if(version===this._signReviewVersion)this._signReviewLoading=false}
+  },
+
+  async loadReferralPending() {
+    if(this._referralPendingLoading || this._unloaded || !this._visible || this.data.currentRole!=='admin' || getRoleFromStorage()!=='admin')return
+    const token=wx.getStorageSync('token'),version=this._roleLoadVersion,requestVersion=this._referralPendingVersion=(this._referralPendingVersion||0)+1
+    this._referralPendingLoading=true
+    try {
+      const r=await request({url:'/system/referral/counts',timeout:15000})
+      if(this._unloaded || !this._visible || requestVersion!==this._referralPendingVersion || version!==this._roleLoadVersion || this.data.currentRole!=='admin' || getRoleFromStorage()!=='admin' || wx.getStorageSync('token')!==token)return
+      this.setData({quickActions:this.data.quickActions.map(a=>a.key==='referral'?{...a,badgeText:courseState.badgeText(Number(r.data.pending)+Number(r.data.anomalies))}:a)})
+    }catch(e){}finally{if(requestVersion===this._referralPendingVersion)this._referralPendingLoading=false}
+  },
+
+  setCoursePending(count, error = '') {
+    if (this._unloaded) return
+    this.setData({coursePendingCount:count,coursePendingError:error,
+      stats:this.data.stats.map(stat=>stat.key==='teacherSinglePending' ? {...stat,value:count == null ? '—' : String(count)} : stat),
+      quickActions:this.data.quickActions.map(action=>action.key==='teacherCourses' ? {...action,badgeText:courseState.badgeText(count)} : action)})
+  },
+  startCoursePendingRefresh() {
+    if (!this._visible || this._unloaded || this.data.currentRole !== 'teacher') return
+    clearInterval(this._coursePendingTimer)
+    this._coursePendingTimer = setInterval(()=>{this.loadCoursePending();this.loadLeavePending();this.loadTeacherData()},30000)
+  },
+  stopCoursePendingRefresh() {
+    clearInterval(this._coursePendingTimer)
+    this._coursePendingTimer = null
+    this._coursePendingVersion = (this._coursePendingVersion || 0) + 1
+    this._coursePendingLoading = false
+    this._coursePendingOwnerToken = null
+    this._leavePendingVersion = (this._leavePendingVersion || 0) + 1
+    this._leavePendingLoading = false
+    this._signReviewVersion=(this._signReviewVersion||0)+1
+    this._signReviewLoading=false
+    this._referralPendingVersion = (this._referralPendingVersion || 0) + 1
+    this._referralPendingLoading = false
+  },
+  async loadCoursePending() {
+    const token = wx.getStorageSync('token')
+    if (this._coursePendingLoading || !this._visible || this._unloaded || this.data.currentRole !== 'teacher' ||
+      getRoleFromStorage() !== 'teacher' || !token || token !== this._coursePendingOwnerToken) return
+    const version = this._coursePendingVersion = (this._coursePendingVersion || 0) + 1
+    const current = () => !this._unloaded && this._visible && version===this._coursePendingVersion &&
+      this.data.currentRole==='teacher' && getRoleFromStorage()==='teacher' && wx.getStorageSync('token')===token
+    this._coursePendingLoading = true
+    try {
+      const result = await request({url:'/miniapp/teacher/course/single/transactions',timeout:15000})
+      if (current()) this.setCoursePending(courseState.pendingCount(result.data || []))
+    } catch (error) {
+      if (current()) this.setCoursePending(null,'课程待处理数量暂时无法加载，请重试。')
+    } finally { if (version===this._coursePendingVersion) this._coursePendingLoading=false }
+  },
+
+  async loadTeacherData() {
+    const token = wx.getStorageSync('token')
+    const version = this._teacherLoadVersion
+    const results = await Promise.allSettled([
+      request({ url: '/miniapp/teacher/sign/list', timeout: 15000 }),
+      request({ url: '/miniapp/teacher/homework/list', timeout: 15000 })
+    ])
+    if (version !== this._teacherLoadVersion || this.data.currentRole !== 'teacher' || wx.getStorageSync('token') !== token) return
+    const classes = results[0].status === 'fulfilled' ? (results[0].value.data || []) : null
+    const homework = results[1].status === 'fulfilled' ? (results[1].value.data || []) : null
+    const openCount = homework ? homework.filter(item => String(item.status) === '1').length : 0
+    const statValues = {
+      teacherClasses: classes ? String(classes.length) : '—',
+      teacherMyCourses: classes ? String(classes.length) : '—',
+      teacherHomework: homework ? String(openCount) : '—',
+      teacherSinglePending: this.data.coursePendingCount == null ? '—' : String(this.data.coursePendingCount)
+    }
+    this.setData({
+      stats: roleProfiles.teacher.stats.map(stat => ({ ...stat, value: statValues[stat.key] })),
+      quickActions: this.data.quickActions.map(a => a.key==='teacherAttendance' && classes ? {...a,badgeText:courseState.badgeText(classes.reduce((n,c)=>n+(c.corrections||[]).length,0))} : a),
+      schedule: (classes || []).slice(0, 3).map((item) => ({
+        time: item.timeSlot || '—',
+        name: item.courseClassName || '未命名班级',
+        room: item.classroomName || '',
+        teacher: item.teacherName || ''
+      })),
+      teacherDataMessage: classes === null ? '班级加载失败，请重新进入或查看学生出勤' : (classes.length ? '' : '当前教师尚未绑定班级'),
+    })
+  },
+
+  async loadParentSchedule() {
+    const token = wx.getStorageSync('token'),ticket=childContext.snapshot(),version=this._parentScheduleVersion=(this._parentScheduleVersion||0)+1
+    this.setData({schedule:[],parentScheduleError:''});if(!ticket.id)return
+    try {
+      const res = await request({ url: '/miniapp/parent/timetable',data:{accountId:ticket.id} })
+      if (this._unloaded || !this._visible || version!==this._parentScheduleVersion || !childContext.current(ticket) || this.data.currentRole !== 'parent' || wx.getStorageSync('token') !== token) return
       const list = res.data || []
       // 取前 3 条，取最近 3 次课，按下次上课日期排序
       const decorated = list.map((item) => {
@@ -307,81 +476,93 @@ Page({
         if (b.date === '已结课') return -1
         return a.date.localeCompare(b.date)
       })
-      const schedule = decorated.slice(0, 3)
-      this.setData({ schedule: schedule.length ? schedule : roleProfiles.parent.schedule })
+      const schedule = decorated.filter(r=>r.dateReady&&r.date!=='已结课').slice(0, 3)
+      this.setData({ schedule, parentScheduleError:decorated.some(r=>!r.dateReady)?'部分课程尚未配置日期，可在我的课表查看':'' })
     } catch (error) {
-      // 接口失败时保留原假数据占位
+      if(!this._unloaded&&this._visible&&version===this._parentScheduleVersion&&childContext.current(ticket))this.setData({schedule:[],parentScheduleError:'课程暂时加载失败，请重试'})
     }
   },
 
+  openChildren() { if(this.data.currentRole==='parent' && getRoleFromStorage()==='parent') wx.navigateTo({url:'/pages/parent-children/parent-children'}) },
+  stopAccountRefresh() {clearInterval(this._accountTimer);this._accountTimer=null;this._accountVersion=(this._accountVersion || 0)+1;this._accountBusy=false;if(!this._unloaded)this.setData({accountPendingError:'',quickActions:this.data.quickActions.map(a=>a.key==='personalAccount'?{...a,badgeText:''}:a)})},
+  async loadAccountPending() {
+    const role=this.data.currentRole,token=wx.getStorageSync('token');if(this._accountBusy || !this._visible || this._unloaded || !['parent','admin'].includes(role) || getRoleFromStorage()!==role || !token)return
+    const v=this._accountVersion=(this._accountVersion || 0)+1,current=()=>!this._unloaded && this._visible && v===this._accountVersion && this.data.currentRole===role && getRoleFromStorage()===role && wx.getStorageSync('token')===token
+    this._accountBusy=true
+    try{const r=await request({url:role==='admin'?'/system/eduTransaction/pending-count':'/miniapp/parent/account/pending-count',data:role==='parent'?{actionable:true}:{},timeout:15000});if(current())this.setData({accountPendingError:'',quickActions:this.data.quickActions.map(a=>a.key==='personalAccount'?{...a,badgeText:courseState.badgeText(Number(r.data))}:a)})}
+    catch(e){if(current())this.setData({accountPendingError:'账户待处理数量暂时无法加载',quickActions:this.data.quickActions.map(a=>a.key==='personalAccount'?{...a,badgeText:''}:a)})}
+    finally{if(v===this._accountVersion)this._accountBusy=false}
+  },
   async loadParentTag() {
+    const token=wx.getStorageSync('token'),roleVersion=this._roleLoadVersion,version=this._parentChildrenVersion=(this._parentChildrenVersion||0)+1
+    this.setData({childLoading:true,childError:'',schedule:[],stats:roleProfiles.parent.stats})
     try {
-      const res = await request({ url: '/miniapp/parent/enrollments' })
-      const enrollments = res.data || []
-      const names = []
-      enrollments.forEach((item) => {
-        if (item.studentName && !names.includes(item.studentName)) {
-          names.push(item.studentName)
-        }
-      })
+      const r=await request({url:'/miniapp/parent/account'})
+      if(this._unloaded||!this._visible||version!==this._parentChildrenVersion||roleVersion!==this._roleLoadVersion||this.data.currentRole!=='parent'||wx.getStorageSync('token')!==token)return
+      const children=((r.data||{}).children||[]).map(c=>({...c,accountId:String(c.accountId),badgeText:courseState.badgeText(c.actionPendingCount)}))
+      const selected=childContext.reconcile(children)
+      this.setData({parentChildren:children,tag:'管理孩子信息'})
+      this.displayChild(selected);await this.loadParentSchedule()
+    } catch(e) {
+      if(!this._unloaded&&this._visible&&version===this._parentChildrenVersion&&this.data.currentRole==='parent'&&wx.getStorageSync('token')===token)this.setData({currentChild:null,parentChildren:[],schedule:[],childError:'孩子资料加载失败，请重试',stats:roleProfiles.parent.stats})
+    } finally {if(version===this._parentChildrenVersion&&!this._unloaded)this.setData({childLoading:false})}
+  },
+  displayChild(child) {
+    const stats=child?[{label:'可用额度',value:String(Number(child.remainingCredits)-Number(child.reservedCredits)),suffix:''},{label:'已报课程',value:String(child.courseCount||0),suffix:'门'},{label:'待办事项',value:String(child.actionPendingCount||0),suffix:'项'}]:roleProfiles.parent.stats
+    this.setData({currentChild:child,stats,schedule:[],showChildPicker:false,parentScheduleError:''})
+    this._parentScheduleVersion=(this._parentScheduleVersion||0)+1
+  },
+  toggleChildPicker(){if(this.data.currentRole==='parent'&&!this.data.roleSwitching&&!this.data.childLoading){if(this.data.childError){this.loadParentTag();return}this.setData({showChildPicker:!this.data.showChildPicker})}},
+  chooseChild(e){
+    if(this.data.currentRole!=='parent'||this.data.roleSwitching||this.data.childLoading)return
+    const child=this.data.parentChildren.find(c=>c.accountId===String(e.currentTarget.dataset.id));if(!child)return
+    childContext.select(child);this.displayChild(child);this.loadParentSchedule()
+  },
+  addChild(){if(this.data.currentRole==='parent'&&!this.data.roleSwitching&&!this.data.childLoading){this.setData({showChildPicker:false});wx.navigateTo({url:'/pages/parent-account/parent-account?create=1&returnHome=1'})}},
 
-      if (names.length === 1) {
-        this.setData({ tag: `${names[0]}家长` })
-      } else if (names.length > 1) {
-        this.setData({ tag: `${names[0]}等${names.length}名学生家长` })
-      } else {
-        this.setData({ tag: '学生家长' })
-      }
-    } catch (error) {
-      this.setData({ tag: '学生家长' })
-    }
+  async openRoleMenu() {
+    if (this._unloaded || this._visible === false || this.data.roleSwitching || this._roleMenuOpen || this.data.roles.length < 2) return
+    const roles = this.data.roles.slice()
+    const token = wx.getStorageSync('token')
+    const version = this._roleLoadVersion
+    this._roleMenuOpen = true
+    try {
+      const choice = await new Promise(resolve => wx.showActionSheet({
+        itemList: roles.map(role => role.name + (role.key === this.data.currentRole ? '（当前）' : '')),
+        success: resolve,
+        fail: () => resolve(null)
+      }))
+      if (!choice || this._unloaded || this._visible === false || !token || token !== wx.getStorageSync('token') || version !== this._roleLoadVersion) return
+      const role = roles[choice.tapIndex]
+      if (role && role.key !== this.data.currentRole) await this.switchRole({ currentTarget: { dataset: { role: role.key } } })
+    } finally { this._roleMenuOpen = false }
   },
 
   async switchRole(e) {
-    if (this.data.roleLocked || this.data.roleSwitching) return
-
-    const role = normalizeRole(e.currentTarget.dataset.role)
-    if (!DEV_ROLE_SWITCH_ENABLED) {
-      this.setData(buildRoleState(role, roleOptions))
-      return
+    if (this._unloaded || this.data.roleSwitching) return
+    const role = e.currentTarget.dataset.role
+    if (!access.options().some(item => item.key === role)) {
+      wx.showToast({ title: '当前账号未获此身份授权', icon: 'none' }); return
     }
-
-    await this.loginAsDevRole(role)
+    this.setData({ roleSwitching: true, quickActions: [], stats: [], schedule: [] })
+    try {
+      await this.applyLoginRole()
+      if (!this._unloaded && this.data.roles.some(item => item.key === role) && access.select(role)) await this.applyLoginRole()
+    } finally { if (!this._unloaded) this.setData({ roleSwitching: false }) }
+  },
+  logout() {
+    this.stopCoursePendingRefresh(); this.stopAccountRefresh()
+    ;['token', 'roles', 'userInfo', 'devSessionVersion'].forEach(k => wx.removeStorageSync(k))
+    Object.assign(getApp().globalData, { token: '', roles: [], permissions: [], userInfo: null })
+    wx.reLaunch({ url: '/pages/register/register' })
   },
 
-  async loginAsDevRole(role) {
-    this.setData({ roleSwitching: true })
-    try {
-      const loginCode = await this.getWxLoginCode()
-      const loginRes = await request({
-        url: '/miniapp/login',
-        method: 'POST',
-        data: {
-          loginCode,
-          phoneCode: 'mock',
-          devRole: role,
-          nickName: `MiniApp ${role}`
-        }
-      })
+  switchTeacher() {
+    if (!this._unloaded && this.data.developmentLoginEnabled) wx.navigateTo({ url: '/pages/register/register?selectTeacher=1' })
+  },
 
-      wx.setStorageSync('token', loginRes.token)
-      wx.setStorageSync('devRole', role)
-      app.globalData.token = loginRes.token
-
-      const infoRes = await request({ url: '/getInfo' })
-      const roles = infoRes.roles || []
-      wx.setStorageSync('roles', roles)
-      wx.setStorageSync('userInfo', infoRes.user || null)
-      app.globalData.roles = roles
-      app.globalData.userInfo = infoRes.user || null
-
-      this.applyLoginRole()
-      wx.showToast({ title: `${roleProfiles[role].name}已登录`, icon: 'none' })
-    } catch (error) {
-      wx.showToast({ title: error.message || '切换失败', icon: 'none' })
-    } finally {
-      this.setData({ roleSwitching: false })
-    }
+  switchParent() {
+    if(!this._unloaded && this.data.developmentLoginEnabled && !this.data.roleSwitching && this.data.currentRole==='parent')wx.navigateTo({url:'/pages/register/register?selectParent=1'})
   },
 
   getWxLoginCode() {
@@ -397,11 +578,26 @@ Page({
     })
   },
 
+  handleStat(e) {
+    if (this._unloaded || this.data.roleSwitching || this.data.currentRole !== 'teacher' || getRoleFromStorage() !== 'teacher') return
+    const stat = this.data.stats.find(item => item.key === e.currentTarget.dataset.key)
+    if (stat && stat.route) wx.navigateTo({ url: stat.route })
+  },
+
   handleAction(e) {
     const route = e.currentTarget.dataset.route
     const title = e.currentTarget.dataset.title
+    const disabled = e.currentTarget.dataset.disabled
+    if (this._unloaded || this.data.roleSwitching || !access.actions(this.data.quickActions, this.data.currentRole).some(a => a.route === route && a.title === title)) return
+    if (disabled) {
+      wx.showToast({
+        title: `${title}已暂时关闭`,
+        icon: 'none'
+      })
+      return
+    }
     if (route) {
-      wx.navigateTo({ url: route })
+      if(this.data.currentRole==='parent'&&['课程报名','我的课表','考勤记录','请假申请','我的作业','我的缴费','我的收据','退费记录'].includes(title)){if(this.data.childLoading||this.data.childError){wx.showToast({title:'请先加载孩子资料',icon:'none'});return}if(!this.data.currentChild){this.addChild();return}wx.navigateTo({url:childContext.url(route)})}else wx.navigateTo({ url: route })
       return
     }
 

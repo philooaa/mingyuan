@@ -38,8 +38,8 @@ spring:
     active: druid
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 20MB
+      max-file-size: 50MB
+      max-request-size: 60MB
   jackson:
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
@@ -62,16 +62,17 @@ spring:
 
 token:
   header: Authorization
-  secret: ${TOKEN_SECRET}
+  secret: ${TOKEN_SECRET:abcdefghijklmnopqrstuvwxyz}
   expireTime: 30
 
 wechat:
   miniapp:
     appid: ${WECHAT_APPID:}
     secret: ${WECHAT_SECRET:}
-    mock-enabled: false
+    mock-enabled: ${WECHAT_MOCK_ENABLED:false}
     mock-phone: 13800000000
     mock-admin-username: admin
+    mock-teacher-username: ${WECHAT_MOCK_TEACHER_USERNAME:}
     mock-teacher-phone: ${WECHAT_MOCK_TEACHER_PHONE:}
 
 mybatis:

@@ -1,0 +1,18 @@
+<wxs module="calendarScroll" src="../../utils/course-calendar-scroll.wxs" />
+<view class="page">
+  <view class="create-heading"><view class="title">选择上课时段</view><view class="calendar-note">点击浅灰 ＋，选择空闲教室后发布</view></view>
+  <view class="load-status" wx:if="{{loading}}">正在查询课表与空闲教室…</view>
+  <view class="load-error" wx:if="{{loadError}}">{{loadError}}<button bindtap="retryLoad">重新加载</button></view>
+  <view wx:if="{{loadSucceeded && !loading && !loadError}}"><include src="../../templates/teacher-week-calendar.wxml" /></view>
+  <view class="availability-note" wx:if="{{loadSucceeded && !loading && !loadError && pendingScheduleCount}}">部分历史日期未配置，空闲结果仅供开发核验。</view>
+  <view class="create-mask" wx:if="{{showSheet}}" bindtap="closeSheet"></view>
+  <view class="create-sheet" wx:if="{{showSheet}}">
+    <view class="sheet-title">发布一对一课程</view>
+    <view class="selected-time">{{selectedSlot.date}}　{{selectedSlot.timeSlot}}</view>
+    <view class="calendar-note">{{subject}} · {{teacherLevelText}} · 仅本次日期</view>
+    <view class="create-field"><text>课名</text><input maxlength="100" value="{{courseClassName}}" bindinput="inputName" placeholder="请输入课名" disabled="{{submitting}}" /></view>
+    <view class="create-field"><text>年级</text><picker range="{{gradeOptions}}" value="{{gradeIndex}}" bindchange="chooseGrade" disabled="{{submitting}}"><view>{{gradeOptions[gradeIndex] || '请选择年级'}}　›</view></picker></view>
+    <view class="create-field"><text>空闲教室</text><picker range="{{roomOptions}}" range-key="label" value="{{roomIndex}}" bindchange="chooseRoom" disabled="{{submitting}}"><view>{{roomOptions[roomIndex].label}}　›</view></picker></view>
+    <view class="create-actions"><button bindtap="closeSheet" disabled="{{submitting}}">取消</button><button class="primary-btn" bindtap="save" loading="{{submitting}}" disabled="{{submitting}}">确认发布</button></view>
+  </view>
+</view>

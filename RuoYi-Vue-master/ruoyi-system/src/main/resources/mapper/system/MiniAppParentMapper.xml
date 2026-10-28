@@ -16,16 +16,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.end_time as endTime,
             s.grade_name as gradeName,
             s.subject_name as subjectName,
-            s.teacher_name as teacherName,
+            coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacherName,
+            s.teacher_id as teacherId,
             s.class_type as classType,
             s.course_class_name as courseClassName,
             c.campus_name as campusName,
             c.classroom_name as classroomName,
-            c.capacity as capacity,
             ifnull(s.enrolled_count, 0) as enrolledCount,
-            greatest(ifnull(c.capacity, 999999) - ifnull(s.enrolled_count, 0), 0) as remainingCount,
             case when e.enrollment_id is null then 0 else 1 end as enrolled
         from edu_course_schedule s
+        left join sys_user teacher on teacher.user_id = s.teacher_id
         inner join edu_classroom c on c.classroom_id = s.classroom_id
         left join edu_enrollment e
           on e.schedule_id = s.schedule_id
@@ -36,6 +36,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.del_flag = '0'
             and s.status = '0'
             and s.recruit_status = '0'
+            and s.class_mode != '2'
             and c.status = '0'
             <if test="gradeName != null and gradeName != ''">
                 and s.grade_name = #{gradeName}
@@ -53,6 +54,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectParentEnrollments" resultType="java.util.HashMap">
         select
             e.enrollment_id as enrollmentId,
+            e.class_date as classDate, e.cancel_request_status as cancelRequestStatus,
+            e.settlement_method as settlementMethod,e.lesson_credits as lessonCredits,e.lesson_completed_time as lessonCompletedTime,
+            s.class_mode as classMode, s.lesson_location as lessonLocation,
+            s.start_time as startTime, s.end_time as endTime,
             e.enrollment_code as enrollmentCode,
             e.schedule_id as scheduleId,
             e.student_name as studentName,
@@ -68,12 +73,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.time_slot as timeSlot,
             s.grade_name as gradeName,
             s.subject_name as subjectName,
-            s.teacher_name as teacherName,
+            coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacherName,
             c.campus_name as campusName,
             c.classroom_name as classroomName
         from edu_enrollment e
         inner join edu_course_schedule s on s.schedule_id = e.schedule_id
-        inner join edu_classroom c on c.classroom_id = s.classroom_id
+        left join sys_user teacher on teacher.user_id = s.teacher_id
+        left join edu_classroom c on c.classroom_id = s.classroom_id
         where e.parent_id = #{parentId}
           and e.del_flag = '0'
         order by e.create_time desc, e.enrollment_id desc
@@ -82,6 +88,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectParentTimetable" resultType="java.util.HashMap">
         select
             e.enrollment_id as enrollmentId,
+            e.class_date as classDate,e.cancel_request_status as cancelRequestStatus,
+            s.class_mode as classMode,s.lesson_location as lessonLocation,
             e.schedule_id as scheduleId,
             e.student_name as studentName,
             e.enrollment_status as enrollmentStatus,
@@ -94,18 +102,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.time_slot as timeSlot,
             s.start_time as startTime,
             s.end_time as endTime,
-            s.start_date as startDate,
-            s.end_date as endDate,
+            coalesce(e.class_date,s.start_date) as startDate,
+            coalesce(e.class_date,s.end_date) as endDate,
             s.class_pattern as classPattern,
             s.grade_name as gradeName,
             s.subject_name as subjectName,
-            s.teacher_name as teacherName,
+            coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacherName,
             s.class_type as classType,
             c.campus_name as campusName,
             c.classroom_name as classroomName
         from edu_enrollment e
         inner join edu_course_schedule s on s.schedule_id = e.schedule_id
-        inner join edu_classroom c on c.classroom_id = s.classroom_id
+        left join sys_user teacher on teacher.user_id = s.teacher_id
+        left join edu_classroom c on c.classroom_id = s.classroom_id
         where e.parent_id = #{parentId}
           and e.del_flag = '0'
           and e.enrollment_status in ('1', '报名成功')
@@ -145,7 +154,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          and a.del_flag = '0'
         where e.parent_id = #{parentId}
           and e.del_flag = '0'
-          and e.enrollment_status in ('1', '报名成功')
+          and (e.enrollment_status in ('1', '报名成功') or a.attendance_status = '1')
           and s.del_flag = '0'
           and s.status = '0'
         group by s.course_class_name
@@ -179,7 +188,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          and a.del_flag = '0'
         where e.parent_id = #{parentId}
           and e.del_flag = '0'
-          and e.enrollment_status in ('1', '报名成功')
+          and (e.enrollment_status in ('1', '报名成功') or a.attendance_status = '1')
           and s.del_flag = '0'
           and s.status = '0'
           and s.course_class_name = #{courseClassName}
@@ -192,10 +201,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         inner join edu_classroom c on c.classroom_id = s.classroom_id
         where s.schedule_id = #{scheduleId}
           and s.del_flag = '0'
-          and s.status = '0'
+          and s.status = '0' and s.class_mode != '2'
           and s.recruit_status = '0'
           and c.status = '0'
-          and ifnull(s.enrolled_count, 0) <![CDATA[<]]> ifnull(c.capacity, 999999)
     </select>
 
     <select id="countActiveEnrollment" resultType="int">
@@ -203,19 +211,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from edu_enrollment
         where schedule_id = #{scheduleId}
           and parent_id = #{parentId}
-          and student_name = #{studentName}
+          and (lesson_account_id = #{lessonAccountId} or (lesson_account_id is null and student_name = #{studentName}))
           and del_flag = '0'
-          and enrollment_status not in ('2', '已取消')
+          and enrollment_status in ('0','1','待确认','已确认','报名成功')
     </select>
 
+    <!--
+      报名占位：同时承担「报名上限」校验——影响 0 行即视为不可报名（满员/停招/教室停用）。
+      一对一（class_mode='2'）暂不校验上限；enroll_limit 为空或 <=0 表示不限。
+    -->
     <update id="increaseScheduleEnrollment">
         update edu_course_schedule s
         inner join edu_classroom c on c.classroom_id = s.classroom_id
         set s.enrolled_count = ifnull(s.enrolled_count, 0) + 1,
-            s.recruit_status = case
-                when ifnull(s.enrolled_count, 0) + 1 >= ifnull(c.capacity, 999999) then '2'
-                else s.recruit_status
-            end,
             s.update_by = 'miniapp',
             s.update_time = now()
         where s.schedule_id = #{scheduleId}
@@ -223,11 +231,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and s.status = '0'
           and s.recruit_status = '0'
           and c.status = '0'
-          and ifnull(s.enrolled_count, 0) <![CDATA[<]]> ifnull(c.capacity, 999999)
+          and (s.class_mode = '2'
+               or s.enroll_limit is null
+               or s.enroll_limit &lt;= 0
+               or ifnull(s.enrolled_count, 0) &lt; s.enroll_limit)
     </update>
 
     <insert id="insertParentEnrollment">
         insert into edu_enrollment (
+            student_id,lesson_account_id,
             enrollment_code,
             schedule_id,
             parent_id,
@@ -241,6 +253,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             create_by,
             create_time
         ) values (
+            (SELECT student_id FROM edu_student_lesson_account WHERE account_id=#{lessonAccountId} AND parent_id=#{parentId}),#{lessonAccountId},
             #{enrollmentCode},
             #{scheduleId},
             #{parentId},

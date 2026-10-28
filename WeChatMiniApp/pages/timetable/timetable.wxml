@@ -1,25 +1,34 @@
 <view class="page">
   <view class="header">
-    <image class="logo" src="/images/logo.png" mode="widthFix"></image>
-    <view class="title">我的课表</view>
+    <view class="title">{{teacherMode ? '我的课程' : '我的课表'}}</view>
+    <view class="ui-caption">上课安排与学员报名记录</view>
   </view>
 
-  <view class="summary">
+  <view class="summary" wx:if="{{!teacherMode}}">
     <view class="summary-item">
-      <view class="summary-value">{{timetableCount}}</view>
+      <view class="summary-value">{{loadSucceeded && !loading && !loadError ? timetableCount : '—'}}</view>
       <view class="summary-label">已报名课次</view>
     </view>
-    <button class="summary-btn" bindtap="goEnrollment">继续报名</button>
+    <button wx:if="{{!teacherMode}}" class="summary-btn" bindtap="goEnrollment">继续报名</button>
   </view>
 
-  <view class="empty" wx:if="{{showEmpty}}">
+  <view class="load-status" wx:if="{{loading}}">正在加载课表…</view>
+  <view class="calendar-warning load-error" wx:if="{{loadError && !loading}}">
+    <view>{{loadError}}</view>
+    <button size="mini" bindtap="retryLoad">重新加载</button>
+  </view>
+
+  <view wx:if="{{teacherMode}}">
+    <view class="empty"><view class="empty-title">教师课表已合并至“我的课程”</view><button class="primary-btn" bindtap="redirectTeacher">进入我的课程</button></view>
+  </view>
+  <view class="empty" wx:if="{{loadSucceeded && !loading && !loadError && showEmpty && !teacherMode}}">
     <view class="empty-title">暂无课表</view>
-    <button class="primary-btn" bindtap="goEnrollment">去报名</button>
+    <button wx:if="{{!teacherMode}}" class="primary-btn" bindtap="goEnrollment">去报名</button>
   </view>
 
-  <view class="period" wx:for="{{groupedTimetable}}" wx:key="key">
+  <view class="period" wx:if="{{loadSucceeded && !loading && !loadError && !teacherMode}}" wx:for="{{groupedTimetable}}" wx:key="key">
     <view class="period-title">{{item.key}}</view>
-    <view class="course-card" wx:for="{{item.items}}" wx:for-item="course" wx:key="enrollmentId">
+    <view class="course-card" wx:for="{{item.items}}" wx:for-item="course" wx:key="viewKey">
       <view class="next-class" wx:if="{{course.nextClassDate}}">
         <text class="next-label">下一次课</text>
         <text class="next-date">{{course.nextClassDate}}</text>
@@ -36,16 +45,15 @@
         <view class="course-name">{{course.courseClassName}}</view>
         <view class="course-meta">{{course.subjectTag}} · {{course.teacherName}}</view>
         <view class="course-meta">{{course.placeText}}</view>
-        <view class="course-footer">
+        <view class="course-footer" wx:if="{{!teacherMode}}">
           <view class="student">学生：{{course.studentName}}</view>
-          <view class="cancel-btn"
+          <view class="cancel-pending-label" wx:if="{{course.cancelRequestPending}}">取消待处理</view>
+          <view class="cancel-btn" wx:else
                 catchtap="handleCancel"
-                data-enrollment-id="{{course.enrollmentId}}"
-                data-course-name="{{course.courseClassName}}"
-                data-student-name="{{course.studentName}}">取消</view>
+                data-enrollment-id="{{course.enrollmentId}}">{{cancelingId === course.viewKey ? '处理中…' : (course.classDate ? '申请取消' : '取消')}}</view>
         </view>
       </view>
-      <view class="pay-tag">{{course.payText}}</view>
+      <view class="pay-tag" wx:if="{{!teacherMode}}">{{course.payText}}</view>
     </view>
   </view>
 </view>

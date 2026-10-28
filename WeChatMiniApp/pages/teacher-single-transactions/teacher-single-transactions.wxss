@@ -1,0 +1,71 @@
+@import "../timetable/timetable.wxss";
+@import "../../styles/number-badge.wxss";
+@import "../../styles/education-ui.wxss";
+@import "../../styles/teacher-week-calendar.wxss";
+.module-subtitle { margin-top:12rpx; color:#647286; font-size:25rpx; }
+.summary { flex-wrap:wrap; gap:16rpx; }
+.summary-item { flex:1; min-width:160rpx; flex-direction:column; align-items:flex-start; gap:4rpx; }
+.summary-label { font-size:22rpx; }
+.module-toolbar { margin:0 24rpx 20rpx; }
+.module-toolbar button { margin:0; }
+.module-tabs { display:flex; margin:0 24rpx 20rpx; padding:8rpx; border-radius:14rpx; background:white; }
+.module-tab { position:relative; display:flex; align-items:center; justify-content:center; flex:1; padding:18rpx 4rpx; text-align:center; font-size:24rpx; color:#647286; border-radius:10rpx; }
+.tab-badge { top:-8rpx; right:-6rpx; }
+.summary-value.attention { color:#e64444; }
+.course-type { display:inline-block; margin-right:6rpx; padding:2rpx 9rpx; border-radius:6rpx; font-size:21rpx; }
+.course-type.class-type { color:#54327e; background:#eee4fc; }.course-type.single-type { color:#146b4b; background:#daf4e5; }
+.module-tab.active { color:#0f58a8; background:#eaf3ff; font-weight:700; }
+.calendar-filter { margin:0 24rpx 16rpx; padding:16rpx; background:white; border-radius:12rpx; font-size:25rpx; color:#0b326a; }
+.calendar-warning { margin:12rpx 24rpx; }
+.teacher-calendar .calendar-warning { margin:12rpx 0; }
+.module-section { margin:24rpx; }
+.module-card { background:white; padding:24rpx; margin:20rpx 0; border-radius:16rpx; line-height:1.6; font-size:26rpx; word-break:break-all; }
+.module-card-title { font-size:29rpx; font-weight:700; color:#0b326a; }
+.module-meta { margin-top:8rpx; color:#647286; font-size:24rpx; line-height:1.55; }
+.module-meta.warning { color:#985b13; }
+.module-actions { display:flex; flex-wrap:wrap; margin-top:18rpx; gap:12rpx; }
+.module-actions button { margin:0; color:#0f58a8; background:#eaf3ff; }
+.module-empty { padding:40rpx 20rpx; text-align:center; color:#778397; border-radius:16rpx; background:white; font-size:25rpx; }
+.module-focus { margin-bottom:16rpx; display:flex; align-items:center; justify-content:space-between; font-size:24rpx; color:#647286; }
+.module-focus button { margin:0; }
+.record-status { display:inline-block; padding:5rpx 12rpx; margin-top:10rpx; border-radius:8rpx; background:#eef0f3; color:#616977; font-size:23rpx; }
+.record-status.pending { background:#fff0bd; color:#745600; }.record-status.confirmed { background:#dcecff; color:#123b6b; }
+.record-status.cancel-pending { background:#ffe2bb; color:#8b4b0c; }.record-status.completed { background:#daf4e5; color:#146b4b; }
+.record-status.cancelled,.record-status.rejected { background:#ffe9e9; color:#a64141; }.record-status.class-course { background:#eee4fc; color:#54327e; }
+.module-mask { position:fixed; top:0; right:0; bottom:0; left:0; z-index:20; background:rgba(8,22,40,.42); }
+.module-sheet { position:fixed; left:0; right:0; bottom:0; z-index:21; padding:28rpx; border-radius:24rpx 24rpx 0 0; background:white; }
+.sheet-heading { display:flex; justify-content:space-between; gap:20rpx; font-size:29rpx; font-weight:700; color:#0b326a; }
+.sheet-heading > view:last-child { flex-shrink:0; color:#647286; font-size:25rpx; }
+.module-lesson-list { height:42vh; margin-top:18rpx; }
+.module-lesson { display:flex; justify-content:space-between; align-items:center; gap:12rpx; padding:14rpx 0; border-bottom:1rpx solid #e5ebf3; font-size:25rpx; }
+.module-lesson .record-status { margin-top:0; flex-shrink:0; }
+
+/* 课程工作台优先呈现课表和待办，保持固定时间轴与横向共用容器。 */
+.page { padding-bottom:calc(32rpx + env(safe-area-inset-bottom)); }
+.create-course { margin:0; flex-shrink:0; background:#2459d9; color:#fff; height:72rpx; line-height:72rpx; padding:0 20rpx; font-size:25rpx; font-weight:600; border-radius:12rpx; }
+.pending-banner { display:flex; align-items:center; justify-content:space-between; gap:16rpx; margin:0 24rpx 16rpx; padding:18rpx 22rpx; border:1rpx solid #f1dba8; border-radius:12rpx; background:#fff6e4; color:#8c5c05; font-size:24rpx; }
+.pending-banner-count { font-size:30rpx; font-weight:700; margin-right:6rpx; }
+.pending-banner > text { flex-shrink:0; font-weight:600; }
+.module-tabs { position:sticky; top:0; z-index:4; margin:0 24rpx 14rpx; padding:0; border-radius:0; border-bottom:1rpx solid #e3e9f2; background:#f5f7fa; }
+.module-tab { padding:22rpx 2rpx; font-size:26rpx; border-radius:0; white-space:nowrap; }
+.module-tab.active { background:transparent; color:#2459d9; }
+.module-tab.active::after { content:""; position:absolute; width:42rpx; height:5rpx; border-radius:3rpx; background:#2459d9; bottom:0; left:50%; transform:translateX(-50%); }
+.tab-badge { top:4rpx; right:0; }
+.calendar-filter { display:flex; align-items:center; justify-content:space-between; gap:12rpx; margin:0 24rpx 8rpx; padding:4rpx 0; background:transparent; }
+.calendar-filter picker { padding:12rpx 18rpx; border:1rpx solid #e8edf4; background:white; border-radius:10rpx; font-size:25rpx; }
+.calendar-help { color:#68778c; font-size:23rpx; }
+.module-section { margin:20rpx 24rpx; }
+.module-card { border:1rpx solid #e8edf4; border-radius:18rpx; margin:16rpx 0; padding:24rpx; word-break:break-word; }
+.module-card-title { font-size:30rpx; color:#202b3d; line-height:1.5; }
+.module-meta { color:#68778c; font-size:24rpx; line-height:1.6; }
+.module-actions { gap:12rpx; padding-top:16rpx; border-top:1rpx solid #edf1f6; }
+.module-actions button { font-size:24rpx; font-weight:500; padding:0 16rpx; border-radius:10rpx; background:#f2f5fa; color:#52627a; line-height:64rpx; }
+.module-actions .decision-primary { background:#2459d9; color:#fff; flex:1; }
+.module-actions .decision-secondary { background:#fff1f0; color:#bb3c3c; flex:1; }
+.record-status { margin-top:0; flex-shrink:0; font-size:22rpx; font-weight:500; }
+.course-type { margin:0; flex-shrink:0; padding:5rpx 12rpx; }
+.module-sheet { box-sizing:border-box; padding-bottom:calc(28rpx + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto; }
+.sheet-heading { color:#202b3d; font-size:32rpx; }
+.module-lesson-list { height:38vh; }
+.pending-section .period-title { font-size:27rpx; }
+.pending-course { border:1rpx solid #e8edf4; font-size:25rpx; }

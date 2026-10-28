@@ -1,0 +1,52 @@
+<view class="page">
+  <view class="top-bar">
+    <text class="count-text">共 {{total}} 个WiFi</text>
+    <button class="add-btn" size="mini" bindtap="openAdd">＋ 新增WiFi</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="tip">加载中…</view>
+
+  <view wx:else class="groups">
+    <view class="group" wx:for="{{groups}}" wx:key="campus" wx:for-item="g">
+      <view class="group-head">
+        <text class="group-title">{{g.campus}}校区</text>
+        <text class="group-count">{{g.wifis.length}} 个</text>
+      </view>
+      <view class="room" wx:for="{{g.wifis}}" wx:key="wifiId" wx:for-item="w">
+        <view class="room-main">
+          <view class="room-name">{{w.ssid}}</view>
+          <view class="room-sub" wx:if="{{w.bssid}}">{{w.bssid}}</view>
+        </view>
+        <view class="room-ops">
+          <text class="op" data-id="{{w.wifiId}}" bindtap="openEdit">编辑</text>
+          <text class="op del" data-id="{{w.wifiId}}" data-name="{{w.ssid}}" bindtap="remove">删除</text>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{groups.length === 0}}" class="tip">暂无WiFi配置，请先新增</view>
+  </view>
+
+  <view wx:if="{{editVisible}}" class="mask" bindtap="closeEdit">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">{{editForm.wifiId ? '编辑WiFi' : '新增WiFi'}}</text>
+        <text class="sheet-close" bindtap="closeEdit">取消</text>
+      </view>
+      <view class="form-item">
+        <text class="form-label">WiFi名称</text>
+        <input class="form-input" data-field="ssid" value="{{editForm.ssid}}" placeholder="如 MingYuan-5G" bindinput="onField"/>
+        <text class="read-wifi" bindtap="readWifi">{{wifiReading ? '读取中…' : '读取当前WiFi'}}</text>
+      </view>
+      <view class="wifi-hint {{connectedSsid ? '' : 'warn'}}" wx:if="{{wifiReading || wifiError || connectedSsid}}">{{wifiReading ? '正在识别手机当前连接的WiFi…' : (connectedSsid ? ('已识别当前WiFi：' + connectedSsid + (connectedBssid ? '（' + connectedBssid + '）' : '')) : wifiError)}}</view>
+      <view class="form-item">
+        <text class="form-label">所属校区</text>
+        <picker class="form-picker" range="{{campusOptions}}" value="{{editForm.campusIndex}}" bindchange="onCampus">
+          <view class="picker-val">{{campusOptions[editForm.campusIndex]}}</view>
+        </picker>
+      </view>
+      <view class="form-item"><text class="form-label">BSSID</text><input class="form-input" data-field="bssid" value="{{editForm.bssid}}" placeholder="路由器MAC，可不填" bindinput="onField"/></view>
+      <view class="form-item"><text class="form-label">备注</text><input class="form-input" data-field="remark" value="{{editForm.remark}}" placeholder="选填" bindinput="onField"/></view>
+      <button class="btn-primary" bindtap="save">保存</button>
+    </view>
+  </view>
+</view>

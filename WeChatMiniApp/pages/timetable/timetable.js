@@ -1,37 +1,88 @@
+const childContext = require('../../utils/child-context')
 const { request } = require('../../utils/request')
 
-Page({
+Page(childContext.page({
   data: {
     loading: false,
+    loadError: '',
+    loadSucceeded: false,
+    teacherMode: false,
+    cancelingId: '',
     timetable: [],
     groupedTimetable: [],
     timetableCount: 0,
     showEmpty: false
   },
 
-  onLoad() {
+  onLoad(options={}) {
+    this.accountId=options.accountId?String(options.accountId):''
+    this._unloaded = false
+    if (this.redirectTeacher()) return
     this.loadTimetable()
   },
+
+  onShow() {
+    if (this.redirectTeacher()) return
+    if (this._scheduleDirty || this._loadedToken !== wx.getStorageSync('token')) {
+      this._scheduleDirty = false
+      this.setData({ timetable: [], groupedTimetable: [], timetableCount: 0 })
+      this.loadTimetable()
+    }
+  },
+
+  redirectTeacher() {
+    const roles = wx.getStorageSync('roles') || []
+    const teacherMode = roles.includes('teacher') && !roles.includes('admin')
+    this.setData({teacherMode})
+    if (!teacherMode) return false
+    this._loadVersion = (this._loadVersion || 0) + 1
+    this.setData({timetable:[],groupedTimetable:[],timetableCount:0,loadSucceeded:false,loading:false})
+    if (!this._redirecting) {
+      this._redirecting = true
+      wx.redirectTo({url:'/pages/teacher-single-transactions/teacher-single-transactions',
+        fail:()=>{if (!this._unloaded) this._redirecting=false}})
+    }
+    return true
+  },
+
+  onUnload() { this._unloaded = true; this._loadVersion = (this._loadVersion || 0) + 1 },
 
   onPullDownRefresh() {
     this.loadTimetable().finally(() => wx.stopPullDownRefresh())
   },
 
+  retryLoad() {
+    if (!this.data.loading) return this.loadTimetable()
+  },
+
   async loadTimetable() {
-    this.setData({ loading: true })
+    if (this.redirectTeacher()) return
+    const version = this._loadVersion = (this._loadVersion || 0) + 1
+    const token = wx.getStorageSync('token')
+    const current = () => !this._unloaded && version === this._loadVersion && wx.getStorageSync('token') === token
+    this._loadedToken = token
+    this.setData({ loading: true, loadError: '', loadSucceeded: false, timetable: [], groupedTimetable: [],
+      timetableCount: 0, showEmpty: false })
     try {
-      const res = await request({ url: '/miniapp/parent/timetable' })
+      const res = await request({ url: '/miniapp/parent/timetable', ...(this.accountId?{data:{accountId:this.accountId}}:{}), timeout: 15000 })
+      if (!current()) return
       const timetable = this.decorateTimetable(res.data || [])
       this.setData({
+        loadSucceeded: true,
         timetable,
         groupedTimetable: this.groupByPeriod(timetable),
         timetableCount: timetable.length,
         showEmpty: timetable.length === 0
       })
     } catch (error) {
-      wx.showToast({ title: error.message || '加载失败', icon: 'none' })
+      if (current()) {
+        let message = '课表暂时无法加载，请稍后重试。'
+        if (error.network) message = '网络连接失败，请检查网络后重试。'
+        if (Number(error.code) === 403) message = '暂时没有查看课表的权限，请联系管理员。'
+        this.setData({ loadError: message, loadSucceeded: false, showEmpty: false })
+      }
     } finally {
-      this.setData({ loading: false })
+      if (current()) this.setData({ loading: false })
     }
   },
 
@@ -41,8 +92,10 @@ Page({
       const next = this.computeNextClass(item)
       return {
         ...item,
+        cancelRequestPending: !!item.classDate && String(item.cancelRequestStatus) === '1',
+        viewKey: String(item.enrollmentId || item.scheduleId),
         timeText: this.buildTimeText(item),
-        placeText: item.classroomName || '',
+        placeText: item.lessonLocation || item.classroomName || '',
         subjectTag: this.joinText([item.gradeName, item.subjectName]),
         payText: item.payStatus === '已支付' ? '已支付' : '未支付',
         nextClassDate: next ? next.date : '',
@@ -87,6 +140,7 @@ Page({
 
   // 按上课模式 + 调课表生成全部上课日期
   buildDateList(item) {
+    if (item.classDate) { const date = this.parseDate(item.classDate); return date ? [date] : [] }
     const start = this.parseDate(item.startDate)
     const end = this.parseDate(item.endDate)
     if (!start || !end) return []
@@ -103,7 +157,8 @@ Page({
     let dates = []
 
     if (pattern === 'WEEKLY') {
-      const targetDay = item.periodName === '周日' ? 0 : 6
+      const targetDay = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'].indexOf(item.periodName)
+      if (targetDay < 0) return []
       let cur = new Date(start)
       while (cur <= end && cur.getDay() !== targetDay) {
         cur.setDate(cur.getDate() + 1)
@@ -195,40 +250,59 @@ Page({
   },
 
   goEnrollment() {
-    wx.navigateTo({ url: '/pages/enrollment/enrollment' })
+    if (this.data.teacherMode) return
+    wx.navigateTo({ url: '/pages/enrollment/enrollment'+(this.accountId?'?accountId='+encodeURIComponent(this.accountId):'') })
   },
 
   async handleCancel(e) {
-    const { enrollmentId, courseName, studentName } = e.currentTarget.dataset || {}
-    if (!enrollmentId) {
+    if (this.data.teacherMode || this.data.loading || !this.data.loadSucceeded || this.data.loadError || this._cancelBusy) return
+    const { enrollmentId } = e.currentTarget.dataset || {}
+    const record = this.data.timetable.find(item => String(item.enrollmentId) === String(enrollmentId))
+    if (!enrollmentId || !record) {
       wx.showToast({ title: '报名信息异常', icon: 'none' })
       return
     }
-    const confirmed = await new Promise((resolve) => {
-      wx.showModal({
-        title: '确认取消报名？',
-        content: `确定要取消「${studentName || '学生'}」的「${courseName || '该课程'}」吗？\n取消后将立即从课表中移除。`,
-        confirmText: '确认取消',
-        cancelText: '再想想',
-        confirmColor: '#c84444',
-        success(res) { resolve(res.confirm) },
-        fail() { resolve(false) }
-      })
-    })
-    if (!confirmed) return
-
-    wx.showLoading({ title: '取消中...', mask: true })
+    const single = !!record.classDate
+    if (single && String(record.cancelRequestStatus) === '1') {
+      wx.showToast({ title: '取消申请待老师处理', icon: 'none' })
+      return
+    }
+    const token = this._loadedToken
+    const current = () => !!token && !this._unloaded && token === wx.getStorageSync('token') && !this.data.teacherMode
+    if (!current()) return
+    this._cancelBusy = true
+    this.setData({ cancelingId: String(enrollmentId) })
+    let showingLoading = false
     try {
-      await request({
-        url: `/miniapp/parent/enrollment/${enrollmentId}`,
-        method: 'DELETE'
+      const confirmed = await new Promise((resolve) => {
+        wx.showModal({
+          title: single ? '确认申请取消本次课？' : '确认取消报名？',
+          content: `确定要${single ? '申请取消' : '取消'}「${record.studentName || '学生'}」的「${record.courseClassName || '该课程'}」吗？\n${single ? '老师同意后才会取消；待处理期间保留报名、名额及课包暂占。' : '取消后将立即从课表中移除。'}`,
+          confirmText: single ? '提交申请' : '确认取消',
+          cancelText: '再想想',
+          confirmColor: '#c84444',
+          success(res) { resolve(res.confirm) },
+          fail() { resolve(false) }
+        })
       })
-      wx.hideLoading()
-      wx.showToast({ title: '已取消报名', icon: 'success' })
+      if (!confirmed || !current()) return
+      wx.showLoading({ title: single ? '提交中...' : '取消中...', mask: true })
+      showingLoading = true
+      await request(single ? {
+        url: `/miniapp/parent/enrollment/${enrollmentId}/cancel-request`, method: 'POST',
+        data: { reason: '家长在我的课表确认申请取消本次课' }
+      } : { url: `/miniapp/parent/enrollment/${enrollmentId}`, method: 'DELETE' })
+      if (!current()) return
+      wx.hideLoading(); showingLoading = false
+      getCurrentPages().forEach(page => { if (page !== this) page._scheduleDirty = true })
+      wx.showToast({ title: single ? '已提交取消申请' : '已取消报名', icon: 'success' })
       await this.loadTimetable()
     } catch (error) {
-      wx.hideLoading()
-      wx.showToast({ title: error.message || '取消失败', icon: 'none' })
+      if (current()) wx.showToast({ title: error.message || (single ? '申请失败，请重试' : '取消失败'), icon: 'none' })
+    } finally {
+      if (showingLoading) wx.hideLoading()
+      this._cancelBusy = false
+      if (!this._unloaded) this.setData({ cancelingId: '' })
     }
   }
-})
+}, {route:'/pages/timetable/timetable',detail:false}))

@@ -59,6 +59,10 @@ public interface EduClassSignInMapper
     public int updateReview1(@Param("scheduleId") Long scheduleId, @Param("classDate") String classDate,
             @Param("adminId") Long adminId, @Param("adminName") String adminName, @Param("images") String images);
 
+    /** Archive an old partial review while preserving its original confirmation. */
+    public int completeLegacyReview(@Param("scheduleId") Long scheduleId, @Param("classDate") String classDate,
+            @Param("adminId") Long adminId, @Param("adminName") String adminName, @Param("images") String images);
+
     /**
      * 写入第2位管理员确认并置复核完成（仅当未写入时）
      */

@@ -1,3 +1,4 @@
+@import "../../styles/education-ui.wxss";
 page {
   min-height: 100vh;
   background: #f4f7fb;
@@ -33,6 +34,40 @@ page {
   color: #59687d;
   font-size: 25rpx;
   line-height: 1.55;
+}
+
+.course-type-bar {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin: 0 24rpx 22rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 14rpx;
+  background: #ffffff;
+}
+
+.course-type-label {
+  color: #334257;
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+.course-type-picker {
+  flex: 1;
+}
+
+.course-type-value {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44rpx;
+  color: #0b326a;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.course-type-arrow {
+  color: #6e7a8c;
 }
 
 .filter-bar {
@@ -250,3 +285,65 @@ page {
   color: #ffffff;
 }
 .tuition-btn { margin-top: 14rpx; background: #edf4ff; color: #0b326a; font-size: 24rpx; border-radius: 14rpx; }
+
+.teacher-filter { margin: 0 24rpx 22rpx; padding: 20rpx; border-radius: 14rpx; background: white; }
+.teacher-filter-title { color: #0b326a; font-size: 26rpx; font-weight: 700; }
+.teacher-tags { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.teacher-tag { margin-top: 14rpx; padding: 10rpx 14rpx; border-radius: 12rpx; color: #0f58a8; background: #eaf3ff; font-size: 23rpx; }
+.teacher-search { margin-top: 18rpx; height: 72rpx; font-size: 25rpx; border-bottom: 1rpx solid #dce5f2; }
+.teacher-filter-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin: 18rpx 0; }
+.teacher-filter-actions button { margin: 0; color: #0f58a8; background: #eaf3ff; font-size: 23rpx; }
+.teacher-filter-hint { margin-bottom: 12rpx; line-height: 1.6; }
+.teacher-options { max-height: 360rpx; }
+.teacher-option { display: flex; align-items: center; gap: 12rpx; padding: 18rpx 10rpx; font-size: 25rpx; }
+.teacher-option.selected { background: #eaf3ff; color: #0f58a8; }
+.teacher-group-title { margin: 24rpx 0 14rpx; font-size: 27rpx; font-weight: 700; color: #0b326a; }
+
+.teacher-tag, .teacher-option, .teacher-group-title { white-space: normal; word-break: break-all; }
+.single-course-card { margin-bottom:18rpx; border-radius:16rpx; background:white; overflow:hidden; border:1rpx solid rgba(18,41,72,.06); }
+.single-course-heading { padding:22rpx; }
+.date-toggle { margin-top:18rpx; color:#0f58a8; font-size:25rpx; font-weight:700; }
+.single-date-list { padding:0 22rpx 12rpx; }
+.single-date-row { display:flex; align-items:center; justify-content:space-between; gap:16rpx; padding:18rpx 0; border-top:1rpx solid #e5ebf3; font-size:24rpx; color:#334257; }
+.single-date-row .status { margin:0; flex-shrink:0; }
+
+/* 教育业务页面：紧凑布局与信息层级 */
+
+.header { margin:0; padding:28rpx 28rpx 22rpx; border-radius:0; background:transparent; box-shadow:none; }
+.header-title { margin-top:0; color:#202b3d; font-size:38rpx; font-weight:700; }
+.header-subtitle { color:#68778c; font-size:24rpx; margin-top:6rpx; }
+.course-type-bar { gap:6rpx; padding:6rpx; margin:0 24rpx 20rpx; border:1rpx solid #e8edf4; background:#edf0f6; border-radius:14rpx; }
+.course-type-tab { flex:1; text-align:center; padding:20rpx 0; font-size:28rpx; color:#68778c; border-radius:10rpx; }
+.course-type-tab.selected { background:#fff; color:#2459d9; font-weight:700; box-shadow:0 2rpx 6rpx #2030500a; }
+.filter-bar { margin-bottom:14rpx; }
+.filter-picker,.icon-btn { border-color:#e8edf4; border-radius:12rpx; }
+.teacher-filter { padding:20rpx; margin-bottom:20rpx; border:1rpx solid #e8edf4; border-radius:14rpx; }
+.teacher-filter-title { color:#52627a; font-size:25rpx; font-weight:500; }
+.teacher-tag { background:#edf2ff; color:#2459d9; border-radius:8rpx; }
+.teacher-group-title { display:flex; align-items:center; margin:24rpx 0 14rpx; font-size:26rpx; color:#52627a; }
+.section-title { font-size:30rpx; font-weight:700; }
+.schedule-card,.enroll-card,.single-course-card { border-color:#e8edf4; box-shadow:none; border-radius:18rpx; }
+.schedule-card,.enroll-card { padding:24rpx; }
+.single-course-heading { padding:24rpx; }
+.course-name { font-size:30rpx; font-weight:700; line-height:1.5; word-break:break-word; }
+.meta { font-size:24rpx; color:#68778c; line-height:1.6; }
+.card-side { min-width:110rpx; gap:16rpx; }
+.count { font-size:28rpx; color:#2459d9; }
+.status,.done { border-radius:8rpx; font-weight:500; padding:6rpx 12rpx; margin-top:10rpx; white-space:nowrap; }
+.enroll-card > view:first-child { flex:1; min-width:0; }
+.enroll-card > view:last-child { flex-shrink:0; text-align:right; max-width:190rpx; }
+.enroll-card button { margin:14rpx 0 0 auto; padding:0 14rpx; color:#2459d9; background:#edf2ff; font-size:23rpx; }
+.date-toggle { margin-top:18rpx; padding-top:16rpx; border-top:1rpx solid #edf1f6; color:#2459d9; font-size:25rpx; }
+.single-date-row { font-size:26rpx; }
+.sheet { max-height:86vh; overflow-y:auto; box-sizing:border-box; padding-bottom:calc(28rpx + env(safe-area-inset-bottom)); }
+.sheet-course { color:#202b3d; line-height:1.5; }
+.sheet-meta { color:#68778c; line-height:1.5; }
+.input { background:#f7f9fc; border-color:#e8edf4; border-radius:12rpx; }
+.submit-btn { background:#2459d9; }
+.empty { border:1rpx dashed #e0e6ef; font-size:25rpx; background:transparent; }
+.settlement-options { display:flex; gap:16rpx; margin:22rpx 0; }.settlement-option { flex:1; padding:20rpx 0; text-align:center; border:1rpx solid #dfe5ee; border-radius:12rpx; color:#68778c; }.settlement-option.selected { background:#edf2ff; border-color:#2459d9; color:#2459d9; }.credit-account { padding:18rpx 0; border-bottom:1rpx solid #edf0f4; font-size:26rpx; }.credit-available { float:right; color:#2459d9; font-weight:600; }
+.booking-wallet{margin:0 24rpx 24rpx;padding:28rpx;border:1rpx solid #dce8fa;border-radius:24rpx;background:linear-gradient(125deg,#eaf2ff,#f5f9ff 80%,#fff7e7);color:#264774}
+.wallet-heading{display:flex;align-items:center;justify-content:space-between;gap:16rpx}.wallet-eyebrow{font-size:23rpx;color:#6882a6}.wallet-child{font-size:28rpx;font-weight:650;margin-top:8rpx}.wallet-mark{font-size:34rpx;color:#8aa7d5;letter-spacing:5rpx;font-weight:700}
+.wallet-stats{display:flex;align-items:center;margin-top:28rpx}.wallet-primary{flex:1.3}.wallet-secondary{flex:1;text-align:center;border-left:1rpx solid #dce6f5}.wallet-value{font-size:62rpx;font-weight:750;line-height:1.2;color:#204d93}.wallet-value text{font-size:24rpx;font-weight:400}.wallet-small-value{font-size:34rpx;font-weight:650;line-height:1.4}.wallet-label{font-size:22rpx;color:#7a8eaa;margin-top:8rpx}
+.wallet-actions{display:flex;justify-content:space-between;align-items:center;margin-top:26rpx}.wallet-history{font-size:24rpx;color:#557aaf;padding:12rpx 0}.wallet-buy{margin:0;padding:0 28rpx;height:70rpx;line-height:70rpx;border-radius:14rpx;background:#2459d9;color:#fff;font-size:25rpx;font-weight:600}.wallet-buy::after{border:0}.wallet-buy[disabled]{background:#a7bad9;color:white}
+.wallet-footnote{margin-top:22rpx;padding-top:18rpx;border-top:1rpx solid #dfe8f5;color:#8594a9;font-size:21rpx;line-height:1.6}.wallet-state{padding:24rpx 0;font-size:25rpx;color:#7589a5;line-height:1.7}.wallet-error{color:#ab6949}

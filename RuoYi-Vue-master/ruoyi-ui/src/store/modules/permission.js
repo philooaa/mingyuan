@@ -59,6 +59,9 @@ function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
       route.children = filterChildren(route.children)
     }
     if (route.component) {
+      if (route.component === 'system/signReview/index') {
+        route.meta = { ...route.meta, title: '学生出勤' }
+      }
       // Layout ParentView 组件特殊处理
       if (route.component === 'Layout') {
         route.component = Layout

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.MiniAppAdminEnrollmentMapper">
+    <!-- 与小程序 compareGrades 一致；在分页前排序，防止低年级留到后续页。 -->
+    <sql id="gradeOrder">
+        case
+          when trim(s.grade_name) in ('一年级', '小学一年级', '小一', '1年级') then 0
+          when trim(s.grade_name) in ('二年级', '小学二年级', '小二', '2年级') then 1
+          when trim(s.grade_name) in ('三年级', '小学三年级', '小三', '3年级') then 2
+          when trim(s.grade_name) in ('四年级', '小学四年级', '小四', '4年级') then 3
+          when trim(s.grade_name) in ('五年级', '小学五年级', '小五', '5年级') then 4
+          when trim(s.grade_name) in ('六年级', '小学六年级', '小六', '6年级') then 5
+          when trim(s.grade_name) in ('初一', '初中一年级', '七年级', '7年级') then 6
+          when trim(s.grade_name) in ('初二', '初中二年级', '八年级', '8年级') then 7
+          when trim(s.grade_name) in ('初三', '初中三年级', '九年级', '9年级') then 8
+          when trim(s.grade_name) in ('高一', '高中一年级') then 9
+          when trim(s.grade_name) in ('高二', '高中二年级') then 10
+          when trim(s.grade_name) in ('高三', '高中三年级') then 11
+          when s.grade_name is null or trim(s.grade_name) in ('', '未分年级') then 100
+          else 99
+        end
+    </sql>
+    <sql id="scheduleView">
+        select s.schedule_id as scheduleId, s.course_class_name as courseClassName,
+               s.grade_name as gradeName, s.subject_name as subjectName,
+               coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacherName, s.class_type as classType, s.class_mode as classMode, s.lesson_location as lessonLocation,
+               s.course_year as courseYear, s.term_name as termName,
+               s.period_name as periodName, s.time_slot as timeSlot,
+               s.start_time as startTime, s.end_time as endTime,
+               s.start_date as startDate, s.end_date as endDate,
+               s.class_pattern as classPattern, s.recruit_status as recruitStatus,
+               s.status, ifnull(s.enrolled_count, 0) as enrolledCount,
+               c.classroom_name as classroomName, c.campus_name as campusName
+        from edu_course_schedule s
+        left join sys_user teacher on teacher.user_id = s.teacher_id
+        left join edu_classroom c on c.classroom_id = s.classroom_id
+    </sql>
+    <select id="selectTeacherSchedules" resultType="java.util.HashMap">
+        <include refid="scheduleView"/>
+        where s.del_flag = '0' and s.teacher_id = #{teacherId}
+        <if test="scheduleId != null">and s.schedule_id = #{scheduleId}</if>
+        order by <include refid="gradeOrder"/>, s.grade_name, s.course_year desc, s.term_name, s.period_name, s.start_time, s.schedule_id
+    </select>
+    <select id="selectGrades" resultType="string">
+        select grade_name from (
+            select distinct s.grade_name, <include refid="gradeOrder"/> as grade_sort
+            from edu_course_schedule s
+            where s.del_flag = '0' and s.grade_name is not null and s.grade_name != ''
+        ) grades
+        order by grade_sort, grade_name
+    </select>
+    <select id="selectSchedules" resultType="java.util.HashMap">
+        <include refid="scheduleView"/>
+        where s.del_flag = '0'
+        <if test="gradeName != null and gradeName != ''">and s.grade_name = #{gradeName}</if>
+        order by <include refid="gradeOrder"/>, s.grade_name, s.course_year desc, s.term_name, s.period_name, s.start_time, s.schedule_id
+    </select>
+    <select id="selectSchedule" resultType="java.util.HashMap">
+        <include refid="scheduleView"/>
+        where s.schedule_id = #{scheduleId} and s.del_flag = '0'
+    </select>
+    <select id="selectTeacherHistory" resultType="java.util.HashMap">
+        select r.class_date as classDate, r.sign_status as signStatus, r.review_status as reviewStatus,
+               r.source_type as sourceType, r.remark
+        from edu_class_sign_in r
+        join edu_enrollment e on e.enrollment_id = r.enrollment_id and e.schedule_id = r.schedule_id
+        join edu_course_schedule s on s.schedule_id = r.schedule_id
+        where r.enrollment_id = #{enrollmentId} and r.del_flag = '0'
+          and e.del_flag = '0' and s.del_flag = '0' and s.teacher_id = #{teacherId}
+        order by r.class_date desc, r.sign_in_id desc
+    </select>
+    <select id="selectHistory" resultType="java.util.HashMap">
+        select class_date as classDate, sign_status as signStatus, review_status as reviewStatus,
+               source_type as sourceType, remark
+        from edu_class_sign_in where enrollment_id = #{enrollmentId} and del_flag = '0'
+        order by class_date desc, sign_in_id desc
+    </select>
+</mapper>

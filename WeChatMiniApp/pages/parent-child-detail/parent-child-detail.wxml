@@ -1,0 +1,2 @@
+<import src="../../templates/child-account.wxml" />
+<template is="child-account" data="{{administrator,view,legacy,child,accounts,childCount,pendingBadge,unlinkedCount,unlinkedPendingBadge,loading,error,submitting,detail,section,sections,recordKind,records,total,pageNum,pendingOnly,showForm,formKind,form,parentId,parentKeyword,parentOptions,parentIndex,grades,gradeIndex,account,showLink,showHistory,historyTitle,history,linkEnrollment,childOptions,childIndex,linkReason}}" />

@@ -55,11 +55,24 @@ public class EduTeacherSalaryConfig extends BaseEntity
     @Excel(name = "班课每次课时长(小时)")
     private BigDecimal classHoursPerSession;
 
+    /** 固定提成金额（元/月） */
+    @Excel(name = "提成(元/月)")
+    private BigDecimal commissionAmount;
+
     /** 状态（0正常 1停用） */
     private String status;
 
     /** 删除标志（0存在 2删除） */
     private String delFlag;
+
+    /** 负责的小学班课门数（统计值，非持久化） */
+    private Integer primaryClassCount;
+
+    /** 负责的中学班课门数（统计值，非持久化） */
+    private Integer jhClassCount;
+
+    /** 负责的一对一门数（统计值，非持久化） */
+    private Integer oneOnOneClassCount;
 
     public void setConfigId(Long configId) { this.configId = configId; }
     public Long getConfigId() { return configId; }
@@ -91,11 +104,23 @@ public class EduTeacherSalaryConfig extends BaseEntity
     public void setClassHoursPerSession(BigDecimal classHoursPerSession) { this.classHoursPerSession = classHoursPerSession; }
     public BigDecimal getClassHoursPerSession() { return classHoursPerSession; }
 
+    public void setCommissionAmount(BigDecimal commissionAmount) { this.commissionAmount = commissionAmount; }
+    public BigDecimal getCommissionAmount() { return commissionAmount; }
+
     public void setStatus(String status) { this.status = status; }
     public String getStatus() { return status; }
 
     public void setDelFlag(String delFlag) { this.delFlag = delFlag; }
     public String getDelFlag() { return delFlag; }
+
+    public void setPrimaryClassCount(Integer primaryClassCount) { this.primaryClassCount = primaryClassCount; }
+    public Integer getPrimaryClassCount() { return primaryClassCount; }
+
+    public void setJhClassCount(Integer jhClassCount) { this.jhClassCount = jhClassCount; }
+    public Integer getJhClassCount() { return jhClassCount; }
+
+    public void setOneOnOneClassCount(Integer oneOnOneClassCount) { this.oneOnOneClassCount = oneOnOneClassCount; }
+    public Integer getOneOnOneClassCount() { return oneOnOneClassCount; }
 
     @Override
     public String toString() {

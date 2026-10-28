@@ -36,4 +36,9 @@ public interface EduTeacherSalaryRecordMapper
      * 返回 teacherId/scheduleId/classDate/classMode/stage/startTime/endTime/总行数/实到行数
      */
     public List<Map<String, Object>> selectMonthlySessions(@Param("salaryMonth") String salaryMonth);
+
+    /**
+     * 寒假 / 春季排课（薪资课时来源，含起止日期与上课模式）
+     */
+    public List<Map<String, Object>> selectTermSchedules();
 }

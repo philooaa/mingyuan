@@ -34,7 +34,7 @@ import com.ruoyi.system.service.ISysUserService;
 
 /**
  * 用户信息
- * 
+ *
  * @author ruoyi
  */
 @RestController
@@ -80,8 +80,8 @@ public class SysUserController extends BaseController
     @PostMapping("/importData")
     public AjaxResult importData(MultipartFile file, boolean updateSupport) throws Exception
     {
-        ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
-        List<SysUser> userList = util.importExcel(file.getInputStream());
+        ExcelUtil<com.ruoyi.system.domain.EduTeacherUserImport> util = new ExcelUtil<>(com.ruoyi.system.domain.EduTeacherUserImport.class);
+        List<SysUser> userList = new java.util.ArrayList<>(util.importExcel(file.getInputStream()));
         String operName = getUsername();
         String message = userService.importUser(userList, updateSupport, operName);
         return success(message);
@@ -90,7 +90,7 @@ public class SysUserController extends BaseController
     @PostMapping("/importTemplate")
     public void importTemplate(HttpServletResponse response)
     {
-        ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
+        ExcelUtil<com.ruoyi.system.domain.EduTeacherUserImport> util = new ExcelUtil<>(com.ruoyi.system.domain.EduTeacherUserImport.class);
         util.importTemplateExcel(response, "用户数据");
     }
 

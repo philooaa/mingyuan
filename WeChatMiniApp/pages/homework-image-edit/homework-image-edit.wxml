@@ -1,0 +1,14 @@
+<view class="page">
+  <view class="toolbar">
+    <view class="tool {{tool==='pen'?'on':''}}" data-tool="pen" bindtap="pickTool">画笔</view>
+    <view class="tool {{tool==='text'?'on':''}}" data-tool="text" bindtap="pickTool">文字</view>
+    <view class="colors"><view wx:for="{{colors}}" wx:key="*this" class="dot {{color===item?'on':''}}" style="background:{{item}}" data-color="{{item}}" bindtap="pickColor"/></view>
+    <view class="tool" bindtap="undo">撤销</view>
+    <view class="tool" bindtap="clear">清空</view>
+  </view>
+  <view class="hint" wx:if="{{textHint}}">{{textHint}}</view>
+  <view class="canvas-wrap">
+    <canvas type="2d" id="cv" class="cv" style="width:{{canvasW}}px;height:{{canvasH}}px" disable-scroll="{{true}}" bindtouchstart="touchStart" bindtouchmove="touchMove" bindtouchend="touchEnd"/>
+  </view>
+  <button class="save" disabled="{{!ready}}" bindtap="save">保存标注并返回</button>
+</view>

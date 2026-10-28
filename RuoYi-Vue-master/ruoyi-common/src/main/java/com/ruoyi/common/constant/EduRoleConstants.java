@@ -13,4 +13,7 @@ public interface EduRoleConstants
 
     /** 管理员角色，沿用若依内置超级管理员 role_key。 */
     String ADMIN = "admin";
+
+    /** 业务管理员；不拥有超级管理员的账号及权限维护权。 */
+    String BUSINESS_ADMIN = "business_admin";
 }

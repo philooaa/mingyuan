@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "课次复核"
+  "navigationBarTitleText": "课次出勤确认",
+  "enablePullDownRefresh": true
 }

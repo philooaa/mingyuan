@@ -1,0 +1,20 @@
+<view class="page"><view class="heading">发放推荐奖励</view><view class="muted">已选择{{recordCount}}条推荐 · 审核后为新家长、老家长或双方发券</view><view class="error" wx:if="{{error}}">{{error}}<button wx:if="{{!identityChanged}}" bindtap="load" disabled="{{busy || uncertain}}">重新加载</button></view><view class="empty" wx:if="{{loading}}">正在加载券模板…</view>
+<view class="card reward-form" wx:if="{{!identityChanged}}">
+    <view class="title">1. 选择券模板</view><view class="muted">接收名单按用户去重；同一家长跨推荐的合法奖励分别发券。</view>
+    <view class="card empty-template" wx:if="{{!loading && !error && !templates.length}}"><view class="title">还没有已启用的券模板</view><view class="muted">先创建并启用模板，再回来发放。已选推荐记录会保留。</view><button class="primary" bindtap="goTemplates">创建券模板</button></view>
+    <picker wx:if="{{templates.length}}" range="{{templates}}" range-key="label" value="{{templateIndex}}" bindchange="chooseTemplate" disabled="{{busy || uncertain}}"><view class="field">{{templateIndex>=0?templates[templateIndex].label:'选择已有优惠券模板'}} ▾</view></picker>
+    <view class="title step-title">2. 选择接收人</view><picker range="{{rewardRoles}}" value="{{rewardRoleIndex}}" bindchange="chooseRewardRole" disabled="{{busy || uncertain}}"><view class="field">接收：{{rewardRoles[rewardRoleIndex]}} ▾</view></picker>
+    <view class="title step-title">3. 填写发放原因</view><textarea value="{{reason}}" maxlength="255" placeholder="填写审核与发放原因" bindinput="inputReason" disabled="{{busy || uncertain}}"/>
+    <view wx:if="{{preview}}"><view class="title">{{preview.recipientCount}}名家长 · {{preview.couponCount}}张券</view><checkbox-group bindchange="selectParents"><label class="person" wx:for="{{preview.recipients}}" wx:key="parentId"><checkbox value="{{item.parentId}}" checked="{{item.checked}}" disabled="{{busy || uncertain}}"/>{{item.parentName}}（{{item.parentPhone || '未填写手机号'}}）</label></checkbox-group><view class="muted">模板：{{preview.template.couponName}} · 抵扣¥{{preview.template.discountAmount}} · 门槛¥{{preview.template.minSpendAmount}}</view></view>
+    <view class="error" wx:if="{{uncertain}}">发放结果尚未确认，名单已锁定。请重试原批次，不要另开批次。</view>
+    <view class="buttons"><button bindtap="back" disabled="{{busy || uncertain}}">返回</button><button class="primary" bindtap="grant" disabled="{{busy || loading || (!uncertain && (templateIndex<0 || !reason))}}" loading="{{busy}}">{{uncertain?'重试原批次':'发券'}}</button></view>
+</view>
+  <view class="shade" wx:if="{{confirmingReward}}"><scroll-view scroll-y class="sheet">
+    <view class="title">确认发放优惠券</view>
+    <view class="card"><view class="title">{{confirmationTemplate.couponName}}</view><view class="coupon-amount">{{confirmationTemplate.summaryText}}</view><view class="muted">{{confirmationTemplate.subjectText}} · {{confirmationTemplate.scopeScheduleId?'限指定课程':'全部课程'}}</view><view class="muted">{{confirmationTemplate.validFrom}} 至 {{confirmationTemplate.validUntil}}</view></view>
+    <view class="title">{{preview.recipientCount}}位家长，共{{preview.couponCount}}张券</view><view class="muted">同一家长跨推荐记录的奖励分别计算。</view>
+    <view class="person" wx:for="{{preview.recipients}}" wx:key="parentId">{{item.parentName}} · {{item.parentPhone || '未填写手机号'}}</view>
+    <view class="muted">发放原因：{{reason}}</view>
+    <view class="buttons"><button bindtap="cancelRewardConfirmation">取消</button><button class="primary" bindtap="confirmRewardGrant">确认发放</button></view>
+  </scroll-view></view>
+</view>

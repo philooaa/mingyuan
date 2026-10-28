@@ -1,0 +1,16 @@
+<view class="page">
+  <view class="card"><view class="title">报名管理</view><view class="muted">先按年级找班次，再查看报名人员</view>
+    <view class="search"><input placeholder="学生姓名 / 家长手机号" value="{{keyword}}" bindinput="inputKeyword" bindconfirm="search" confirm-type="search"/><button size="mini" bindtap="search">搜索</button></view>
+    <picker range="{{grades}}" value="{{gradeIndex}}" disabled="{{loading}}" bindchange="changeGrade"><view class="filter">年级：{{grades[gradeIndex]}} ▾</view></picker>
+  </view>
+  <view wx:for="{{groups}}" wx:key="grade" class="group">
+    <view class="group-title" bindtap="toggle" data-index="{{index}}">{{item.grade}} <text>{{item.collapsed ? '展开 ＋' : '收起 －'}}</text></view>
+    <block wx:if="{{!item.collapsed}}"><view wx:for="{{item.items}}" wx:for-item="schedule" wx:key="scheduleId" class="card" bindtap="open" data-id="{{schedule.scheduleId}}">
+      <view class="title">{{schedule.course}}</view><view class="ui-time">{{schedule.time}}</view><view class="muted">{{schedule.teacherName || '教师未提供'}}</view>
+      <view class="muted">{{schedule.courseYear}} {{schedule.termName}} · {{schedule.room}}</view>
+      <view class="row"><text>已报名 {{schedule.enrolledCount}} 人</text><text>{{schedule.recruitText}} · 查看名单 ›</text></view>
+    </view></block>
+  </view>
+  <view class="empty" wx:if="{{error}}">{{error}}</view><view class="empty" wx:elif="{{!loading && !list.length}}">暂无班次</view>
+  <view class="empty">{{loading ? '加载中…' : (total > list.length ? '上滑加载更多班次' : '已显示全部班次')}}</view>
+</view>

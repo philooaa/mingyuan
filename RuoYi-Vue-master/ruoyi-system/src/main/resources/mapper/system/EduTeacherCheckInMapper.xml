@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.EduTeacherCheckInMapper">
+
+    <resultMap type="EduTeacherCheckIn" id="EduTeacherCheckInResult">
+        <id     property="checkInId"      column="check_in_id"      />
+        <result property="scheduleId"     column="schedule_id"      />
+        <result property="classDate"      column="class_date"       />
+        <result property="checkType"      column="check_type"       />
+        <result property="teacherId"      column="teacher_id"       />
+        <result property="teacherName"    column="teacher_name"     />
+        <result property="campusName"     column="campus_name"      />
+        <result property="classroomName"  column="classroom_name"   />
+        <result property="ssid"           column="ssid"             />
+        <result property="bssid"          column="bssid"            />
+        <result property="checkInTime"    column="check_in_time"    />
+        <result property="createBy"       column="create_by"        />
+        <result property="createTime"     column="create_time"      />
+        <result property="remark"         column="remark"           />
+    </resultMap>
+
+    <sql id="cols">r.check_in_id, r.schedule_id, r.class_date, r.check_type, r.teacher_id, r.teacher_name,
+        r.campus_name, r.classroom_name, r.ssid, r.bssid, r.check_in_time,
+        r.create_by, r.create_time, r.remark</sql>
+
+    <!-- 某教师某日期的打卡记录（上班/下班） -->
+    <select id="selectByTeacherAndDate" resultMap="EduTeacherCheckInResult">
+        select <include refid="cols"/>
+        from edu_teacher_check_in r
+        where r.teacher_id = #{teacherId} and r.class_date = #{classDate}
+        order by r.check_in_time
+    </select>
+
+    <!-- 某教师某日期某类型是否已打卡 -->
+    <select id="countByTeacherDateType" resultType="int">
+        select count(*) from edu_teacher_check_in
+        where teacher_id = #{teacherId} and class_date = #{classDate} and check_type = #{checkType}
+    </select>
+
+    <!-- 某日期全部打卡记录（teacherId 可为空） -->
+    <select id="selectByDate" resultMap="EduTeacherCheckInResult">
+        select <include refid="cols"/>
+        from edu_teacher_check_in r
+        where r.class_date = #{classDate}
+        <if test="teacherId != null">and r.teacher_id = #{teacherId}</if>
+        order by r.check_in_time
+    </select>
+
+    <!-- 日期区间打卡记录（teacherId 可为空） -->
+    <select id="selectByRange" resultMap="EduTeacherCheckInResult">
+        select <include refid="cols"/>
+        from edu_teacher_check_in r
+        where r.class_date between #{start} and #{end}
+        <if test="teacherId != null">and r.teacher_id = #{teacherId}</if>
+        order by r.class_date, r.check_in_time
+    </select>
+
+    <!-- 新增打卡记录 -->
+    <insert id="insert" parameterType="EduTeacherCheckIn" useGeneratedKeys="true" keyProperty="checkInId">
+        insert into edu_teacher_check_in
+            (schedule_id, class_date, check_type, teacher_id, teacher_name, campus_name, classroom_name,
+             ssid, bssid, check_in_time, create_by, create_time, remark)
+        values
+            (#{scheduleId}, #{classDate}, #{checkType}, #{teacherId}, #{teacherName}, #{campusName}, #{classroomName},
+             #{ssid}, #{bssid}, #{checkInTime}, #{createBy}, #{createTime}, #{remark})
+    </insert>
+
+    <!-- 修改打卡记录（只更新非空字段） -->
+    <update id="update" parameterType="EduTeacherCheckIn">
+        update edu_teacher_check_in
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="checkInTime != null">check_in_time = #{checkInTime},</if>
+            <if test="campusName != null and campusName != ''">campus_name = #{campusName},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where check_in_id = #{checkInId}
+    </update>
+
+    <!-- 删除打卡记录 -->
+    <delete id="deleteById">
+        delete from edu_teacher_check_in where check_in_id = #{checkInId}
+    </delete>
+
+</mapper>

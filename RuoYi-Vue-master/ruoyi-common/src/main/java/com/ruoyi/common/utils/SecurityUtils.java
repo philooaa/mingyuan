@@ -8,6 +8,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.util.PatternMatchUtils;
 import com.ruoyi.common.constant.Constants;
+import com.ruoyi.common.constant.EduRoleConstants;
+import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.domain.entity.SysRole;
 import com.ruoyi.common.core.domain.model.LoginUser;
@@ -168,7 +170,10 @@ public class SecurityUtils
     public static boolean hasRole(String role)
     {
         List<SysRole> roleList = getLoginUser().getUser().getRoles();
-        Collection<String> roles = roleList.stream().map(SysRole::getRoleKey).collect(Collectors.toSet());
+        Collection<String> roles = roleList.stream()
+                .filter(r -> !EduRoleConstants.BUSINESS_ADMIN.equals(r.getRoleKey())
+                        || ("0".equals(r.getStatus()) && "0".equals(r.getDelFlag())))
+                .map(SysRole::getRoleKey).collect(Collectors.toSet());
         return hasRole(roles, role);
     }
 
@@ -182,7 +187,20 @@ public class SecurityUtils
     public static boolean hasRole(Collection<String> roles, String role)
     {
         return roles.stream().filter(StringUtils::hasText)
-                .anyMatch(x -> Constants.SUPER_ADMIN.equals(x) || PatternMatchUtils.simpleMatch(x, role));
+                .anyMatch(x -> Constants.SUPER_ADMIN.equals(x) || PatternMatchUtils.simpleMatch(x, role)
+                        || (EduRoleConstants.BUSINESS_ADMIN.equals(x) && Constants.SUPER_ADMIN.equals(role)));
+    }
+
+    public static boolean isBusinessAdmin(SysUser user)
+    {
+        return user != null && user.getRoles() != null && user.getRoles().stream()
+                .anyMatch(role -> EduRoleConstants.BUSINESS_ADMIN.equals(role.getRoleKey())
+                        && "0".equals(role.getStatus()) && "0".equals(role.getDelFlag()));
+    }
+
+    public static void requireSuperAdmin()
+    {
+        if (!isAdmin()) throw new ServiceException("仅原始 admin 超级管理员可维护管理员账号和角色权限");
     }
 
 }

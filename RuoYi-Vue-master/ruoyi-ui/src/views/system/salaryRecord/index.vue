@@ -22,7 +22,8 @@
       </el-form-item>
     </el-form>
 
-    <el-table v-loading="loading" :data="recordList" border size="mini" show-summary :summary-method="getSummary">
+    <el-table v-loading="loading" :data="recordList" border size="mini" show-summary :summary-method="getSummary"
+      empty-text="该月份尚未生成结算单，请点击右上角「按月预览/生成」">
       <el-table-column label="月份" align="center" prop="salaryMonth" width="90" />
       <el-table-column label="教师" align="center" prop="teacherName" width="90" />
       <el-table-column label="底薪" align="center" prop="baseSalary" width="90" />
@@ -59,6 +60,11 @@
       <el-table-column label="课时费合计" align="center" prop="lessonAmount" width="110">
         <template slot-scope="scope"><span class="amt">¥{{ scope.row.lessonAmount }}</span></template>
       </el-table-column>
+      <el-table-column label="提成" align="center" prop="commissionAmount" width="100">
+        <template slot-scope="scope">
+          <span class="amt">¥{{ scope.row.commissionAmount }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="应发合计" align="center" prop="totalAmount" width="110">
         <template slot-scope="scope"><span class="total-amt">¥{{ scope.row.totalAmount }}</span></template>
       </el-table-column>
@@ -84,8 +90,6 @@
 
     <!-- 预览对话框 -->
     <el-dialog :title="`月度预览（${previewMonth}）`" :visible.sync="previewOpen" width="1100px" append-to-body>
-      <el-alert type="info" :closable="false" style="margin-bottom: 10px"
-        title="数据来自当月签到记录实时统计：班课按实到≥1人的课次计（每次默认2小时，可在薪资标准调整），一对一按实到学员人次计。确认无误后点击「生成结算单」。" />
       <el-table :data="previewList" border size="mini" max-height="480" show-summary :summary-method="getPreviewSummary">
         <el-table-column label="教师" align="center" prop="teacherName" width="90" fixed="left" />
         <el-table-column label="底薪" align="center" prop="baseSalary" width="80" />
@@ -106,6 +110,9 @@
         </el-table-column>
         <el-table-column label="课时费" align="center" width="90">
           <template slot-scope="scope"><b>¥{{ scope.row.lessonAmount }}</b></template>
+        </el-table-column>
+        <el-table-column label="提成" align="center" width="90">
+          <template slot-scope="scope"><b>¥{{ scope.row.commissionAmount }}</b></template>
         </el-table-column>
         <el-table-column label="应发" align="center" width="90">
           <template slot-scope="scope"><b class="total-amt">¥{{ scope.row.totalAmount }}</b></template>
@@ -205,7 +212,7 @@ export default {
       columns.forEach((col, i) => {
         if (i === 0) { sums[i] = '合计'; return }
         const prop = col.property
-        if (['baseSalary', 'primaryClassAmount', 'jhClassAmount', 'primary1on1Amount', 'junior1on1Amount', 'senior1on1Amount', 'lessonAmount', 'totalAmount'].includes(prop)) {
+        if (['baseSalary', 'primaryClassAmount', 'jhClassAmount', 'primary1on1Amount', 'junior1on1Amount', 'senior1on1Amount', 'lessonAmount', 'commissionAmount', 'totalAmount'].includes(prop)) {
           sums[i] = '¥' + this.sumAmount(data, prop).toFixed(2)
         } else {
           sums[i] = ''
@@ -217,7 +224,7 @@ export default {
       const sums = []
       columns.forEach((col, i) => {
         if (i === 0) { sums[i] = '合计'; return }
-        if (['baseSalary', 'lessonAmount', 'totalAmount'].includes(col.property)) {
+        if (['baseSalary', 'lessonAmount', 'commissionAmount', 'totalAmount'].includes(col.property)) {
           sums[i] = '¥' + this.sumAmount(data, col.property).toFixed(2)
         } else {
           sums[i] = ''

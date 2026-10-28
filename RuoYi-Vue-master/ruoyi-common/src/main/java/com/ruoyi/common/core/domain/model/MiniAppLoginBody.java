@@ -17,6 +17,32 @@ public class MiniAppLoginBody
      */
     private String devRole;
 
+    /** Selected teacher user ID; only accepted by local development login. */
+    private Long devTeacherId;
+
+    /** Selected parent user ID; only accepted by local development login. */
+    private Long devParentId;
+
+    public Long getDevTeacherId()
+    {
+        return devTeacherId;
+    }
+
+    public void setDevTeacherId(Long devTeacherId)
+    {
+        this.devTeacherId = devTeacherId;
+    }
+
+    public Long getDevParentId()
+    {
+        return devParentId;
+    }
+
+    public void setDevParentId(Long devParentId)
+    {
+        this.devParentId = devParentId;
+    }
+
     public String getLoginCode()
     {
         return loginCode;

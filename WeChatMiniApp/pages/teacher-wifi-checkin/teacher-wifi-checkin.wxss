@@ -1,0 +1,161 @@
+.page {
+  min-height: 100vh;
+  background: #f4f7fb;
+  padding-bottom: 40rpx;
+}
+
+.wifi-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24rpx 24rpx 0;
+  padding: 22rpx 28rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 16rpx rgba(28, 37, 48, 0.06);
+}
+
+.wifi-info {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.wifi-label {
+  font-size: 24rpx;
+  color: #8a95a3;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.wifi-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wifi-name.ok {
+  color: #18a058;
+}
+
+.wifi-name.none {
+  color: #d94c4c;
+}
+
+.wifi-refresh {
+  font-size: 26rpx;
+  color: #2b6de5;
+  flex-shrink: 0;
+  padding-left: 24rpx;
+}
+
+.wifi-error {
+  margin: 12rpx 32rpx 0;
+  font-size: 22rpx;
+  color: #d98a1f;
+  line-height: 1.5;
+}
+
+.wifi-manual {
+  margin: 12rpx 24rpx 0;
+}
+
+.wifi-manual-input {
+  height: 80rpx;
+  padding: 0 24rpx;
+  line-height: normal;
+  background: #fff;
+  border: 1rpx solid #dce5f2;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+}
+
+.header {
+  padding: 32rpx 32rpx 16rpx;
+}
+
+.header-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1c2530;
+}
+
+.header-subtitle {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8a95a3;
+}
+
+.punch-card {
+  margin: 24rpx;
+  padding: 8rpx 28rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(28, 37, 48, 0.06);
+}
+
+.punch-row {
+  display: flex;
+  align-items: center;
+  padding: 30rpx 0;
+}
+
+.punch-label {
+  width: 160rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1c2530;
+}
+
+.punch-time {
+  flex: 1;
+  font-size: 28rpx;
+  color: #18a058;
+}
+
+.punch-time.none {
+  color: #b6bfca;
+}
+
+.punch-btn {
+  width: 140rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  text-align: center;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #fff;
+}
+
+.punch-btn.in {
+  background: #2b6de5;
+}
+
+.punch-btn.out {
+  background: #18a058;
+}
+
+.punch-btn.done {
+  background: #e6f7ee;
+  color: #18a058;
+}
+
+.punch-btn.disabled {
+  background: #eef2f8;
+  color: #b6bfca;
+}
+
+.punch-divider {
+  height: 1rpx;
+  background: #eef2f8;
+}
+
+.loading {
+  text-align: center;
+  padding: 24rpx;
+  color: #8a95a3;
+  font-size: 26rpx;
+}

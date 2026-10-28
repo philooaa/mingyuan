@@ -3,8 +3,11 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ruoyi.system.mapper.EduEnrollmentMapper">
-    
+
     <resultMap type="EduEnrollment" id="EduEnrollmentResult">
+        <result property="lessonAccountId" column="lesson_account_id" />
+        <result property="classDate" column="class_date" />
+        <result property="cancelRequestStatus" column="cancel_request_status" />
         <result property="enrollmentId"    column="enrollment_id"    />
         <result property="enrollmentCode"    column="enrollment_code"    />
         <result property="scheduleId"    column="schedule_id"    />
@@ -23,24 +26,62 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateBy"    column="update_by"    />
         <result property="updateTime"    column="update_time"    />
         <result property="remark"    column="remark"    />
+        <result property="courseClassName" column="course_class_name" />
+        <result property="parentPhone" column="parent_phone" />
         <result property="gradeName"    column="grade_name"    />
         <result property="subjectName"    column="subject_name"    />
         <result property="classType"    column="class_type"    />
         <result property="teacherName"    column="teacher_name"    />
         <result property="recruitStatus"    column="recruit_status"    />
+        <result property="attendedLessonCount" column="attended_lesson_count" />
+        <result property="pendingLessonCount" column="pending_lesson_count" />
+        <result property="recordedLessonCount" column="recorded_lesson_count" />
+        <result property="leaveLessonCount" column="leave_lesson_count" />
     </resultMap>
 
     <sql id="selectEduEnrollmentVo">
-        select e.enrollment_id, e.enrollment_code, e.schedule_id, e.parent_id, e.student_name, e.student_phone, e.contact_phone, e.enrollment_status, e.pay_status, e.cancel_time, e.cancel_reason, e.status, e.del_flag, e.create_by, e.create_time, e.update_by, e.update_time, e.remark,
-               s.grade_name, s.subject_name, s.class_type, s.teacher_name, s.recruit_status
+        select e.lesson_account_id,e.class_date,e.cancel_request_status,e.enrollment_id, e.enrollment_code, e.schedule_id, e.parent_id, e.student_name, e.student_phone, e.contact_phone, e.enrollment_status, e.pay_status, e.cancel_time, e.cancel_reason, e.status, e.del_flag, e.create_by, e.create_time, e.update_by, e.update_time, e.remark,
+               s.grade_name, s.subject_name, s.class_type, coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacher_name, s.recruit_status, s.course_class_name, parent.phonenumber as parent_phone,
+               ifnull(history.attended_lesson_count, 0) as attended_lesson_count,
+               ifnull(history.pending_lesson_count, 0) as pending_lesson_count,
+               ifnull(history.recorded_lesson_count, 0) as recorded_lesson_count,
+               ifnull(history.leave_lesson_count, 0) as leave_lesson_count
         from edu_enrollment e
         left join edu_course_schedule s on e.schedule_id = s.schedule_id
+        left join sys_user teacher on teacher.user_id = s.teacher_id
+        left join sys_user parent on parent.user_id = e.parent_id
+        left join (
+            select enrollment_id,
+                   count(distinct case when sign_status in ('1', '4', '5') and review_status = '1' then class_date end) as attended_lesson_count,
+                   count(distinct case when sign_status in ('1', '4', '5') and ifnull(review_status, '0') != '1' then class_date end) as pending_lesson_count,
+                   count(distinct case when sign_status = '2' then class_date end) as recorded_lesson_count,
+                   count(distinct case when sign_status = '3' then class_date end) as leave_lesson_count
+            from edu_class_sign_in where del_flag = '0' and enrollment_id is not null
+            <if test="_parameter instanceof com.ruoyi.system.domain.EduEnrollment and params.teacherUserId != null">
+                and exists (select 1 from edu_enrollment history_enrollment
+                    join edu_course_schedule history_schedule on history_schedule.schedule_id = history_enrollment.schedule_id
+                    where history_enrollment.enrollment_id = edu_class_sign_in.enrollment_id
+                      and history_enrollment.schedule_id = edu_class_sign_in.schedule_id
+                      and history_schedule.teacher_id = #{params.teacherUserId} and history_schedule.del_flag = '0')
+            </if>
+            group by enrollment_id
+        ) history on history.enrollment_id = e.enrollment_id
     </sql>
 
     <select id="selectEduEnrollmentList" parameterType="EduEnrollment" resultMap="EduEnrollmentResult">
         <include refid="selectEduEnrollmentVo"/>
         <where>
-            e.del_flag = '0'
+            e.schedule_id is not null
+            <if test="params.teacherUserId != null">
+                and s.teacher_id = #{params.teacherUserId} and s.del_flag = '0'
+            </if>
+            <if test="params.teacherEnrollmentId != null">and e.enrollment_id = #{params.teacherEnrollmentId}</if>
+            <if test="delFlag != null and delFlag != ''">and e.del_flag = #{delFlag}</if>
+            <if test="params.adminKeyword != null and params.adminKeyword != ''">
+                and (e.student_name like concat('%', #{params.adminKeyword}, '%')
+                     or e.contact_phone like concat('%', #{params.adminKeyword}, '%')
+                     or parent.phonenumber like concat('%', #{params.adminKeyword}, '%'))
+            </if>
             <if test="enrollmentCode != null  and enrollmentCode != ''"> and e.enrollment_code = #{enrollmentCode}</if>
             <if test="scheduleId != null "> and e.schedule_id = #{scheduleId}</if>
             <if test="parentId != null "> and e.parent_id = #{parentId}</if>
@@ -53,16 +94,18 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="cancelReason != null  and cancelReason != ''"> and e.cancel_reason = #{cancelReason}</if>
             <if test="status != null  and status != ''"> and e.status = #{status}</if>
         </where>
+        order by e.create_time desc, e.enrollment_id desc
     </select>
-    
+
     <select id="selectEduEnrollmentByEnrollmentId" parameterType="Long" resultMap="EduEnrollmentResult">
         <include refid="selectEduEnrollmentVo"/>
-        where enrollment_id = #{enrollmentId}
+        where e.enrollment_id = #{enrollmentId} and e.schedule_id is not null
     </select>
 
     <insert id="insertEduEnrollment" parameterType="EduEnrollment" useGeneratedKeys="true" keyProperty="enrollmentId">
         insert into edu_enrollment
         <trim prefix="(" suffix=")" suffixOverrides=",">
+            student_id,lesson_account_id,
             <if test="enrollmentCode != null and enrollmentCode != ''">enrollment_code,</if>
             <if test="scheduleId != null">schedule_id,</if>
             <if test="parentId != null">parent_id,</if>
@@ -82,6 +125,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="remark != null">remark,</if>
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
+            (SELECT student_id FROM edu_student_lesson_account WHERE account_id=#{lessonAccountId} AND parent_id=#{parentId}),#{lessonAccountId},
             <if test="enrollmentCode != null and enrollmentCode != ''">#{enrollmentCode},</if>
             <if test="scheduleId != null">#{scheduleId},</if>
             <if test="parentId != null">#{parentId},</if>
@@ -111,12 +155,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="studentName != null and studentName != ''">student_name = #{studentName},</if>
             <if test="studentPhone != null">student_phone = #{studentPhone},</if>
             <if test="contactPhone != null">contact_phone = #{contactPhone},</if>
-            <if test="enrollmentStatus != null">enrollment_status = #{enrollmentStatus},</if>
             <if test="payStatus != null">pay_status = #{payStatus},</if>
-            <if test="cancelTime != null">cancel_time = #{cancelTime},</if>
             <if test="cancelReason != null">cancel_reason = #{cancelReason},</if>
             <if test="status != null">status = #{status},</if>
-            <if test="delFlag != null">del_flag = #{delFlag},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
@@ -126,4 +167,28 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where enrollment_id = #{enrollmentId}
     </update>
 
+    <update id="cancelEnrollment">
+        update edu_enrollment
+        set enrollment_status = '2', cancel_time = now(),
+            update_by = #{updateBy}, update_time = now()
+        where enrollment_id = #{enrollmentId} and del_flag = '0'
+          and ifnull(enrollment_status, '1') not in ('2', '已取消')
+    </update>
+
+    <update id="releaseScheduleSeat">
+        update edu_course_schedule
+        set enrolled_count = greatest(ifnull(enrolled_count, 0) - 1, 0),
+            update_by = #{updateBy}, update_time = now()
+        where schedule_id = #{scheduleId}
+    </update>
+
+    <update id="invalidateUnusedAttendance">
+        update edu_attendance
+        set attendance_status = '2', status = '1',
+            update_by = #{updateBy}, update_time = now()
+        where enrollment_id = #{enrollmentId} and del_flag = '0'
+          and attendance_status in ('0', '未上课')
+          and attended_time is null and confirm_by is null
+          and ifnull(confirm_name, '') = ''
+    </update>
 </mapper>

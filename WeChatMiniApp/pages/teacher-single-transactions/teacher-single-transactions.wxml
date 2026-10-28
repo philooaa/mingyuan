@@ -1,0 +1,57 @@
+<wxs module="calendarScroll" src="../../utils/course-calendar-scroll.wxs" />
+<view class="page">
+  <view class="ui-heading">
+    <view class="ui-heading-main"><view class="ui-title">我的课程</view><view class="ui-caption">{{loadSucceeded && !loading ? courseCount : '—'}} 门课程 · {{loadSucceeded && !loading ? plannedLessonCount : '—'}} 个计划课次</view></view>
+    <button class="create-course" bindtap="addSchedule" disabled="{{!loadSucceeded || loading || submitting || refreshError}}">＋ 新增一对一</button>
+  </view>
+  <view class="pending-banner" wx:if="{{loadSucceeded && !loading && pendingCount > 0}}" bindtap="openPending"><view><text class="pending-banner-count">{{pendingCount}}</text> 项报名／取消申请待处理</view><text>去处理 ›</text></view>
+  <view class="module-tabs"><view wx:for="{{tabs}}" wx:key="key" class="module-tab {{activeTab === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="changeTab"><text>{{item.label}}</text><view class="number-badge tab-badge" wx:if="{{item.key === 'bookings' && pendingBadge && loadSucceeded && !loading}}">{{pendingBadge}}</view></view></view>
+  <view class="load-status" wx:if="{{loading}}">正在加载课程…</view>
+  <view class="calendar-warning load-error" wx:if="{{loadError && !loading}}"><view>{{loadError}}</view><view>加载成功前无法判断空闲时段。</view><button size="mini" bindtap="retryLoad">重新加载</button></view>
+  <view class="calendar-warning" wx:if="{{refreshError && !loading}}"><view>{{refreshError}}</view><view>当前显示上次加载的课表。</view><button size="mini" bindtap="retryLoad">重新加载</button></view>
+  <view wx:if="{{activeTab === 'calendar' || activeTab === 'courses'}}">
+    <view class="calendar-filter"><picker range="{{calendarFilterOptions}}" value="{{calendarFilterIndex}}" bindchange="onCalendarFilterChange"><view>{{calendarFilterOptions[calendarFilterIndex]}}　⌄</view></picker><view class="calendar-help" wx:if="{{activeTab === 'calendar'}}">左右滑动查看整周</view></view>
+  </view>
+  <view wx:if="{{activeTab === 'calendar'}}">
+    <view class="calendar-warning" wx:if="{{calendarFilterIndex !== 0}}">当前隐藏了部分课程，空白处仍可能有课；新增课程会校验全部课程占用。</view>
+    <include src="../../templates/teacher-week-calendar.wxml" />
+  </view>
+  <view class="module-section" wx:if="{{loadSucceeded && !loading && activeTab === 'courses'}}">
+    <view class="ui-section-title">课程列表 <text class="ui-subtle">{{visibleCourses.length}} 门</text></view>
+    <view class="module-empty" wx:if="{{!visibleCourses.length}}">暂无符合条件的课程</view>
+    <view class="module-card" wx:for="{{visibleCourses}}" wx:key="scheduleId">
+      <view class="ui-row"><view class="module-card-title" bindtap="showCourse" data-id="{{item.scheduleId}}">{{item.courseClassName}}</view><text class="course-type {{item.classMode === '2' ? 'single-type' : 'class-type'}}">{{item.modeText}}</text></view>
+      <view class="module-meta">{{item.subjectTag}} · {{item.courseStatusText}}</view>
+      <view class="ui-time">{{item.periodName}} {{item.timeText}}</view>
+      <view class="module-meta">{{item.dateRangeText}}</view><view class="module-meta">地点：{{item.placeText}}</view>
+      <view class="module-meta warning" wx:if="{{item.pendingReason}}">{{item.pendingReason}}</view>
+      <view class="module-actions"><button size="mini" bindtap="showCourse" data-id="{{item.scheduleId}}">{{item.lessonCount}} 个课次 ›</button><button size="mini" bindtap="openStudents" data-id="{{item.scheduleId}}">班级学员</button><button size="mini" bindtap="editSchedule" data-id="{{item.scheduleId}}">管理课程</button></view>
+    </view>
+  </view>
+  <view class="module-section" wx:if="{{loadSucceeded && !loading && (activeTab === 'bookings' || activeTab === 'records')}}">
+    <view class="calendar-note">{{activeTab === 'bookings' ? '处理一对一报名确认和取消申请' : '一对一报名与课次记录；班课记录可进入学员详情查看'}}</view>
+    <view class="module-actions" wx:if="{{activeTab === 'records'}}"><button size="mini" bindtap="openStudents">学员与班课上课记录</button></view>
+    <view class="module-focus" wx:if="{{focusedId || focusedScheduleId}}"><view>当前查看指定课程或课次 {{focusedDate}}</view><button size="mini" bindtap="showAll">查看全部</button></view>
+    <view class="module-empty" wx:if="{{!rows.length}}">{{activeTab === 'bookings' ? '暂无待处理报名或取消申请' : '暂无一对一报名记录'}}</view>
+    <view class="module-card" wx:for="{{rows}}" wx:key="enrollmentId">
+      <view class="ui-row"><view class="module-card-title">{{item.studentName}}</view><view class="record-status {{item.lessonState}}">{{item.statusText}}</view></view>
+      <view class="ui-time">{{item.classDate}} {{item.timeText}}</view><view class="module-meta">{{item.courseClassName}}</view><view class="module-meta">{{item.lessonLocation || '地点待配置'}}</view>
+      <view class="module-meta warning" wx:if="{{item.isCancel}}">申请原因：{{item.cancelRequestReason}}</view>
+      <view class="module-meta">{{item.settlementText}}</view>
+      <view class="module-actions" wx:if="{{item.canComplete}}"><button class="decision-primary" size="mini" data-id="{{item.enrollmentId}}" bindtap="complete" disabled="{{submitting || refreshError}}">确认完成{{item.settlementMethod === 'P' ? '并消课' : ''}}</button></view>
+      <view class="module-actions" wx:if="{{item.canHandle}}">
+        <block wx:if="{{item.isCancel}}"><button class="decision-primary" size="mini" data-id="{{item.enrollmentId}}" data-action="APPROVE_CANCEL" bindtap="decide" disabled="{{submitting || refreshError}}">同意取消</button><button class="decision-secondary" size="mini" data-id="{{item.enrollmentId}}" data-action="REJECT_CANCEL" bindtap="decide" disabled="{{submitting || refreshError}}">拒绝取消</button></block>
+        <block wx:elif="{{item.isPending}}"><button class="decision-primary" size="mini" data-id="{{item.enrollmentId}}" data-action="CONFIRM" bindtap="decide" disabled="{{submitting || refreshError}}">确认接课</button><button class="decision-secondary" size="mini" data-id="{{item.enrollmentId}}" data-action="REJECT" bindtap="decide" disabled="{{submitting || refreshError}}">拒绝报名</button></block>
+      </view>
+      <view class="module-actions"><button size="mini" data-id="{{item.enrollmentId}}" bindtap="history">处理历史</button><button size="mini" data-id="{{item.enrollmentId}}" bindtap="attendance">上课记录</button></view>
+    </view>
+  </view>
+  <view class="module-mask" wx:if="{{showCourseSheet}}" bindtap="closeCourse"></view>
+  <view class="module-sheet" wx:if="{{showCourseSheet}}">
+    <view class="sheet-heading"><view>{{selectedCourse.courseClassName}}</view><view bindtap="closeCourse">关闭</view></view>
+    <view class="module-meta">{{selectedCourse.classMode === '2' ? '一对一' : '班课'}} · {{selectedCourse.subjectTag}}</view>
+    <view class="module-meta">{{selectedCourse.timeText}} · {{selectedCourse.placeText}}</view><view class="module-meta">{{selectedCourse.dateRangeText}} · 共{{selectedCourse.lessonCount}}个课次</view>
+    <scroll-view scroll-y class="module-lesson-list"><view class="module-lesson" wx:for="{{selectedLessons}}" wx:key="classDate" bindtap="openCourseRecords" data-date="{{item.classDate}}"><view>{{item.classDate}} {{item.studentName}}</view><view class="record-status {{item.lessonState}}">{{item.statusText}}</view></view><view class="module-meta" wx:if="{{!selectedLessons.length}}">{{selectedCourse.pendingReason || '暂无已确定的课次'}}</view></scroll-view>
+    <view class="module-actions"><button size="mini" bindtap="editSchedule" data-id="{{selectedCourse.scheduleId}}">修改排课</button><button size="mini" bindtap="openStudents" data-id="{{selectedCourse.scheduleId}}">学员与上课记录</button><button size="mini" wx:if="{{selectedCourse.classMode === '2'}}" bindtap="openCourseRecords">报名与记录</button></view>
+  </view>
+</view>

@@ -7,7 +7,7 @@
   <view class="summary">
     <view class="summary-main">
       <view class="summary-value">{{totalAttended}}/{{totalCount}}</view>
-      <view class="summary-label">已上课 / 总课次</view>
+      <view class="summary-label">{{childScoped?'到课记录 / 已记录课次':'已上课 / 总课次'}}</view>
     </view>
   </view>
 
@@ -15,7 +15,7 @@
     <view class="empty-title">暂无上课记录</view>
   </view>
 
-  <view class="course-card" wx:for="{{courses}}" wx:key="courseClassName" data-name="{{item.courseClassName}}" bindtap="openDetails">
+  <view class="course-card" wx:for="{{courses}}" wx:key="enrollmentId" data-id="{{item.enrollmentId}}" data-name="{{item.courseClassName}}" bindtap="openDetails">
     <view class="card-head">
       <view class="course-name">{{item.courseClassName}}</view>
       <view class="count">{{item.progressText}}</view>
@@ -33,13 +33,14 @@
   <view class="mask" wx:if="{{showSheet}}" bindtap="closeDetails"></view>
   <view class="sheet" wx:if="{{showSheet}}">
     <view class="sheet-title">{{selectedCourse.courseClassName}}</view>
-    <view class="sheet-subtitle">已上课 {{selectedCourse.attendedCount}} 次，共 {{selectedCourse.totalCount}} 次</view>
+    <view class="sheet-subtitle">已上课 {{selectedCourse.attendedCount}} 次，已记录 {{selectedCourse.totalCount}} 次</view>
     <scroll-view class="detail-list" scroll-y>
       <view class="detail-item" wx:for="{{details}}" wx:key="attendanceId">
         <view class="lesson-no">第{{item.indexNo}}次</view>
         <view class="detail-main">
           <view class="detail-time">{{item.timeText}}</view>
           <view class="detail-meta">{{item.placeText}}</view>
+          <view class="detail-meta" wx:if="{{item.reviewText}}">{{item.reviewText}}</view>
         </view>
         <view class="status {{item.statusClass}}">{{item.statusText}}</view>
       </view>

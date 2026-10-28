@@ -7,6 +7,9 @@ import java.util.List;
  */
 public class MiniAppSignSubmitBody
 {
+    private Long reviewVersion;
+    public Long getReviewVersion() { return reviewVersion; }
+    public void setReviewVersion(Long value) { reviewVersion=value; }
     /** 排课ID */
     private Long scheduleId;
 

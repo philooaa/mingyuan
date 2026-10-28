@@ -1,0 +1,40 @@
+<view class="page">
+  <view class="wifi-bar">
+    <view class="wifi-info">
+      <text class="wifi-label">当前WiFi</text>
+      <text class="wifi-name {{wifiReady && connectedSsid ? 'ok' : 'none'}}">
+        {{wifiReady ? (connectedSsid || '未连接WiFi') : '未获取到'}}
+      </text>
+    </view>
+    <text class="wifi-refresh" bindtap="refreshWifi">刷新</text>
+  </view>
+  <view class="wifi-error" wx:if="{{!wifiReady && wifiError}}">{{wifiError}}</view>
+  <view class="wifi-manual" wx:if="{{!wifiReady}}">
+    <input class="wifi-manual-input" placeholder="手动输入WiFi名称（如 MingYuan-Wanda-5G）" value="{{manualSsid}}" bindinput="inputManualSsid"/>
+  </view>
+
+  <view class="header">
+    <view class="header-title">教师WiFi打卡</view>
+    <view class="header-subtitle">{{date}} · 连接校区WiFi上下班打卡</view>
+  </view>
+
+  <view class="punch-card">
+    <view class="punch-row">
+      <view class="punch-label">上班打卡</view>
+      <view class="punch-time" wx:if="{{inRecord}}">{{inRecord.timeText}}　{{inRecord.campusName}}</view>
+      <view class="punch-time none" wx:else>未打卡</view>
+      <view class="punch-btn in {{inRecord ? 'done' : ''}}" wx:if="{{!inRecord}}" data-type="in" bindtap="checkIn">打卡</view>
+      <view class="punch-btn in done" wx:else>已打卡</view>
+    </view>
+    <view class="punch-divider"></view>
+    <view class="punch-row">
+      <view class="punch-label">下班打卡</view>
+      <view class="punch-time" wx:if="{{outRecord}}">{{outRecord.timeText}}　{{outRecord.campusName}}</view>
+      <view class="punch-time none" wx:elif="{{inRecord}}">待打卡</view>
+      <view class="punch-time none" wx:else>需先打上班卡</view>
+      <view class="punch-btn out {{outRecord ? 'done' : (!inRecord ? 'disabled' : '')}}" data-type="out" bindtap="checkIn">{{outRecord ? '已打卡' : '打卡'}}</view>
+    </view>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}">加载中...</view>
+</view>

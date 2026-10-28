@@ -44,6 +44,7 @@ export function canCollect(bill) {
 export function canPrice(bill) {
   return (
     !!bill &&
+    bill.billType !== 'CREDIT_PACKAGE' &&
     ['OPEN', 'PENDING_PRICE'].includes(bill.billingStatus) &&
     !(bill.payments || []).some((p) => !['FAILED', 'CLOSED'].includes(p.paymentStatus))
   )
@@ -54,11 +55,8 @@ export function canClosePayment(payment) {
 export function canReview(refund, actorId) {
   return (
     !!refund &&
-    refund.applicantId != null &&
     actorId != null &&
-    refund.refundStatus === 'PENDING_REVIEW' &&
-    (String(refund.applicantId) !== String(actorId) ||
-      (refund.financeMode === 'MOCK' && refund.mockAllowed === true))
+    refund.refundStatus === 'WAIT_EDU'
   )
 }
 export function validateEvidenceFile(file) {
@@ -131,13 +129,16 @@ export const labels = {
   UNKNOWN: '结果未知／待核对',
   SUCCESS: '成功',
   FAILED: '失败',
-  PENDING_REVIEW: '待审核',
+  WAIT_EDU: '等待教务确认金额',
+  WAIT_ADMIN: '教务已阅，等待管理员退款',
+  PENDING_REVIEW: '历史待审核',
   APPROVED: '审核通过／待执行',
   PROCESSING: '处理中',
   REJECTED: '驳回',
   CANCELLED: '已撤回',
-  PARTIAL: '不退课退费',
-  WITHDRAWAL: '退课退费',
+  PARTIAL: '费用调整',
+  WITHDRAWAL: '退出此课程',
+  SESSION: '单次请假',
   ISSUED: '有效',
   VOID: '作废',
   READY: '文件可用',
@@ -160,7 +161,7 @@ export function label(value) {
 export function statusType(value) {
   if (['SUCCESS', 'READY', 'OPEN', 'ACTIVE', 'ISSUED', 'AVAILABLE'].includes(value))
     return 'success'
-  if (['UNKNOWN', 'HISTORY_PENDING', 'PENDING_REVIEW', 'PENDING', 'PROCESSING'].includes(value))
+  if (['WAIT_EDU', 'WAIT_ADMIN', 'UNKNOWN', 'HISTORY_PENDING', 'PENDING_REVIEW', 'PENDING', 'PROCESSING'].includes(value))
     return 'warning'
   if (['FAILED', 'REJECTED', 'VOID'].includes(value)) return 'danger'
   return 'info'

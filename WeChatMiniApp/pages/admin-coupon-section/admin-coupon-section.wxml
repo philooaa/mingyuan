@@ -1,0 +1,67 @@
+<view class="page {{couponTab==='referrals' && kind==='records'?'with-reward-footer':''}}"><view class="heading">{{sectionTitle}}</view><view class="muted">{{sectionHint}}</view>
+  <block wx:if="{{couponTab!=='referrals'}}">
+    <view class="error" wx:if="{{optionsError}}">{{optionsError}}<button size="mini" bindtap="loadCouponOptions">重试</button></view>
+    <button wx:if="{{couponTab==='templates'}}" class="primary" bindtap="editCoupon" disabled="{{busy || !!optionsError}}">新建券模板</button>
+    <view wx:if="{{couponTab==='grants'}}" class="card filters"><input type="number" maxlength="11" value="{{couponPhone}}" placeholder="家长手机号（3至11位）" bindinput="couponInput"/><button size="mini" bindtap="couponSearch" disabled="{{busy}}">查询</button></view>
+    <view class="muted" wx:if="{{couponTab==='issue'}}">普通发放：同一模板每位家长限一张。推荐奖励请返回优惠券管理，进入“推荐审核”。</view>
+    <view class="error" wx:if="{{error}}">{{error}}<button bindtap="load">重新加载</button></view>
+    <view class="card" wx:for="{{couponRows}}" wx:key="rowKey">
+      <view class="row"><view class="title">{{item.couponName}}</view><text class="pill">{{item.stateText}}</text></view><view class="coupon-amount">{{item.summaryText}}</view>
+      <view class="muted">{{item.scopeText}} · {{item.subjectText}}</view><view class="muted">{{item.validFrom}} 至 {{item.validUntil}}</view>
+      <block wx:if="{{couponTab==='grants'}}"><view>{{item.parentName}} · {{item.parentPhone || '未填写手机号'}}</view><view class="muted">{{item.sourceText}} · {{item.grantReason}}</view><view class="muted" wx:if="{{item.revokeReason}}">撤回：{{item.revokeReason}}</view><button wx:if="{{item.couponStatus==='AVAILABLE'}}" size="mini" data-id="{{item.userCouponId}}" bindtap="revokeCoupon" disabled="{{busy}}">撤回优惠券</button></block>
+      <block wx:else><view class="muted">已发 {{item.issuedQuantity}} / {{item.totalQuantity}} 张</view><view class="buttons"><button wx:if="{{couponTab==='templates'}}" size="mini" data-id="{{item.templateId}}" bindtap="editCoupon" disabled="{{busy}}">{{item.issuedQuantity>0?'管理状态':'编辑模板'}}</button><button size="mini" data-id="{{item.templateId}}" bindtap="openOrdinary" disabled="{{busy || item.templateStatus!=='ACTIVE' || item.remaining<=0}}">发放优惠券</button></view></block>
+    </view>
+    <view class="empty" wx:if="{{loading}}">加载中…</view><view class="empty" wx:elif="{{!error && !couponRows.length}}"><view>{{couponTab==='grants'?'暂无发放记录':'还没有可用的券模板'}}</view><view wx:if="{{couponTab==='issue'}}" class="muted">先创建并启用模板，再选择家长发券。</view><button wx:if="{{couponTab==='issue'}}" class="primary" bindtap="goTemplates">创建券模板</button></view>
+    <view class="buttons" wx:if="{{couponTotal>20}}"><button size="mini" bindtap="couponPrevious" disabled="{{loading || busy || couponPage===1}}">上一页</button><text>{{couponPage}} · 共{{couponTotal}}条</text><button size="mini" bindtap="couponNext" disabled="{{loading || busy || couponPage*20>=couponTotal}}">下一页</button></view>
+  </block>
+  <block wx:if="{{couponTab==='referrals'}}">
+  <view class="card filters"><input type="number" placeholder="按家长手机号查找（3至11位）" value="{{parentPhone}}" bindinput="inputParent"/><picker range="{{filterRoles}}" value="{{filterRoleIndex}}" bindchange="chooseFilterRole"><view>{{filterRoles[filterRoleIndex]}} ▾</view></picker><button size="mini" bindtap="search" disabled="{{busy || loading}}">查询</button></view>
+  <view class="error" wx:if="{{error}}">{{error}}<button bindtap="load">重新加载</button></view>
+  <checkbox-group bindchange="selectRecords">
+    <view class="card" wx:for="{{rows}}" wx:key="rowId">
+      <view class="row"><label wx:if="{{kind==='records'}}"><checkbox value="{{item.recordId}}" checked="{{item.checked}}" disabled="{{busy || loading}}"/>推荐 #{{item.recordId}}</label><text wx:else>#{{kind==='bindings'?item.bindingId:(kind==='rewards'?item.rewardId:item.anomalyId)}}</text><text class="pill">{{item.label}}</text></view>
+      <view>新用户：{{item.inviteeName}}（{{item.inviteePhone || '未填写手机号'}}）</view><view>老用户：{{item.referrerName}}（{{item.referrerPhone || '未填写手机号'}}）</view>
+      <view wx:if="{{item.couponName}}">{{item.couponName}} · 接收手机号 {{item.parentPhone || '未填写'}} · {{item.couponLabel}}</view><view class="muted">{{item.timeText}}</view>
+      <view class="buttons"><button wx:if="{{kind==='bindings' && !item.lockedAt}}" size="mini" data-id="{{item.bindingId}}" data-action="correct" bindtap="act" disabled="{{busy}}">纠错</button><button wx:if="{{kind==='rewards' && item.couponStatus==='AVAILABLE'}}" size="mini" data-id="{{item.rewardId}}" data-action="revoke" bindtap="act" disabled="{{busy}}">撤回奖励券</button><button wx:if="{{kind==='anomalies' && item.state==='OPEN'}}" size="mini" data-id="{{item.anomalyId}}" data-action="resolve" bindtap="act" disabled="{{busy}}">记录处理结果</button></view>
+      <view class="muted history" wx:if="{{item.historyRows.length}}"><view wx:for="{{item.historyRows}}" wx:for-item="event" wx:key="index">{{event.label}} · {{event.timeText}} · 操作人 {{event.actorId}}<view>{{event.reason}}<text wx:if="{{event.result}}"> · {{event.result}}</text><text wx:if="{{event.fromReferrerId}}"> · 原推荐人ID {{event.fromReferrerId}} → {{event.referrerId}}</text></view></view></view>
+    </view>
+  </checkbox-group>
+  <view class="empty" wx:if="{{loading}}">加载中…</view><view class="empty" wx:elif="{{!error && !rows.length}}">暂无记录</view>
+  <view class="buttons" wx:if="{{total>20}}"><button size="mini" bindtap="previous" disabled="{{loading || busy || pageNum===1}}">上一页</button><text>{{pageNum}} · 共{{total}}条</text><button size="mini" bindtap="next" disabled="{{loading || busy || pageNum*20>=total}}">下一页</button></view>
+
+
+  </block>
+  <view class="shade" wx:if="{{templateOpen}}"><view class="sheet coupon-sheet"><scroll-view scroll-y class="coupon-sheet-body"><view class="coupon-sheet-content">
+    <view class="title">{{templateForm.templateId?'编辑券模板':'新建券模板'}}</view><view class="muted" wx:if="{{templateForm.issuedQuantity>0}}">已发模板规则冻结，仅允许启停或提高发行上限。</view>
+    <view class="form-label">券名称</view><input value="{{templateForm.couponName}}" data-field="couponName" maxlength="100" bindinput="templateInput" disabled="{{busy || templateForm.issuedQuantity>0}}" placeholder="例如：数学课程抵扣券"/>
+    <view class="form-label">抵扣类型</view><picker range="{{['无门槛抵扣','满减券']}}" value="{{templateKind}}" bindchange="templateKind" disabled="{{busy || templateForm.issuedQuantity>0}}"><view class="field">{{templateKind?'满减券':'无门槛抵扣'}} ▾</view></picker>
+    <view class="form-label">抵扣金额（元）</view><input type="digit" value="{{templateForm.discountAmount}}" data-field="discountAmount" bindinput="templateInput" disabled="{{busy || templateForm.issuedQuantity>0}}"/>
+    <block wx:if="{{templateKind}}"><view class="form-label">满多少元可用</view><input type="digit" value="{{templateForm.minSpendAmount}}" data-field="minSpendAmount" bindinput="templateInput" disabled="{{busy || templateForm.issuedQuantity>0}}"/></block>
+    <view class="form-label">适用学科</view><view class="muted">可单选、多选；全选表示不限学科。</view><view bindtap="allCouponSubjects" class="subject-all"><checkbox checked="{{allSubjects}}" disabled="{{busy || templateForm.issuedQuantity>0}}"/>全选／不限学科</view><checkbox-group bindchange="couponSubjects" class="subject-grid"><label wx:for="{{subjectOptions}}" wx:key="name"><checkbox value="{{item.name}}" checked="{{item.checked}}" disabled="{{busy || templateForm.issuedQuantity>0}}"/>{{item.name}}</label></checkbox-group>
+    <view class="form-label">适用课程类型</view><view class="field" wx:if="{{templateForm.issuedQuantity>0 && (!templateForm.courseScope || templateForm.courseScope==='LEGACY')}}">{{legacyScopeText}}（保留原限制）</view><picker wx:else range="{{courseOptions}}" range-key="label" value="{{courseIndex}}" bindchange="templateCourse" disabled="{{busy || templateForm.issuedQuantity>0}}"><view class="field">{{courseOptions[courseIndex].label}} ▾</view></picker><view class="meta">一对一课包仅支持不限学科的券；选择两类通用可用于一对一和大班课。</view>
+    <view class="form-label">生效日期与时间</view><view class="row"><picker mode="date" value="{{templateForm.fromDate}}" data-field="fromDate" bindchange="templateInput" disabled="{{busy || templateForm.issuedQuantity>0}}"><view class="field">{{templateForm.fromDate}}</view></picker><picker mode="time" value="{{templateForm.fromTime}}" data-field="fromTime" bindchange="templateInput" disabled="{{busy || templateForm.issuedQuantity>0}}"><view class="field">{{templateForm.fromTime}}</view></picker></view>
+    <view class="form-label">到期日期与时间</view><view class="row"><picker mode="date" value="{{templateForm.untilDate}}" data-field="untilDate" bindchange="templateInput" disabled="{{busy || templateForm.issuedQuantity>0}}"><view class="field">{{templateForm.untilDate}}</view></picker><picker mode="time" value="{{templateForm.untilTime}}" data-field="untilTime" bindchange="templateInput" disabled="{{busy || templateForm.issuedQuantity>0}}"><view class="field">{{templateForm.untilTime}}</view></picker></view>
+    <view class="form-label">发行总量（张）</view><input type="number" value="{{templateForm.totalQuantity}}" data-field="totalQuantity" bindinput="templateInput" disabled="{{busy}}"/>
+    <view class="form-label">状态</view><picker range="{{statusOptions}}" value="{{statusIndex}}" bindchange="templateStatus" disabled="{{busy}}"><view class="field">{{statusOptions[statusIndex]}} ▾</view></picker>
+    <textarea value="{{templateForm.description}}" data-field="description" bindinput="templateInput" maxlength="500" placeholder="使用说明（选填）" disabled="{{busy || templateForm.issuedQuantity>0}}"/>
+  </view></scroll-view>
+    <view class="buttons coupon-sheet-actions"><button bindtap="closeCoupon" disabled="{{busy}}">取消</button><button class="primary" bindtap="saveCoupon" loading="{{busy}}" disabled="{{busy}}">保存模板</button></view>
+  </view></view>
+  <view class="shade" wx:if="{{grantOpen}}"><view class="sheet coupon-sheet"><scroll-view scroll-y class="coupon-sheet-body"><view class="coupon-sheet-content">
+    <view class="title">发放优惠券</view><view class="card"><view class="title">{{grantTemplate.couponName}}</view><view class="coupon-amount">{{grantTemplate.summaryText}}</view><view class="muted">{{grantTemplate.scopeText}} · {{grantTemplate.subjectText}}</view><view class="muted">{{grantTemplate.validFrom}} 至 {{grantTemplate.validUntil}}</view></view>
+    <view class="filters"><input type="number" maxlength="11" value="{{parentPhone}}" placeholder="输入至少3位手机号，自动查找" bindinput="parentPhone" disabled="{{busy || ordinaryUncertain}}"/><button size="mini" bindtap="parentSearch" disabled="{{busy || ordinaryUncertain}}">查询</button></view>
+    <view class="muted">手机号支持前缀匹配；未输入时显示家长列表。</view><view class="muted" wx:if="{{parentLoading}}">正在查询家长…</view><view class="muted" wx:elif="{{parentLookupMessage}}">{{parentLookupMessage}}</view>
+    <checkbox-group bindchange="ordinaryParents"><label class="person" wx:for="{{parentRows}}" wx:key="parentId"><checkbox value="{{item.parentId}}" checked="{{item.checked}}" disabled="{{busy || ordinaryUncertain}}"/>{{item.parentName}} · {{item.parentPhone || '未填写手机号'}}</label></checkbox-group>
+    <view class="buttons"><button size="mini" bindtap="ordinarySelectPage" disabled="{{busy || parentLoading || ordinaryUncertain}}">选择本页</button><button size="mini" bindtap="parentPrevious" disabled="{{busy || parentLoading || ordinaryUncertain || parentPage===1}}">上一页</button><button size="mini" bindtap="parentNext" disabled="{{busy || parentLoading || ordinaryUncertain || parentPage*20>=parentTotal}}">下一页</button></view>
+    <view class="muted">已选择{{ordinarySelected.length}}位家长 · 每批最多100位</view><textarea value="{{ordinaryReason}}" maxlength="255" placeholder="填写发放原因" bindinput="ordinaryReason" disabled="{{busy || ordinaryUncertain}}"/>
+    <view class="card" wx:if="{{ordinaryPreview}}"><view class="title">确认名单：{{ordinaryPreview.count}}位家长，共{{ordinaryPreview.count}}张券</view><view wx:for="{{ordinaryPreview.people}}" wx:key="parentId">{{item.parentName}} · {{item.parentPhone || '未填写手机号'}}</view></view>
+    <view class="error" wx:if="{{ordinaryUncertain}}">发放结果尚未确认，名单已锁定。请重试原批次。</view>
+  </view></scroll-view>
+    <view class="buttons coupon-sheet-actions"><button bindtap="closeOrdinary" disabled="{{busy || ordinaryUncertain}}">取消</button><button wx:if="{{!ordinaryUncertain}}" bindtap="previewOrdinary" disabled="{{busy}}">预览名单</button><button class="primary" bindtap="grantOrdinary" disabled="{{busy || (!ordinaryUncertain && !ordinaryPreview)}}" loading="{{busy}}">{{ordinaryUncertain?'重试原批次':'确认发放'}}</button></view>
+  </view></view>
+
+  <view class="reward-footer" wx:if="{{couponTab==='referrals' && kind==='records'}}">
+    <view class="reward-selection"><view>已选 <text class="selection-count">{{selectedIds.length}}</text> 条推荐</view><view class="muted">勾选记录，可多选</view></view>
+    <button class="primary reward-submit" bindtap="openRewardPage" disabled="{{busy || loading || !selectedIds.length}}">发券</button>
+  </view>
+</view>

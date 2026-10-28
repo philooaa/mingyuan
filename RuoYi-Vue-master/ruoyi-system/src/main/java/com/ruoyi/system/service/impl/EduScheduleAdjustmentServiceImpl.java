@@ -34,6 +34,25 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
 {
     @Autowired
     private EduScheduleAdjustmentMapper eduScheduleAdjustmentMapper;
+    @Autowired private com.ruoyi.system.mapper.EduCourseScheduleMapper singleSchedules;
+    @Autowired private com.ruoyi.system.shop.ShopRepository singleDb;
+    @Autowired private com.ruoyi.system.service.ScheduleAvailabilityService availability;
+
+    private void protectSingle(Long scheduleId) {
+        var before = singleSchedules.selectEduCourseScheduleByScheduleId(scheduleId);
+        if (before == null) throw new ServiceException("排课不存在");
+        availability.lockResources(List.of(before));
+        var schedule = singleSchedules.lockSchedule(scheduleId);
+        if (!java.util.Objects.equals(before.getTeacherId(),schedule.getTeacherId()) || !java.util.Objects.equals(before.getClassroomId(),schedule.getClassroomId())) throw new ServiceException("排课已调整，请刷新");
+        if (schedule != null && "2".equals(schedule.getClassMode()) && !singleDb.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND class_date IS NOT NULL FOR UPDATE",scheduleId).isEmpty()) throw new ServiceException("一对一已有按日期报名，不能通过批量调课改变原课次；请先核对处理历史");
+    }
+    private void checkResult(Long scheduleId) { availability.check(singleSchedules.lockSchedule(scheduleId)); }
+    private void validateChange(EduScheduleAdjustment change,Long excludeId) {
+        var schedule=singleSchedules.lockSchedule(change.getScheduleId());
+        LocalDate original=com.ruoyi.system.service.ScheduleCalendar.date(change.getOriginalDate());
+        if(original == null || !availability.dates(schedule,List.of()).contains(original)) throw new ServiceException("原日期不是该课程的有效课次");
+        if(!singleDb.rows("SELECT adjustment_id FROM edu_schedule_adjustment WHERE schedule_id=? AND original_date=? AND adjustment_id<>? FOR UPDATE",change.getScheduleId(),change.getOriginalDate(),excludeId == null ? -1 : excludeId).isEmpty()) throw new ServiceException("该课次已有调课记录，请修改已有记录");
+    }
 
     /**
      * 查询排课调课记录
@@ -66,10 +85,15 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor=Exception.class)
     public int insertEduScheduleAdjustment(EduScheduleAdjustment eduScheduleAdjustment)
     {
+        protectSingle(eduScheduleAdjustment.getScheduleId());
+        validateChange(eduScheduleAdjustment,null);
         eduScheduleAdjustment.setCreateTime(DateUtils.getNowDate());
-        return eduScheduleAdjustmentMapper.insertEduScheduleAdjustment(eduScheduleAdjustment);
+        int count = eduScheduleAdjustmentMapper.insertEduScheduleAdjustment(eduScheduleAdjustment);
+        checkResult(eduScheduleAdjustment.getScheduleId());
+        return count;
     }
 
     /**
@@ -79,10 +103,20 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor=Exception.class)
     public int updateEduScheduleAdjustment(EduScheduleAdjustment eduScheduleAdjustment)
     {
+        var current = eduScheduleAdjustmentMapper.selectEduScheduleAdjustmentByAdjustmentId(eduScheduleAdjustment.getAdjustmentId());
+        if (current == null) throw new ServiceException("调课记录不存在");
+        protectSingle(current.getScheduleId());
+        if (eduScheduleAdjustment.getScheduleId() != null && !eduScheduleAdjustment.getScheduleId().equals(current.getScheduleId())) throw new ServiceException("调课记录不能改绑其他排课");
+        eduScheduleAdjustment.setScheduleId(current.getScheduleId());
+        if(eduScheduleAdjustment.getOriginalDate() == null) eduScheduleAdjustment.setOriginalDate(current.getOriginalDate());
+        validateChange(eduScheduleAdjustment,current.getAdjustmentId());
         eduScheduleAdjustment.setUpdateTime(DateUtils.getNowDate());
-        return eduScheduleAdjustmentMapper.updateEduScheduleAdjustment(eduScheduleAdjustment);
+        int count = eduScheduleAdjustmentMapper.updateEduScheduleAdjustment(eduScheduleAdjustment);
+        checkResult(current.getScheduleId());
+        return count;
     }
 
     /**
@@ -92,9 +126,16 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor=Exception.class)
     public int deleteEduScheduleAdjustmentByIds(Long[] adjustmentIds)
     {
-        return eduScheduleAdjustmentMapper.deleteEduScheduleAdjustmentByIds(adjustmentIds);
+        Set<Long> schedules = new java.util.TreeSet<>();
+        for (Long id : java.util.Arrays.stream(adjustmentIds).distinct().sorted().toList()) { var record = eduScheduleAdjustmentMapper.selectEduScheduleAdjustmentByAdjustmentId(id); if(record != null) schedules.add(record.getScheduleId()); }
+        availability.lockResources(schedules.stream().map(singleSchedules::selectEduCourseScheduleByScheduleId).toList());
+        schedules.forEach(this::protectSingle);
+        int count = eduScheduleAdjustmentMapper.deleteEduScheduleAdjustmentByIds(adjustmentIds);
+        schedules.forEach(this::checkResult);
+        return count;
     }
 
     /**
@@ -104,9 +145,10 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
      * @return 结果
      */
     @Override
+    @Transactional(rollbackFor=Exception.class)
     public int deleteEduScheduleAdjustmentByAdjustmentId(Long adjustmentId)
     {
-        return eduScheduleAdjustmentMapper.deleteEduScheduleAdjustmentByAdjustmentId(adjustmentId);
+        return deleteEduScheduleAdjustmentByIds(new Long[] {adjustmentId});
     }
 
     /**
@@ -158,10 +200,12 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         String username = SecurityUtils.getUsername();
         Date now = DateUtils.getNowDate();
         int count = 0;
+        availability.lockResources(schedules.stream().map(s -> singleSchedules.selectEduCourseScheduleByScheduleId(((Number)s.get("scheduleId")).longValue())).toList());
 
         for (Map<String, Object> s : schedules)
         {
             Long scheduleId = ((Number) s.get("scheduleId")).longValue();
+            protectSingle(scheduleId);
             Set<LocalDate> classDates = computeClassDates(
                     toLocalDate((Date) s.get("startDate")),
                     toLocalDate((Date) s.get("endDate")),
@@ -214,12 +258,13 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         {
             throw new ServiceException("日期范围内没有需要调整的上课日（可能均已被调整过）");
         }
+        for (var s : schedules) checkResult(((Number)s.get("scheduleId")).longValue());
         return count;
     }
 
     /**
      * 计算某排课在开课~结课日期内的全部上课日
-     * 规则与小程序端保持一致：WEEKLY 仅“周日”按周日对齐、其余一律按周六对齐；
+     * 规则与小程序端保持一致：WEEKLY 按明确的周一至周日对齐；
      * 模式为空时期次为周六/周日按 WEEKLY，否则按 DAILY_5_1（上5天休1天）
      */
     private Set<LocalDate> computeClassDates(LocalDate start, LocalDate end, String classPattern, String periodName)
@@ -236,7 +281,9 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         }
         if ("WEEKLY".equals(pattern))
         {
-            DayOfWeek targetDay = "周日".equals(periodName) ? DayOfWeek.SUNDAY : DayOfWeek.SATURDAY;
+            int weekday = com.ruoyi.system.service.ScheduleCalendar.weekday(periodName);
+            if (weekday == 0) return dates;
+            DayOfWeek targetDay = DayOfWeek.of(weekday);
             LocalDate cur = start;
             while (!cur.isAfter(end) && cur.getDayOfWeek() != targetDay)
             {

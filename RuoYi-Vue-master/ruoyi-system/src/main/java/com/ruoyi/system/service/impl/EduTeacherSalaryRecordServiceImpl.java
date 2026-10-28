@@ -2,10 +2,15 @@ package com.ruoyi.system.service.impl;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -172,7 +177,11 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
         Map<Long, String> teacherNames = new HashMap<>();
         for (Map<String, Object> u : teacherUsers)
         {
-            teacherNames.put(toLong(u.get("teacherId")), String.valueOf(u.get("teacherName")));
+            // 优先真名(realName)，老接口没返回时退回 teacherName；teacher_name 冗余字段统一存真名
+            Object real = u.get("realName");
+            String name = real == null || String.valueOf(real).isBlank() || "null".equals(String.valueOf(real))
+                    ? String.valueOf(u.get("teacherName")) : String.valueOf(real);
+            teacherNames.put(toLong(u.get("teacherId")), name);
         }
         // 薪资标准
         Map<Long, EduTeacherSalaryConfig> configMap = new HashMap<>();
@@ -180,60 +189,65 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
         {
             configMap.put(c.getTeacherId(), c);
         }
-        // 当月课次聚合
-        List<Map<String, Object>> sessions = recordMapper.selectMonthlySessions(salaryMonth);
+        // 当月课次：按寒假 / 春季排课的起止日期与上课模式推算，不再依赖考勤记录
+        // （暑假、秋季为历史数据，不参与薪资计算）
         Map<Long, double[]> hoursMap = new HashMap<>();   // [5] 小时
-        Map<Long, long[]> countMap = new HashMap<>();     // [5] 节数/人次
+        Map<Long, long[]> countMap = new HashMap<>();     // [5] 节数
         Set<Long> involved = new HashSet<>();
-        for (Map<String, Object> s : sessions)
+        YearMonth ym = YearMonth.parse(salaryMonth);
+        LocalDate monthStart = ym.atDay(1);
+        LocalDate monthEnd = ym.atEndOfMonth();
+        for (Map<String, Object> s : recordMapper.selectTermSchedules())
         {
             Long teacherId = toLong(s.get("teacherId"));
             if (teacherId == null)
             {
                 continue;
             }
-            involved.add(teacherId);
+            LocalDate from = toLocalDate(s.get("startDate"));
+            LocalDate to = toLocalDate(s.get("endDate"));
+            if (from == null || to == null)
+            {
+                continue;
+            }
+            // 排课区间与本月的交集
+            LocalDate begin = from.isAfter(monthStart) ? from : monthStart;
+            LocalDate finish = to.isBefore(monthEnd) ? to : monthEnd;
+            if (begin.isAfter(finish))
+            {
+                continue;
+            }
+            int times = sessionTimes(s, begin, finish);
+            if (times <= 0)
+            {
+                continue;
+            }
             EduTeacherSalaryConfig cfg = configMap.get(teacherId);
             double defHours = cfg != null && cfg.getClassHoursPerSession() != null
                     ? cfg.getClassHoursPerSession().doubleValue() : 2.0;
             double sessionHours = sessionHours(s.get("startTime"), s.get("endTime"), defHours);
-            long attended = toLong(s.get("attendedRows")) == null ? 0L : toLong(s.get("attendedRows"));
             String classMode = s.get("classMode") == null ? "1" : String.valueOf(s.get("classMode"));
-            String stage = s.get("stage") == null ? "primary" : String.valueOf(s.get("stage"));
+            String stage = stage(s.get("gradeName"));
 
             int idx;
-            long addCount;
-            double addHours;
             if ("2".equals(classMode))
             {
-                // 一对一：按实到学员人次
-                if (attended <= 0)
-                {
-                    continue;
-                }
                 idx = "junior".equals(stage) ? JUNIOR_1ON1 : ("senior".equals(stage) ? SENIOR_1ON1 : PRIMARY_1ON1);
-                addCount = attended;
-                addHours = attended * sessionHours;
             }
             else
             {
-                // 班课：实到≥1 计 1 次课
-                if (attended <= 0)
-                {
-                    continue;
-                }
                 idx = "primary".equals(stage) ? PRIMARY_CLASS : JH_CLASS;
-                addCount = 1;
-                addHours = sessionHours;
             }
+            involved.add(teacherId);
             hoursMap.computeIfAbsent(teacherId, k -> new double[5]);
             countMap.computeIfAbsent(teacherId, k -> new long[5]);
-            hoursMap.get(teacherId)[idx] += addHours;
-            countMap.get(teacherId)[idx] += addCount;
+            hoursMap.get(teacherId)[idx] += sessionHours * times;
+            countMap.get(teacherId)[idx] += times;
         }
 
-        // 汇总：有标准或有课次的教师
-        Set<Long> all = new HashSet<>();
+        // 汇总：覆盖全部教师账号。未配置薪资标准、当月无签到课次的教师同样列出（金额为 0），
+        // 避免薪资表因为「没有考勤」而漏人。
+        Set<Long> all = new LinkedHashSet<>(teacherNames.keySet());
         all.addAll(configMap.keySet());
         all.addAll(involved);
         List<EduTeacherSalaryRecord> result = new ArrayList<>();
@@ -263,6 +277,9 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
                 lessonAmount = lessonAmount.add(amountBd[i]);
             }
             BigDecimal base = cfg != null && cfg.getBaseSalary() != null ? cfg.getBaseSalary() : BigDecimal.ZERO;
+            // 提成：薪资标准中直接配置的固定金额（元/月），不随课时费浮动
+            BigDecimal commission = cfg != null && cfg.getCommissionAmount() != null
+                    ? cfg.getCommissionAmount().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
 
             EduTeacherSalaryRecord r = new EduTeacherSalaryRecord();
             r.setTeacherId(teacherId);
@@ -287,12 +304,117 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
             r.setTotalLessons(totalLessons);
             r.setTotalHours(totalHours.setScale(1, RoundingMode.HALF_UP));
             r.setLessonAmount(lessonAmount);
-            r.setTotalAmount(base.add(lessonAmount).setScale(2, RoundingMode.HALF_UP));
+            r.setCommissionAmount(commission);
+            r.setTotalAmount(base.add(lessonAmount).add(commission).setScale(2, RoundingMode.HALF_UP));
             r.setDelFlag("0");
             result.add(r);
         }
         result.sort((a, b) -> a.getTeacherId().compareTo(b.getTeacherId()));
         return result;
+    }
+
+    /**
+     * 排课在 [begin, finish] 内的上课次数。
+     * WEEKLY：period_name 指明「周六」「周日」，区间内该星期几出现的天数；
+     * DAILY_5_1：从排课 start_date 起「上 5 天休 1 天」循环，落在区间内的上课天数。
+     */
+    private int sessionTimes(Map<String, Object> s, LocalDate begin, LocalDate finish)
+    {
+        String pattern = s.get("classPattern") == null ? "" : String.valueOf(s.get("classPattern"));
+        if ("WEEKLY".equals(pattern))
+        {
+            DayOfWeek dow = weekDay(String.valueOf(s.get("periodName")));
+            if (dow == null)
+            {
+                return 0;
+            }
+            int n = 0;
+            for (LocalDate d = begin; !d.isAfter(finish); d = d.plusDays(1))
+            {
+                if (d.getDayOfWeek() == dow)
+                {
+                    n++;
+                }
+            }
+            return n;
+        }
+        if ("DAILY_5_1".equals(pattern))
+        {
+            LocalDate from = toLocalDate(s.get("startDate"));
+            if (from == null)
+            {
+                return 0;
+            }
+            int n = 0;
+            for (LocalDate d = begin; !d.isAfter(finish); d = d.plusDays(1))
+            {
+                // 每 6 天为一轮：第 1~5 天上课，第 6 天休息
+                if (ChronoUnit.DAYS.between(from, d) % 6 != 5)
+                {
+                    n++;
+                }
+            }
+            return n;
+        }
+        return 0;
+    }
+
+    /** 「周六」「周日」等中文星期标签转 DayOfWeek */
+    private DayOfWeek weekDay(String periodName)
+    {
+        if (periodName == null)
+        {
+            return null;
+        }
+        switch (periodName.trim())
+        {
+            case "周一": return DayOfWeek.MONDAY;
+            case "周二": return DayOfWeek.TUESDAY;
+            case "周三": return DayOfWeek.WEDNESDAY;
+            case "周四": return DayOfWeek.THURSDAY;
+            case "周五": return DayOfWeek.FRIDAY;
+            case "周六": return DayOfWeek.SATURDAY;
+            case "周日":
+            case "周天": return DayOfWeek.SUNDAY;
+            default: return null;
+        }
+    }
+
+    /** 学段：初一~初三=junior，高一~高三=senior，其余=primary */
+    private String stage(Object gradeName)
+    {
+        String g = gradeName == null ? "" : String.valueOf(gradeName).trim();
+        if ("初一".equals(g) || "初二".equals(g) || "初三".equals(g))
+        {
+            return "junior";
+        }
+        if ("高一".equals(g) || "高二".equals(g) || "高三".equals(g))
+        {
+            return "senior";
+        }
+        return "primary";
+    }
+
+    private LocalDate toLocalDate(Object o)
+    {
+        if (o == null)
+        {
+            return null;
+        }
+        if (o instanceof LocalDate)
+        {
+            return (LocalDate) o;
+        }
+        if (o instanceof java.sql.Date)
+        {
+            return ((java.sql.Date) o).toLocalDate();
+        }
+        if (o instanceof Date)
+        {
+            return ((Date) o).toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+        }
+        String v = String.valueOf(o).trim();
+        return v.length() < 10 ? null : LocalDate.parse(v.substring(0, 10));
     }
 
     /** 课次时长（小时）：优先取排课起止时间差，异常时用默认时长 */

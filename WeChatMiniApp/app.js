@@ -1,8 +1,7 @@
 App({
   globalData: {
-    // WeChat DevTools can call the local backend directly.
-    // Use an HTTPS domain here when testing on a real device or publishing.
-    baseUrl: 'http://127.0.0.1:8080',
+    // 体验版与管理网页共用测试后端；不要使用手机自身的 127.0.0.1。
+    baseUrl: 'https://test-admin.mingyuantostars.online/prod-api',
     token: '',
     userInfo: null,
     roles: []

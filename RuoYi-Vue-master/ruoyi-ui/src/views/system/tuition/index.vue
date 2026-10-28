@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-alert
-      title="真实与模拟账单分别查询。历史金额待核验时不计作欠费或实收；正式微信在线支付尚未开通。"
+      title="真实与模拟账单分别查询。历史金额待核验时不计作欠费或实收；课程收费仅登记线下实际收款，不提供课程在线支付。"
       type="info"
       :closable="false"
       class="mb8"
@@ -91,7 +91,7 @@
       <el-table-column label="报名号" prop="enrollmentCode" min-width="145" />
       <el-table-column label="学生" prop="studentName" width="100" />
       <el-table-column label="家长" prop="parentName" width="100" />
-      <el-table-column label="课程" prop="courseClassName" min-width="160" />
+      <el-table-column label="课程／课包" prop="courseClassName" min-width="160" />
       <el-table-column label="校区" prop="campusName" width="90" />
       <el-table-column
         v-for="col in amounts"
@@ -174,6 +174,21 @@
               {{ money(detail[col.key]) }} 元
             </el-descriptions-item>
           </el-descriptions>
+          <template v-if="detail.billType === 'CREDIT_PACKAGE'">
+            <el-alert :title="detail.packageCreditedTime ? '课包已入账：' + detail.packageCreditedTime : detail.billingStatus === 'CLOSED' ? '课包订单已取消' : '课包待确认：确认线下收款后一次性增加孩子额度'" type="info" :closable="false" class="mb8" />
+            <el-descriptions v-if="detail.packageSnapshot" :column="3" border size="small">
+              <el-descriptions-item label="购买年级">{{ detail.packageSnapshot.gradeName }}</el-descriptions-item>
+              <el-descriptions-item label="购买包数">{{ detail.packageSnapshot.packageCount }}</el-descriptions-item>
+              <el-descriptions-item label="基础额度">{{ detail.packageSnapshot.credits }}</el-descriptions-item>
+              <el-descriptions-item label="基础单价">{{ money(detail.packageSnapshot.unitPrice) }} 元</el-descriptions-item>
+              <el-descriptions-item label="原价">{{ money(detail.packageSnapshot.grossAmount) }} 元</el-descriptions-item>
+              <el-descriptions-item label="课包优惠">{{ money(detail.packageSnapshot.packageDiscount) }} 元</el-descriptions-item>
+              <el-descriptions-item label="折后金额">{{ money(detail.packageSnapshot.subtotal) }} 元</el-descriptions-item>
+              <el-descriptions-item label="优惠券优惠">{{ money(detail.packageSnapshot.couponDiscount) }} 元</el-descriptions-item>
+              <el-descriptions-item label="最终应付">{{ money(detail.packageSnapshot.payableAmount) }} 元</el-descriptions-item>
+            </el-descriptions>
+            <el-alert title="课包按家长订单锁定价格和优惠券。课包余额暂不支持班课退费流程，请联系教务核对。" type="info" :closable="false" />
+          </template>
           <div class="finance-actions">
             <el-button
               v-hasPermi="['system:tuition:price']"
@@ -268,7 +283,7 @@
                     </el-button>
                     <el-button
                       v-hasPermi="['system:tuitionRefund:apply']"
-                      v-if="s.row.paymentStatus === 'SUCCESS' && s.row.amount !== '0.00'"
+                      v-if="detail.billType !== 'CREDIT_PACKAGE' && s.row.paymentStatus === 'SUCCESS' && s.row.amount !== '0.00'"
                       type="text"
                       @click="goRefund(s.row)"
                     >
@@ -403,7 +418,7 @@
             <el-select
               v-model="form.userCouponId"
               clearable
-              :disabled="quoteLoading"
+              :disabled="quoteLoading || (detail && detail.billType === 'CREDIT_PACKAGE')"
               @change="refreshQuote"
             >
               <el-option
@@ -679,7 +694,7 @@ export default {
         originalAmount: this.detail.originalAmount,
         financialVersion: this.detail.financialVersion,
         financeMode: this.detail.financeMode || 'REAL',
-        userCouponId: null,
+        userCouponId: this.detail.billType === 'CREDIT_PACKAGE' ? (this.detail.packageSnapshot || {}).userCouponId || null : null,
         payerName: this.detail.parentName || '',
         channel: 'CASH',
         paidTime: (payment && payment.paidTime) || '',
@@ -697,7 +712,8 @@ export default {
       this.quoteLoading = true
       this.formError = ''
       try {
-        const r = await quoteTuition(this.detail.enrollmentId, this.form.userCouponId)
+        const userCouponId = this.detail.billType === 'CREDIT_PACKAGE' ? (this.detail.packageSnapshot || {}).userCouponId || null : this.form.userCouponId
+        const r = await quoteTuition(this.detail.enrollmentId, userCouponId)
         if (sequence === this.quoteRequest) {
           this.quote = r.data
           this.availableCoupons = r.data.coupons || []
@@ -858,6 +874,7 @@ export default {
       }
     },
     goRefund(row) {
+      if (this.detail && this.detail.billType === 'CREDIT_PACKAGE') return
       this.detailOpen = false
       this.$router.push({
         path: '/finance/tuitionRefund',

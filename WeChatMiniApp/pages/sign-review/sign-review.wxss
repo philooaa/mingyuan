@@ -3,6 +3,11 @@
   background: #f4f6fa;
   padding-bottom: 40rpx;
 }
+.review-tabs { display:flex; margin:0 24rpx 12rpx; background:#fff; border-radius:16rpx; padding:8rpx; }
+.review-tab { flex:1; text-align:center; padding:18rpx 0; color:#7c8798; font-size:28rpx; }
+.review-tab.active { color:#3158a4; font-weight:600; background:#edf3ff; border-radius:12rpx; }
+.badge.returned { color:#b76827; background:#fff0e3; }
+.return-reason { margin-top:16rpx; color:#a65c25; font-size:25rpx; line-height:1.5; }
 
 .header {
   padding: 40rpx 32rpx 20rpx;
@@ -156,3 +161,48 @@
   font-size: 26rpx;
   color: #8a95a3;
 }
+
+.attendance-modes {display:flex; margin:0 24rpx 20rpx; border-bottom:1rpx solid #e7ebf2;}
+.attendance-mode {flex:1;text-align:center;padding:20rpx 0;color:#7c8798;font-size:28rpx;}
+.attendance-mode.active {color:#3158a4;font-weight:600;border-bottom:4rpx solid #3158a4;}
+.overview-filters {margin:0 24rpx 20rpx;background:#fff;border-radius:16rpx;padding:20rpx;}
+.course-search {display:flex;gap:12rpx;align-items:center;}
+.course-search input,.overview-student-search input {flex:1;min-width:0;height:80rpx;line-height:normal;font-size:26rpx;background:#f5f7fb;padding:0 16rpx;border-radius:10rpx;}
+.course-search button {margin:0;flex-shrink:0;}
+.course-choice {font-size:27rpx;line-height:1.6;padding:20rpx 0;color:#263650;font-weight:600;}
+.range-filters {display:flex;align-items:center;gap:14rpx;font-size:24rpx;color:#6c7990;flex-wrap:wrap;}
+.range-filters picker {padding:10rpx;background:#f5f7fb;border-radius:8rpx;}
+.range-reset {color:#3158a4;}
+.overview-metrics {display:flex;background:#fff;border-radius:16rpx;margin:16rpx 24rpx;padding:22rpx 8rpx;}
+.overview-metrics>view {flex:1;text-align:center;display:flex;flex-direction:column;gap:8rpx;font-size:23rpx;color:#8390a3;}
+.metric-value {font-size:38rpx;font-weight:700;color:#253958;}
+.overview-caption {margin:12rpx 24rpx;font-size:23rpx;line-height:1.6;color:#8994a5;}
+.overview-warning {margin:16rpx 24rpx;padding:18rpx;border-radius:12rpx;background:#fff5e5;color:#9a6b2d;font-size:25rpx;line-height:1.6;}
+.overview-student-search {margin:20rpx 24rpx;}
+.attendance-legend {display:flex;gap:16rpx;flex-wrap:wrap;margin:12rpx 24rpx;font-size:23rpx;color:#94a0b2;}
+.attendance-grid {display:flex;margin:0 24rpx;border:1rpx solid #e2e8f1;border-radius:12rpx;overflow:hidden;background:#fff;}
+.student-axis {width:200rpx;flex-shrink:0;background:#f9fbfe;border-right:1rpx solid #e2e8f1;}
+.attendance-head {height:76rpx;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#eef3fb;color:#54677f;font-size:24rpx;border-bottom:1rpx solid #e2e8f1;}
+.student-axis-row,.attendance-data-row {height:156rpx;box-sizing:border-box;border-bottom:1rpx solid #eef1f6;}
+.student-axis-row {padding:14rpx 12rpx;display:flex;flex-direction:column;justify-content:center;gap:6rpx;}
+.student-axis-name {flex-shrink:0;line-height:40rpx;font-size:27rpx;font-weight:600;color:#3158a4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.student-axis-meta {font-size:21rpx;line-height:1.5;color:#8a95a7;}
+.student-axis-row .student-axis-meta {flex-shrink:0;line-height:32rpx;white-space:nowrap;}
+.attendance-scroll {flex:1;width:0;}
+.attendance-date-row,.attendance-data-row {display:flex;}
+.attendance-date-row {height:76rpx;background:#eef3fb;}
+.attendance-date,.attendance-cell {width:140rpx;flex-shrink:0;box-sizing:border-box;border-right:1rpx solid #eef1f6;}
+.attendance-cell {height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:25rpx;gap:8rpx;}
+.cell-review {font-size:20rpx;color:#a58a5b;}
+.sign-1 {color:#27856e;}.sign-2 {color:#8792a3;}.sign-3 {color:#b58336;}.sign-4 {color:#416eaf;}.sign-5 {color:#8562b4;}.sign-empty {color:#c6cdd7;}.sign-conflict {color:#bd5b56;}
+.overview-message {text-align:center;padding:40rpx 24rpx;color:#8994a5;font-size:26rpx;line-height:1.7;}
+.student-summary-mask {position:fixed;inset:0;background:rgba(23,37,57,.35);z-index:29;}
+.student-summary-sheet {position:fixed;left:0;right:0;bottom:0;height:85vh;box-sizing:border-box;display:flex;flex-direction:column;padding:24rpx 12rpx calc(24rpx + env(safe-area-inset-bottom));background:#fff;border-radius:28rpx 28rpx 0 0;z-index:30;}
+.student-summary-head {display:flex;justify-content:space-between;align-items:center;padding:0 24rpx;}
+.student-summary-title {font-size:36rpx;font-weight:700;color:#263650;}
+.student-summary-head .overview-caption {margin:8rpx 0;}
+.summary-close {color:#3158a4;padding:16rpx;font-size:26rpx;}
+.summary-counts {margin:8rpx 24rpx;font-size:23rpx;color:#7e8b9e;line-height:1.6;}
+.summary-scroll {flex:1;height:0;min-height:0;}
+.summary-lesson {display:flex;justify-content:space-between;gap:20rpx;padding:20rpx 24rpx;border-bottom:1rpx solid #eef1f6;color:#48617f;font-size:26rpx;}
+.summary-lesson-course {font-size:27rpx;color:#263650;margin-bottom:8rpx;}

@@ -2,10 +2,12 @@
   <view class="header"><view class="header-title">我的作业</view><view class="header-subtitle">查看作业要求与提交进度</view></view>
   <scroll-view wx:if="{{classTabs.length > 2}}" scroll-x class="class-tabs"><view wx:for="{{classTabs}}" wx:key="key" class="class-tab {{activeClass === item.key ? 'class-tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchClass">{{item.name}}</view></scroll-view>
   <view class="tabs"><view wx:for="{{statusTabs}}" wx:key="key" class="tab {{activeStatus === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchStatus">{{item.name}}</view></view>
-  <view class="card" wx:for="{{shown}}" wx:key="rowKey" data-key="{{item.rowKey}}" bindtap="openDetail">
+  <view class="group" wx:for="{{groups}}" wx:key="classId" wx:for-item="group">
+    <view class="group-head"><view class="group-name">{{group.displayName}}</view><view class="group-count">{{group.items.length}} 项作业</view></view>
+    <view class="card" wx:for="{{group.items}}" wx:key="rowKey" data-key="{{item.rowKey}}" bindtap="openDetail">
     <view class="title">{{item.titleText}}</view>
-    <view class="meta">班级：{{item.className}}</view>
     <view class="meta">截止：{{item.deadlineText}} <text class="status">{{item.statusText}}</text><text class="score" wx:if="{{item.scoreText}}">　得分：{{item.scoreText}}</text></view>
+  </view>
   </view>
   <view class="empty" wx:if="{{!loading && !shown.length}}">该分类暂无作业</view><view class="loading" wx:if="{{loading}}">加载中...</view>
 </view>

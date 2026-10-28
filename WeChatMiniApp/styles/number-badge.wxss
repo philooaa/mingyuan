@@ -1,0 +1,20 @@
+.number-badge {
+  position: absolute;
+  top: -12rpx;
+  right: -14rpx;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32rpx;
+  height: 32rpx;
+  padding: 0 7rpx;
+  box-sizing: border-box;
+  border: 3rpx solid #fff;
+  border-radius: 999rpx;
+  background: #e64444;
+  color: #fff;
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 1;
+}

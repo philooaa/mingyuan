@@ -1,3 +1,4 @@
+@import "../../styles/education-ui.wxss";
 page {
   min-height: 100vh;
   background: #f4f7fb;
@@ -228,3 +229,70 @@ page {
   font-weight: 700;
   line-height: 1;
 }
+
+.teacher-calendar { margin: 0 24rpx; }
+.load-status { margin: 20rpx 24rpx; text-align: center; color: #647286; font-size: 25rpx; }
+.load-error { margin: 20rpx 24rpx; }
+.load-error button { margin: 16rpx 0 0; color: #0b326a; background: #fff; }
+.week-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8rpx; }
+.week-toolbar button { margin: 0; padding: 0 16rpx; font-size: 24rpx; color: #0b326a; background: #fff; }
+.date-picker { padding: 14rpx 12rpx; font-size: 24rpx; color: #0f58a8; background: #fff; border-radius: 10rpx; }
+.week-label { margin: 20rpx 0 10rpx; text-align: center; font-size: 29rpx; font-weight: 700; }
+.calendar-note { margin: 12rpx 0; font-size: 23rpx; line-height: 1.6; color: #647286; }
+.calendar-warning { padding: 16rpx; margin: 12rpx 0; border-radius: 12rpx; background: #fff0d7; color: #865108; font-size: 24rpx; line-height: 1.6; }
+.week-horizontal { width: 100%; display: flex; background: white; border: 1rpx solid #d8e2ee; border-radius: 12rpx; overflow: hidden; }
+.fixed-time-column { width: 100rpx; flex-shrink: 0; background: #f6f9fc; }
+.time-head { height: 88rpx; line-height: 88rpx; text-align: center; font-size: 25rpx; background: #eaf2fd; }
+.time-viewport { height: 65vh; overflow: hidden; }
+.time-axis { width: 100rpx; height: 2914rpx; position: relative; will-change: transform; }
+.hour-label { position: absolute; width: 100%; text-align: center; font-size: 21rpx; line-height: 32rpx; color: #647286; }
+.day-scroll { width: calc(100% - 100rpx); flex-shrink: 0; min-width: 0; }
+.day-content, .day-header-row, .day-body-row { width: 1750rpx; }
+.day-header-row { display: flex; height: 88rpx; background: #eaf2fd; font-size: 25rpx; text-align: center; }
+.day-head { width: 250rpx; flex-shrink: 0; padding-top: 12rpx; box-sizing: border-box; border-left: 1rpx solid #d8e2ee; }
+.day-head.today { color: #0f58a8; font-weight: 800; background: #d4e7ff; }
+.week-vertical { height: 65vh; width: 1750rpx; }
+.day-body-row { display: flex; height: 2914rpx; position: relative; }
+.day-column { width: 250rpx; height: 2880rpx; position: relative; flex-shrink: 0; box-sizing: border-box; border-left: 1rpx solid #d8e2ee; }
+.today-column { background: #f6faff; }
+.hour-line { position: absolute; width: 100%; border-top: 1rpx solid #e3eaf2; }
+.lesson-block { position: absolute; box-sizing: border-box; padding: 8rpx; border: 2rpx solid white; border-left: 5rpx solid #367ccd; border-radius: 8rpx; background: #dcecff; color: #123b6b; font-size: 22rpx; line-height: 1.45; overflow: hidden; word-break: break-all; }
+.lesson-block.overlap { border-left-color: #b76e08; background: #fff0d7; color: #714609; }
+.lesson-block.one-to-one { border-left-color: #249477; background: #daf4eb; }
+.block-time { font-size: 22rpx; font-weight: 700; }
+.block-name { margin: 6rpx 0; font-weight: 700; }
+.pending-section { margin-top: 28rpx; }
+.pending-course { padding: 20rpx; margin-bottom: 12rpx; border-radius: 12rpx; background: white; font-size: 25rpx; line-height: 1.65; }
+.pending-reason { color: #a66b12; }
+
+.add-schedule { margin-bottom: 18rpx; }
+.cancel-pending-label { margin-left:auto; flex-shrink:0; color:#8c5c05; font-size:23rpx; }
+
+.lesson-block.one-to-one.empty { background: #e7e9ed; border-left-color: #8c939e; color: #4b5260; margin: 0; text-align: left; box-shadow: none; }
+.lesson-block.one-to-one.pending { background: #fff0bd; border-left-color: #cc9400; color: #745600; }
+.lesson-block.one-to-one.confirmed { background: #dcecff; border-left-color: #367ccd; color: #123b6b; }
+.lesson-block.one-to-one.cancel-pending { background: #ffe2bb; border-left-color: #dd801c; color: #8b4b0c; }
+.lesson-block.one-to-one.completed { background: #daf4e5; border-left-color: #249477; color: #146b4b; }
+.lesson-block.one-to-one.unavailable { background: #eef0f3; border-left-color: #8c939e; color: #616977; border-style: dashed; }
+.lesson-block.class-course { background: #eee4fc; border-left-color: #8251bd; color: #54327e; }
+
+/* 教育业务页面：紧凑布局与信息层级 */
+
+.header { margin:0; padding:28rpx; background:transparent; box-shadow:none; }
+.title { margin-top:0; color:#202b3d; font-size:38rpx; font-weight:700; }
+.summary { border:1rpx solid #e8edf4; box-shadow:none; border-radius:16rpx; }
+.summary-value { font-size:36rpx; color:#2459d9; }
+.summary-label { font-weight:500; font-size:24rpx; }
+.summary-btn,.primary-btn { background:#2459d9; font-weight:600; border-radius:12rpx; }
+.course-card { border-color:#e8edf4; box-shadow:none; border-radius:18rpx; }
+.next-class { background:#edf2ff; border-radius:10rpx; padding:12rpx 14rpx; }
+.next-date { color:#2459d9; }
+.next-weekday { background:transparent; color:#2459d9; }
+.next-class.pending { background:#fff6e4; color:#8c5c05; }
+.course-name { font-weight:700; padding-right:0; line-height:1.5; }
+.course-meta { font-size:24rpx; line-height:1.6; color:#68778c; }
+.time-pill { width:auto; height:auto; padding:12rpx 16rpx; color:#2459d9; font-size:28rpx; }
+.pay-tag { position:static; align-self:flex-start; margin-left:auto; border-radius:8rpx; font-weight:500; padding:6rpx 12rpx; }
+.student { background:#f1f4f9; color:#52627a; font-weight:500; border-radius:8rpx; }
+.period-title { font-size:28rpx; font-weight:700; }
+.empty { box-shadow:none; border:1rpx solid #e8edf4; }

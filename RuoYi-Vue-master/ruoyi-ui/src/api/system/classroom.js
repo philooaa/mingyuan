@@ -17,6 +17,14 @@ export function getClassroom(classroomId) {
   })
 }
 
+// 校区分类统计（教室管理页的校区分类用）
+export function getClassroomCampusStats() {
+  return request({
+    url: '/system/classroom/campusStats',
+    method: 'get'
+  })
+}
+
 // 新增教室信息
 export function addClassroom(data) {
   return request({

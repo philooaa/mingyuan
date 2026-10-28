@@ -1,10 +1,18 @@
 # Opt in with --spring.profiles.active=druid,local. Never use this profile in production.
+spring:
+  datasource:
+    druid:
+      master:
+        # Override MYSQL_DATABASE when using a separate development database.
+        url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE:mingyuaneduminiapp}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
 payment:
   mode: mock
 wechat:
   miniapp:
+    # Local/test codes only. Production must use a configured real SMS sender.
+    phone-code-mode: development
     mock-enabled: true
-    # Leave both blank to reuse the enabled teacher with the lowest user_id.
-    # Explicit username takes precedence over phone; invalid config never falls back.
+    # Teacher login requires an explicit devTeacherId selected from enabled teachers.
+    # Legacy environment fields are retained for configuration compatibility only.
     mock-teacher-username: ${WECHAT_MOCK_TEACHER_USERNAME:}
     mock-teacher-phone: ${WECHAT_MOCK_TEACHER_PHONE:}

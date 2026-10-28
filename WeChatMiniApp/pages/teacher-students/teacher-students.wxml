@@ -1,0 +1,37 @@
+<view class="page">
+  <view class="title">班级学员</view>
+  <view class="muted">查看本人班级，查找学员与上课记录</view>
+  <view class="search"><input value="{{keyword}}" bindinput="inputKeyword" bindconfirm="search" confirm-type="search" placeholder="学生姓名 / 家长电话"/><button size="mini" bindtap="search">搜索</button></view>
+  <view class="back" wx:if="{{mode !== 'courses'}}" bindtap="showCourses">返回我的课程 ›</view>
+  <view class="empty" wx:if="{{error}}">{{error}}</view>
+  <block wx:if="{{mode === 'courses'}}">
+    <view class="card" wx:for="{{courses}}" wx:key="scheduleId" data-id="{{item.scheduleId}}" bindtap="openCourse">
+      <view class="ui-row"><view class="title">{{item.course}}</view><text class="ui-link">›</text></view><view class="ui-time">{{item.time}}</view><view class="muted">{{item.gradeName}} · {{item.room}}</view>
+      <view class="muted">{{item.courseYear}} {{item.termName}} · 班次 {{item.scheduleId}} · {{item.status === '1' ? '已停用' : '正常'}}</view>
+    </view>
+    <view class="empty" wx:if="{{!loading && !error && !courses.length}}">暂无本人负责的课程</view>
+  </block>
+  <block wx:elif="{{mode === 'detail' && enrollment}}">
+    <view class="card"><view class="ui-row"><view class="title">{{enrollment.studentName}}</view><text class="ui-pill ui-pill-muted">{{enrollment.enrollmentText}}</text></view>
+      <view class="ui-kv"><text>报名联系电话</text><text>{{enrollment.contactPhone || '未提供'}}</text></view><view class="ui-kv"><text>家长账号手机号</text><text>{{enrollment.parentPhone || '未提供'}}</text></view>
+      <view class="ui-kv"><text>学生手机号</text><text>{{enrollment.studentPhone || '未提供'}}</text></view><view class="muted" wx:if="{{enrollment.remark}}">备注：{{enrollment.remark}}</view>
+    </view>
+    <view class="card" bindtap="openStudentCourse"><view class="title">{{schedule.course}} ›</view><view class="ui-time">{{schedule.time}}</view><view class="muted">{{schedule.room}} · 班次 {{enrollment.scheduleId}}</view></view>
+    <view class="card"><view class="title">上课记录</view><view class="ui-metrics"><view class="ui-metric"><view>{{enrollment.attendedLessonCount}}</view>已复核到课</view><view class="ui-metric"><view>{{enrollment.pendingLessonCount}}</view>待复核</view><view class="ui-metric"><view>{{enrollment.recordedLessonCount}}</view>录播</view><view class="ui-metric"><view>{{enrollment.leaveLessonCount}}</view>请假</view></view>
+      <view class="history" wx:for="{{history}}" wx:key="key"><view>{{item.date}} · {{item.sourceText}} · {{item.signText}} · {{item.reviewText}}</view><view class="muted" wx:if="{{item.remark}}">{{item.remark}}</view></view>
+      <view class="muted" wx:if="{{!history.length}}">暂无课次签到记录</view>
+    </view>
+  </block>
+  <block wx:elif="{{mode === 'students' || mode === 'search'}}">
+    <view class="card" wx:if="{{mode === 'students' && schedule}}"><view class="title">{{schedule.course}}</view><view>{{schedule.time}} · {{schedule.room}}</view><view class="muted">班次 {{scheduleId}}</view></view>
+    <view class="muted">{{mode === 'search' ? '本人全部课程搜索结果' : '当前班次学员'}} · 共 {{total}} 条报名</view>
+    <view class="card" wx:for="{{students}}" wx:key="enrollmentId" data-id="{{item.enrollmentId}}" bindtap="openStudent">
+      <view class="ui-row"><view class="title">{{item.studentName}}</view><text class="ui-pill ui-pill-muted">{{item.enrollmentText}} ›</text></view>
+      <view>{{item.courseClassName || '未命名课程'}} · 班次 {{item.scheduleId}}</view>
+      <view class="muted">报名联系电话：{{item.contactPhone || '未提供'}}</view><view class="muted">家长账号手机号：{{item.parentPhone || '未提供'}}</view>
+    </view>
+    <view class="empty" wx:if="{{!loading && !error && !students.length}}">没有找到学员</view>
+    <view class="empty" wx:if="{{students.length}}">{{students.length < total ? '上滑加载更多' : '已显示全部记录'}}</view>
+  </block>
+  <view class="empty" wx:if="{{loading}}">加载中…</view>
+</view>

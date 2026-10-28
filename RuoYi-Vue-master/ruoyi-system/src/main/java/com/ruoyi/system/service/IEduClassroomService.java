@@ -1,6 +1,7 @@
 package com.ruoyi.system.service;
 
 import java.util.List;
+import java.util.Map;
 import com.ruoyi.system.domain.EduClassroom;
 
 /**
@@ -26,6 +27,13 @@ public interface IEduClassroomService
      * @return 教室信息集合
      */
     public List<EduClassroom> selectEduClassroomList(EduClassroom eduClassroom);
+
+    /**
+     * 校区分类统计（教室管理页的校区分类用）
+     *
+     * @return [{campusName, roomCount}]
+     */
+    public List<Map<String, Object>> selectCampusStats();
 
     /**
      * 新增教室信息

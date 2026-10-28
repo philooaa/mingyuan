@@ -1,1 +1,29 @@
-<view class="page"><view class="header">提交列表</view><view class="summary"><text>班级人数 {{stats.total}}</text><text>已提交 {{stats.submitted}}</text><text class="pending">未提交 {{stats.pending}}</text></view><view class="card" wx:for="{{list}}" wx:key="enrollmentId" data-id="{{item.submissionId}}" bindtap="open"><view class="title">{{item.studentName || '学生'}}</view><view class="meta">{{item.missing ? '未提交' : ('提交时间：' + (item.submitTime || '-') + '　' + item.statusText)}}</view><view class="score">{{item.missing ? '-' : (item.finalScore === null || item.finalScore === undefined ? '-' : item.finalScore)}} 分</view></view><view class="empty" wx:if="{{!loading && !list.length}}">暂无提交</view><view class="loading" wx:if="{{loading}}">加载中...</view></view>
+<view class="page">
+  <view class="header">
+    <view class="header-title">{{title || '提交列表'}}</view>
+    <view class="header-sub" wx:if="{{scheduleName}}">{{scheduleName}}</view>
+  </view>
+  <view class="summary">
+    <text>班级人数 {{stats.total}}</text>
+    <text>已提交 {{stats.submitted}}</text>
+    <text class="pending">未提交 {{stats.pending}}</text>
+    <text class="unreviewed" wx:if="{{stats.unreviewed}}">未批阅 {{stats.unreviewed}}</text>
+  </view>
+  <view class="group" wx:for="{{groups}}" wx:key="scheduleId" wx:for-item="group">
+    <view class="group-head">
+      <view class="group-name">{{group.name}}</view>
+      <view class="group-stat">提交 {{group.submitted}}/{{group.students.length}}<text wx:if="{{group.unreviewed}}" class="group-warn">　待批 {{group.unreviewed}}</text></view>
+    </view>
+    <view class="card submitted" wx:for="{{group.submittedStudents}}" wx:key="submissionId" wx:for-item="stu" data-id="{{stu.submissionId}}" bindtap="open">
+      <view class="title">{{stu.studentName}}</view>
+      <view class="meta">提交时间：{{stu.submitTime || '-'}}</view>
+      <view class="score {{stu.reviewed ? '' : 'todo'}}">{{stu.scoreText}}</view>
+    </view>
+    <view class="miss-block" wx:if="{{group.missing.length}}">
+      <view class="miss-title">未提交（{{group.missing.length}}）</view>
+      <view class="miss-names"><text class="miss-name" wx:for="{{group.missing}}" wx:key="enrollmentId" wx:for-item="stu">{{stu.studentName}}</text></view>
+    </view>
+  </view>
+  <view class="empty" wx:if="{{!loading && !groups.length}}">{{emptyText}}</view>
+  <view class="loading" wx:if="{{loading}}">加载中...</view>
+</view>

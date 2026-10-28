@@ -24,6 +24,9 @@ class MiniAppLoginServiceTest
     private List<SysUser> users;
     private SysRole teacherRole;
     private LoginUser issuedToken;
+    private boolean developmentEnabled;
+    private SysRole parentRole;
+    private String[] profiles;
 
     @BeforeEach
     void setup() throws Exception
@@ -33,8 +36,19 @@ class MiniAppLoginServiceTest
         teacherRole.setRoleKey("teacher");
         teacherRole.setStatus("0");
         teacherRole.setDelFlag("0");
+        parentRole=new SysRole(8L);parentRole.setRoleKey("parent");parentRole.setStatus("0");parentRole.setDelFlag("0");
+        profiles=new String[]{"local"};
+        set("environment",new org.springframework.core.env.StandardEnvironment(){@Override public String[] getActiveProfiles(){return profiles;}});
         users = List.of(user(10L, "teacher_a", "0", List.of(teacherRole)));
         issuedToken = null;
+        developmentEnabled = true;
+        set("developmentSession", new MiniAppDevelopmentSession() {
+            @Override public boolean isEnabled() { return developmentEnabled; }
+            @Override public String getVersion() {
+                if (!developmentEnabled) throw new ServiceException("Development login disabled");
+                return "test-session";
+            }
+        });
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(
                 proxy(HttpServletRequest.class, (method, args) -> switch (method) {
                     case "getHeader" -> null;
@@ -52,16 +66,28 @@ class MiniAppLoginServiceTest
                             u.getRoles().stream().limit(1).toList())).orElse(null);
             case "selectUserById" -> users.stream().filter(u -> u.getUserId().equals(args[0])).findFirst().orElse(null);
             case "updateLoginInfo" -> 1;
+            case "insertUser" -> {
+                SysUser created = (SysUser) args[0];
+                assertArrayEquals(new Long[] { parentRole.getRoleId() }, created.getRoleIds());
+                created.setUserId(44L); created.setDelFlag("0"); created.setRoles(List.of(parentRole));
+                users = java.util.stream.Stream.concat(users.stream(), java.util.stream.Stream.of(created)).toList();
+                yield 1;
+            }
             default -> throw new AssertionError("Unexpected user service call: " + method);
         }));
         set("userMapper", proxy(SysUserMapper.class, (method, args) -> {
+            if ("selectParentUserByPhone".equals(method)) return users.stream()
+                    .filter(u -> u.getPhonenumber().equals(args[0]) && u.getRoles().stream().anyMatch(r -> "parent".equals(r.getRoleKey())))
+                    .findFirst().orElse(null);
+            if ("selectUserIdsByPhone".equals(method)) return users.stream()
+                    .filter(u -> u.getPhonenumber().equals(args[0]) && "0".equals(u.getDelFlag())).map(SysUser::getUserId).toList();
             if (!"selectAllocatedList".equals(method)) throw new AssertionError(method);
             SysUser filter = (SysUser) args[0];
             return users.stream().filter(u -> u.getRoles().stream()
                     .anyMatch(r -> r.getRoleId().equals(filter.getRoleId()))).toList();
         }));
         set("roleMapper", proxy(SysRoleMapper.class, (method, args) -> switch (method) {
-            case "checkRoleKeyUnique" -> "teacher".equals(args[0]) ? teacherRole : null;
+            case "checkRoleKeyUnique" -> "teacher".equals(args[0]) ? teacherRole : "parent".equals(args[0]) ? parentRole : null;
             case "selectRolePermissionByUserId" -> users.stream().filter(u -> u.getUserId().equals(args[0]))
                     .findFirst().orElseThrow().getRoles().stream().filter(r -> "0".equals(r.getDelFlag())).toList();
             default -> throw new AssertionError("Unexpected role mapper call: " + method);
@@ -74,6 +100,9 @@ class MiniAppLoginServiceTest
                 issuedToken = loginUser;
                 return "test-token";
             }
+            @Override public String createDevelopmentToken(LoginUser loginUser) {
+                return createToken(loginUser);
+            }
         });
     }
 
@@ -81,74 +110,26 @@ class MiniAppLoginServiceTest
     void cleanup() { RequestContextHolder.resetRequestAttributes(); }
 
     @Test
-    void unspecifiedTeacherUsesLowestIdEnabledExistingTeacher()
+    void unspecifiedTeacherNeverSilentlySelectsAnotherTeacher() throws Exception
     {
-        users = List.of(user(20L, "teacher_b", "0", List.of(teacherRole)),
-                user(2L, "disabled", "1", List.of(teacherRole)),
-                user(10L, "teacher_a", "0", List.of(teacherRole)));
-        assertEquals("test-token", login());
-        assertEquals(10L, issuedToken.getUserId());
-    }
-
-    @Test
-    void explicitUsernameOverridesAutomaticChoice() throws Exception
-    {
-        users = List.of(users.get(0), user(20L, "teacher_b", "0", List.of(teacherRole)));
-        set("mockTeacherUsername", "teacher_b");
-        assertEquals("test-token", login());
-        assertEquals(20L, issuedToken.getUserId());
-    }
-
-    @Test
-    void missingExplicitUsernameDoesNotSilentlySwitchToPhoneOrAnotherTeacher() throws Exception
-    {
-        set("mockTeacherUsername", "missing_teacher");
-        set("mockTeacherPhone", users.get(0).getPhonenumber());
-        assertThrows(ServiceException.class, this::login);
+        set("mockTeacherUsername", "teacher_a");
+        assertThrows(ServiceException.class, () -> service.login("mock","mock","Teacher","teacher"));
         assertNull(issuedToken);
     }
 
     @Test
-    void explicitPhoneIsSupportedWhenUsernameIsBlank() throws Exception
+    void selectedTeacherRetainsAllActiveRoles() throws Exception
     {
-        set("mockTeacherPhone", users.get(0).getPhonenumber());
-        assertEquals("test-token", login());
-        assertEquals(10L, issuedToken.getUserId());
+        SysRole parent=new SysRole(8L); parent.setRoleKey("parent"); parent.setStatus("0"); parent.setDelFlag("0");
+        users.get(0).setRoles(List.of(parent,teacherRole));
+        assertEquals("test-token",login());
+        assertEquals(List.of("parent","teacher"),issuedToken.getUser().getRoles().stream().map(SysRole::getRoleKey).toList());
     }
 
     @Test
-    void phoneLoginRetainsAllRolesDespiteLegacyJoinedLookupLimit() throws Exception
+    void missingSelectedTeacherDoesNotFallback() throws Exception
     {
-        SysRole parent = new SysRole(8L);
-        parent.setRoleKey("parent");
-        parent.setStatus("0");
-        parent.setDelFlag("0");
-        users.get(0).setRoles(List.of(parent, teacherRole));
-        set("mockTeacherPhone", users.get(0).getPhonenumber());
-        assertEquals("test-token", login());
-        assertEquals(List.of("parent", "teacher"), issuedToken.getUser().getRoles().stream()
-                .map(SysRole::getRoleKey).toList());
-    }
-
-    @Test
-    void sharedParentPhoneSelectsTheTeacherNotTheFirstUser() throws Exception
-    {
-        SysUser parent = user(3L, "parent_a", "0", List.of());
-        parent.setPhonenumber(users.get(0).getPhonenumber());
-        users = List.of(parent, users.get(0));
-        set("mockTeacherPhone", parent.getPhonenumber());
-        assertEquals("test-token", login());
-        assertEquals(10L, issuedToken.getUserId());
-    }
-
-    @Test
-    void phoneSharedByTwoEnabledTeachersRequiresExplicitUsername() throws Exception
-    {
-        SysUser other = user(20L, "teacher_b", "0", List.of(teacherRole));
-        other.setPhonenumber(users.get(0).getPhonenumber());
-        users = List.of(users.get(0), other);
-        set("mockTeacherPhone", other.getPhonenumber());
-        assertThrows(ServiceException.class, this::login);
+        assertThrows(ServiceException.class, () -> service.login("mock","mock","Teacher","teacher",99L));
         assertNull(issuedToken);
     }
 
@@ -211,7 +192,195 @@ class MiniAppLoginServiceTest
         assertNull(issuedToken);
     }
 
-    private String login() { return service.login("mock", "mock", "Test Teacher", "teacher"); }
+    @Test
+    void selectedTeacherOverridesConfiguredFallback() throws Exception
+    {
+        users = List.of(users.get(0), user(20L, "teacher_b", "0", List.of(teacherRole)));
+        set("mockTeacherUsername", "teacher_a");
+        assertEquals("test-token", service.login("mock", "mock", "Teacher", "teacher", 20L));
+        assertEquals(20L, issuedToken.getUserId());
+    }
+
+    @Test
+    void administratorCannotEnterThroughTeacherLogin() throws Exception
+    {
+        SysRole administrator = new SysRole(8L);
+        administrator.setRoleKey("administrator");
+        administrator.setStatus("0");
+        administrator.setDelFlag("0");
+        users.get(0).setRoles(List.of(teacherRole, administrator));
+        assertThrows(ServiceException.class, this::login);
+        assertThrows(ServiceException.class, () -> service.login("mock", "mock", "Teacher", "teacher", 10L));
+        assertTrue(service.developmentTeachers().isEmpty());
+        assertNull(issuedToken);
+    }
+
+    @Test
+    void teacherLoginAndTeacherListRequireLocalDevelopmentSession()
+    {
+        developmentEnabled = false;
+        assertThrows(ServiceException.class, this::login);
+        assertThrows(ServiceException.class, () -> service.login("mock", "mock", "Teacher", "teacher", 10L));
+        assertThrows(ServiceException.class, service::developmentTeachers);
+        assertNull(issuedToken);
+    }
+
+    @Test void businessAdminCannotUsePasswordFreeTeacherShortcut() throws Exception
+    {
+        SysRole business = new SysRole(9L);
+        business.setRoleKey("business_admin"); business.setStatus("0"); business.setDelFlag("0");
+        users.get(0).setRoles(List.of(teacherRole, business));
+        assertTrue(service.developmentTeachers().isEmpty());
+        assertThrows(ServiceException.class, this::login);
+        assertNull(issuedToken);
+    }
+
+    @Test
+    void selectedTeacherIdCannotBeUsedForAnotherRole()
+    {
+        assertThrows(ServiceException.class, () -> service.login("mock", "mock", "Teacher", "parent", 10L));
+        assertNull(issuedToken);
+    }
+
+    @Test
+    void teacherListContainsExistingEligibleTeachers()
+    {
+        users = List.of(users.get(0), user(20L, "disabled_teacher", "1", List.of(teacherRole)));
+        assertEquals(1, service.developmentTeachers().size());
+        assertEquals("10", service.developmentTeachers().get(0).get("userId"));
+    }
+
+    private String login() { return service.login("mock", "mock", "Test Teacher", "teacher", 10L); }
+
+    @Test void selectedParentsIssueTheirOwnIdentitiesAndIndependentOptions() {
+        users=List.of(user(30L,"dev_referral_a","0",List.of(parentRole)),user(31L,"dev_referral_b","0",List.of(parentRole)));
+        assertEquals(2,service.developmentParents().size());
+        assertEquals("test-token",service.login("mock","mock","Parent","parent",null,30L));assertEquals(30L,issuedToken.getUserId());
+        assertEquals("test-token",service.login("mock","mock","Parent","parent",null,31L));assertEquals(31L,issuedToken.getUserId());
+    }
+    @Test void selectedParentCannotImpersonateStaffOrAnotherRole() {
+        users=List.of(user(30L,"dev_referral_a","0",List.of(parentRole,teacherRole)));
+        assertTrue(service.developmentParents().isEmpty());
+        assertThrows(ServiceException.class,()->service.login("mock","mock","Parent","parent",null,30L));
+        assertThrows(ServiceException.class,()->service.login("mock","mock","Parent","admin",null,30L));
+        assertThrows(ServiceException.class,()->service.login("mock","mock","Parent","teacher",10L,30L));
+        assertNull(issuedToken);
+    }
+    @Test void disabledDeletedMissingParentsAndRolesCannotLogin() {
+        users=List.of(user(30L,"dev_referral_a","1",List.of(parentRole)));
+        assertThrows(ServiceException.class,()->service.login("mock","mock","Parent","parent",null,30L));
+        users.get(0).setStatus("0");users.get(0).setDelFlag("2");assertTrue(service.developmentParents().isEmpty());
+        users.get(0).setDelFlag("0");parentRole.setStatus("1");assertTrue(service.developmentParents().isEmpty());
+        assertThrows(ServiceException.class,()->service.login("mock","mock","Parent","parent",null,30L));
+        assertThrows(ServiceException.class,()->service.login("mock","mock","Parent","parent",null,99L));
+        assertNull(issuedToken);
+    }
+    @Test void parentSelectionNeverWorksInProductionEvenWithAccidentalMockFlag() {
+        users=List.of(user(30L,"dev_referral_a","0",List.of(parentRole)));
+        for(String[] value:List.of(new String[]{},new String[]{"prod"},new String[]{"local","production"})){
+            profiles=value;assertThrows(ServiceException.class,service::developmentParents);assertThrows(ServiceException.class,()->service.login("mock","mock","Parent","parent",null,30L));
+        }
+        profiles=new String[]{"local"};developmentEnabled=false;assertThrows(ServiceException.class,service::developmentParents);
+        assertNull(issuedToken);
+    }
+
+    @Test void legacyAdminShortcutRequiresAnEnabledDevelopmentSession() {
+        developmentEnabled = false;
+        assertThrows(ServiceException.class, () -> service.login("mock", "mock", "Admin", "admin"));
+        assertNull(issuedToken);
+    }
+
+    @Test void developmentSessionRejectsProductionEvenWithMockFlag() throws Exception {
+        MiniAppDevelopmentSession session = new MiniAppDevelopmentSession();
+        var flag = MiniAppDevelopmentSession.class.getDeclaredField("mockEnabled");
+        flag.setAccessible(true); flag.set(session, true);
+        var env = MiniAppDevelopmentSession.class.getDeclaredField("environment");
+        env.setAccessible(true); env.set(session, new org.springframework.core.env.StandardEnvironment() {
+            @Override public String[] getActiveProfiles() { return profiles; }
+        });
+        assertTrue(session.isEnabled());
+        for (String[] value : List.of(new String[] {}, new String[] { "prod" }, new String[] { "local", "production" })) {
+            profiles = value;
+            assertFalse(session.isEnabled());
+            assertThrows(ServiceException.class, session::getVersion);
+        }
+    }
+
+    @Test void verifiedPhoneKeepsMultipleExistingRolesWithoutAddingParent() {
+        SysRole education = new SysRole(9L); education.setRoleKey("education"); education.setStatus("0"); education.setDelFlag("0");
+        users.get(0).setRoles(List.of(teacherRole, education));
+        assertEquals("test-token", service.loginVerifiedPhone("13800000010"));
+        assertEquals(List.of("teacher", "education"), issuedToken.getUser().getRoles().stream().map(SysRole::getRoleKey).toList());
+        assertEquals(1, users.size());
+    }
+
+    @Test void wechatEntryMatchesExistingTeacherInsteadOfCreatingAnotherParent() throws Exception {
+        SysRole education = new SysRole(9L); education.setRoleKey("education"); education.setStatus("0"); education.setDelFlag("0");
+        users.get(0).setRoles(List.of(teacherRole, education));
+        set("mockPhone", "13800000010");
+        assertEquals("test-token", service.login("wx-code", "phone-code", "微信用户", null));
+        assertEquals(10L, issuedToken.getUserId());
+        assertEquals(1, users.size());
+        assertEquals(List.of("teacher", "education"), issuedToken.getUser().getRoles().stream().map(SysRole::getRoleKey).toList());
+    }
+
+    @Test void wechatEntryRejectsAmbiguousPhoneWithoutCreatingAccount() throws Exception {
+        SysUser duplicate = user(20L, "other", "0", List.of(parentRole));
+        duplicate.setPhonenumber("13800000010");
+        users = List.of(users.get(0), duplicate);
+        set("mockPhone", "13800000010");
+        assertThrows(ServiceException.class, () -> service.login("wx-code", "phone-code", "微信用户", null));
+        assertNull(issuedToken);
+        assertEquals(2, users.size());
+    }
+
+    @Test void firstRegistrationCanOnlyReceiveExistingParentRole() {
+        assertEquals("test-token", service.loginVerifiedPhone("13900000044"));
+        assertEquals(List.of("parent"), issuedToken.getUser().getRoles().stream().map(SysRole::getRoleKey).toList());
+        assertEquals("13900000044", issuedToken.getUser().getPhonenumber());
+    }
+
+    @Test void verifiedBusinessAdministratorKeepsItsExistingIdentity() {
+        SysRole business = new SysRole(9L); business.setRoleKey("business_admin"); business.setStatus("0"); business.setDelFlag("0");
+        users.get(0).setRoles(List.of(business));
+        assertEquals("test-token", service.loginVerifiedPhone("13800000010"));
+        assertEquals(10L, issuedToken.getUserId());
+        assertEquals(List.of("business_admin"), issuedToken.getUser().getRoles().stream().map(SysRole::getRoleKey).toList());
+    }
+
+    @Test void wechatTransportDoesNotLogSecretOrToken() throws Exception {
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/token", exchange -> {
+            byte[] body = "{\"access_token\":\"sensitive-test-token\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try(var out = exchange.getResponseBody()) { out.write(body); }
+        });
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        var captured = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        captured.start(); logger.addAppender(captured); server.start();
+        try {
+            var request = MiniAppLoginService.class.getDeclaredMethod("requestJson", String.class, String.class);
+            request.setAccessible(true);
+            var response = (com.alibaba.fastjson2.JSONObject) request.invoke(service, "http://127.0.0.1:"+server.getAddress().getPort()+"/token", "secret=sensitive-test-secret");
+            assertEquals("sensitive-test-token", response.getString("access_token"));
+            assertTrue(captured.list.stream().noneMatch(e -> e.getFormattedMessage().contains("sensitive-test-")), "WeChat credentials and tokens must not enter logs");
+        } finally { server.stop(0); logger.detachAppender(captured); captured.stop(); }
+    }
+
+    @Test void ambiguousPhoneNeverSelectsAnArbitraryPrivilegedAccount() {
+        SysUser other = user(11L, "other", "0", List.of(parentRole)); other.setPhonenumber("13800000010");
+        users = List.of(users.get(0), other);
+        assertThrows(ServiceException.class, () -> service.loginVerifiedPhone("13800000010"));
+        assertNull(issuedToken);
+    }
+
+    @Test void disabledAccountOrMissingActiveRoleDoesNotRegisterAReplacement() {
+        users.get(0).setStatus("1");
+        assertThrows(ServiceException.class, () -> service.loginVerifiedPhone("13800000010"));
+        users.get(0).setStatus("0"); teacherRole.setStatus("1");
+        assertThrows(ServiceException.class, () -> service.loginVerifiedPhone("13800000010"));
+        assertEquals(1, users.size()); assertNull(issuedToken);
+    }
 
     private SysUser user(long id, String name, String status, List<SysRole> roles)
     {

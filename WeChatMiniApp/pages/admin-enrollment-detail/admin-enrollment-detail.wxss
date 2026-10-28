@@ -1,0 +1,6 @@
+@import "../admin-enrollment/admin-enrollment.wxss";
+
+/* 教育业务页面：紧凑布局与信息层级 */
+
+.page > button { margin:24rpx 0 0; border-radius:14rpx; font-size:28rpx; background:#fff1f0; color:#bb3c3c; }
+.page > .empty { font-size:24rpx; line-height:1.7; }

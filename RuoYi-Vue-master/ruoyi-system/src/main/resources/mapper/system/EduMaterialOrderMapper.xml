@@ -41,7 +41,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                o.wx_transaction_id, o.refund_time, o.refund_reason, o.status, o.del_flag,
                o.create_by, o.create_time, o.update_by, o.update_time, o.remark,
                m.title as material_title,
-               u.nick_name as parent_name
+               <!-- 家长姓名：真名优先，真名不是中文名时退回中文昵称。
+                    不能直接用 u.nick_name —— 家长账号的 nick_name 存的是报名表里的「微信昵称」，
+                    有 20 个是经办老师/课程顾问的微信，195/295 更是等于教师真名「王文晶」。
+                    口径与 CouponService.PARENT_DISPLAY_NAME 保持一致。 -->
+               case when trim(coalesce(u.user_name,'')) = '' then trim(coalesce(u.nick_name,''))
+                    when u.user_name regexp '[一-龥]' then trim(u.user_name)
+                    when trim(coalesce(u.nick_name,'')) != '' and u.nick_name regexp '[一-龥]' then trim(u.nick_name)
+                    else trim(u.user_name) end as parent_name
         from edu_material_order o
         left join edu_material m on m.material_id = o.material_id
         left join sys_user u     on u.user_id = o.parent_id

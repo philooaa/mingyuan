@@ -25,6 +25,33 @@ function page(name) {
   return instance
 }
 const { request } = require('../utils/request')
+test('public upload addresses use the current HTTPS API prefix without duplication', () => {
+  const previous = app.globalData.baseUrl
+  app.globalData.baseUrl = 'https://test-admin.mingyuantostars.online/prod-api'
+  try {
+    const s = require('../utils/material-shop')
+    const want = 'https://test-admin.mingyuantostars.online/prod-api/profile/upload/a.jpg'
+    for (const value of ['/profile/upload/a.jpg', 'profile/upload/a.jpg',
+      'http://test-admin.mingyuantostars.online/profile/upload/a.jpg',
+      'https://test-admin.mingyuantostars.online/profile/upload/a.jpg',
+      '/prod-api/profile/upload/a.jpg',
+      'http://test-admin.mingyuantostars.online/prod-api/profile/upload/a.jpg']) assert.equal(s.imageUrl(value), want)
+    assert.equal(s.imageUrl('https://cdn.example.com/profile/a.jpg'), 'https://cdn.example.com/profile/a.jpg')
+    assert.equal(s.imageUrl('wxfile://tmp/test.jpg'), 'wxfile://tmp/test.jpg')
+    assert.equal(s.imageUrl(''), '')
+  } finally { app.globalData.baseUrl = previous }
+})
+test('new material images persist the canonical file path rather than a broken proxy URL', async () => {
+  const previous = app.globalData.baseUrl
+  app.globalData.baseUrl = 'https://test-admin.mingyuantostars.online/prod-api'
+  try {
+    environment({ chooseMedia: o => o.success({ tempFiles: [{ tempFilePath: '/tmp/image.jpg', size: 50 }] }),
+      uploadFile: o => o.success({ statusCode: 200, data: JSON.stringify({ code: 200, fileName: '/profile/upload/a.jpg', url: 'http://test-admin.mingyuantostars.online/profile/upload/a.jpg' }) }) })
+    const p = page('material-upload'); p._role = 'admin'
+    p.chooseImages({ currentTarget: { dataset: { kind: 'cover' } } }); await new Promise(resolve => setImmediate(resolve))
+    assert.equal(p.data.form.coverUrl, 'https://test-admin.mingyuantostars.online/prod-api/profile/upload/a.jpg')
+  } finally { app.globalData.baseUrl = previous }
+})
 test('HTTP 200 carrying application 403 rejects and preserves backend message', async () => {
   environment({ request: options => options.success({ statusCode: 200, data: { code: 403, msg: '无权限' } }) })
   await assert.rejects(request({ url: '/system/material' }), /无权限/)
@@ -461,6 +488,6 @@ test('product media pickers keep successful results when the native picker tempo
   environment({ chooseMedia(options) { imagePicker = options }, chooseMessageFile(options) { filePicker = options }, uploadFile(options) { options.success({ statusCode: 200, data: JSON.stringify({ code: 200, url: '/profile/new.png' }) }) } })
   const p = page('material-upload'); p.onLoad(); p._role = 'admin'; p.openForm()
   p.chooseImages({ currentTarget: { dataset: { kind: 'cover' } } }); p.onHide()
-  await imagePicker.success({ tempFiles: [{ tempFilePath: '/tmp/new.png', size: 10 }] }); assert.equal(p.data.form.coverUrl, '/profile/new.png')
+  await imagePicker.success({ tempFiles: [{ tempFilePath: '/tmp/new.png', size: 10 }] }); assert.equal(p.data.form.coverUrl, 'http://127.0.0.1:8080/profile/new.png')
   p.chooseFile(); p.onHide(); filePicker.success({ tempFiles: [{ name: 'test.pdf', path: '/tmp/test.pdf', size: 10 }] }); assert.equal(p.data.file.name, 'test.pdf')
 })

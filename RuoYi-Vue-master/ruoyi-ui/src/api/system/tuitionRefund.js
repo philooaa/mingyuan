@@ -16,6 +16,9 @@ export function applyRefund(data) {
 export function reviewRefund(id, data) {
   return request({ url: '/system/tuition/refunds/' + id + '/review', method: 'post', data })
 }
+export function cancelRefund(id) {
+  return request({ url: '/system/tuition/refunds/' + id + '/cancel', method: 'post' })
+}
 export function executeRefund(id) {
   return request({ url: '/system/tuition/refunds/' + id + '/execute', method: 'post' })
 }
@@ -28,4 +31,8 @@ export function refundEvidence(id) {
     method: 'get',
     responseType: 'blob',
   })
+}
+
+export function markRefunded(id, data) {
+  return request({ url: '/system/tuition/refunds/' + id + '/mark-refunded', method: 'post', data })
 }

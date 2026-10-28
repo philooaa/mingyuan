@@ -2,30 +2,35 @@
   <view class="hero">
     <view class="hero-top">
       <image class="logo" src="{{logoUrl}}" mode="widthFix"></image>
-      <view class="tag">{{tag}}</view>
+      <view wx:if="{{roles.length}}" class="tag role-label" bindtap="openRoleMenu" hover-class="{{roles.length > 1 ? 'role-label-pressed' : 'none'}}">
+        <text>{{roleSwitching ? '切换中…' : currentRoleName}}</text><text class="role-arrow" wx:if="{{roles.length > 1}}">▾</text>
+      </view>
     </view>
 
-    <view class="role-switch">
-      <view
-        class="role-chip {{item.className}}"
-        wx:for="{{roles}}"
-        wx:key="key"
-        data-role="{{item.key}}"
-        bindtap="switchRole"
-      >
-        {{item.name}}
-      </view>
+    <view class="account-toolbar">
+      <button wx:if="{{currentRole === 'parent' && roles.length}}" class="logout-button" size="mini" bindtap="openChildren">管理孩子信息 ›</button>
+      <button class="logout-button" size="mini" bindtap="logout">退出登录</button>
     </view>
 
     <view class="hero-copy">
       <view class="eyebrow">{{eyebrow}}</view>
-      <view class="title">{{title}}</view>
+      <block wx:if="{{currentRole === 'parent'}}">
+        <view class="parent-welcome"><text class="child-name-switch" bindtap="toggleChildPicker">{{childLoading ? '加载中' : currentChild ? currentChild.studentName : '选择孩子'}} ▾</text><text>{{currentChild ? '家长，欢迎您' : '，欢迎您'}}</text></view>
+        <view class="child-caption">{{currentChild ? currentChild.gradeName + ' · 当前孩子' : childError || '添加孩子信息，开始管理课程与学习'}}</view>
+        <view class="home-child-picker" wx:if="{{showChildPicker}}">
+          <view class="home-child-option {{currentChild.accountId === item.accountId ? 'chosen' : ''}}" wx:for="{{parentChildren}}" wx:key="accountId" data-id="{{item.accountId}}" bindtap="chooseChild"><view><text>{{item.studentName}}</text><text class="child-option-grade">{{item.gradeName}}</text></view><view><text class="child-option-badge" wx:if="{{item.badgeText}}">{{item.badgeText}}</text><text wx:if="{{currentChild.accountId === item.accountId}}">✓</text></view></view>
+          <view class="home-child-add" bindtap="addChild">＋ 添加孩子信息</view>
+        </view>
+        <view class="child-load-retry" wx:if="{{childError}}" bindtap="loadParentTag">重新加载孩子资料</view>
+      </block>
+      <view class="title" wx:else>{{title}}</view>
     </view>
 
-    <view class="stats">
-      <view class="stat" wx:for="{{stats}}" wx:key="label">
+    <view class="stats {{currentRole === 'teacher' ? 'stats-teacher' : ''}}">
+      <view class="stat {{item.route ? 'stat-clickable' : ''}}" wx:for="{{stats}}" wx:key="label" data-key="{{item.key}}" bindtap="handleStat" hover-class="{{item.route ? 'stat-pressed' : 'none'}}" hover-stay-time="80">
         <view class="stat-value">{{item.value}}<text>{{item.suffix}}</text></view>
         <view class="stat-label">{{item.label}}</view>
+        <view class="stat-link" wx:if="{{item.linkText}}">{{item.linkText}}<text>›</text></view>
       </view>
     </view>
   </view>
@@ -39,22 +44,27 @@
 
     <view class="action-grid">
       <view
-        class="action-card {{item.tone}}"
+        class="action-card {{item.tone}} {{item.disabled ? 'action-disabled' : ''}}"
         wx:for="{{quickActions}}"
         wx:key="title"
         data-title="{{item.title}}"
         data-route="{{item.route}}"
+        data-disabled="{{item.disabled}}"
         bindtap="handleAction"
       >
-        <view class="action-icon">{{item.icon}}</view>
+        <view class="action-icon">{{item.icon}}<view class="number-badge" wx:if="{{item.badgeText}}">{{item.badgeText}}</view></view>
         <view class="action-title">{{item.title}}</view>
       </view>
     </view>
+    <view class="course-pending-message" wx:if="{{currentRole === 'teacher' && coursePendingError}}"><text>{{coursePendingError}}</text><text class="pending-retry" bindtap="loadCoursePending">重新加载</text></view>
+    <view class="course-pending-message" wx:if="{{accountPendingError}}"><text>{{accountPendingError}}</text><text class="pending-retry" bindtap="loadAccountPending">重新加载</text></view>
   </view>
 
   <view class="section split">
     <view class="panel">
       <view class="section-title">{{agendaTitle}}</view>
+      <view class="course-meta" wx:if="{{currentRole === 'parent'}}">{{parentScheduleError || (!schedule.length ? (currentChild ? '暂无已排定的待上课程' : '请先选择孩子') : currentChild.studentName + '的近期课程')}}</view>
+      <view class="course-meta" wx:if="{{currentRole === 'teacher' && teacherDataMessage}}">{{teacherDataMessage}}</view>
       <view class="course" wx:for="{{schedule}}" wx:key="time">
         <view class="course-time-wrap">
           <view class="course-meta-date" wx:if="{{item.dateReady}}">

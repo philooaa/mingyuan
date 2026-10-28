@@ -52,6 +52,9 @@ public interface SysUserMapper
      */
     public SysUser selectUserByPhonenumber(String phonenumber);
 
+    /** Exact phone identity lookup; ambiguity is handled explicitly instead of selecting the first user. */
+    public List<Long> selectUserIdsByPhone(String phonenumber);
+
     /**
      * 通过手机号查询含指定角色的家长用户（避免同手机号的教师/管理员账号被误命中）
      *
@@ -84,6 +87,9 @@ public interface SysUserMapper
      * @return 结果
      */
     public int updateUser(SysUser user);
+
+    /** 仅由用户管理修改登录名称，个人资料编辑不更新登录名称。 */
+    public int updateUserName(SysUser user);
 
     /**
      * 修改用户头像

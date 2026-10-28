@@ -1,36 +1,18 @@
 <view class="auth-page">
   <view class="brand">
     <image class="logo" src="/images/logo.png" mode="widthFix"></image>
-    <view class="badge">开发登录</view>
-    <view class="title">选择角色进入小程序</view>
-    <view class="subtitle">开发阶段可直接切换家长、教师、管理员，并获得对应若依鉴权 token。</view>
+    <view class="title">欢迎来到名远教育</view>
+    <view class="subtitle">连接家校，让每一次成长都有陪伴</view>
   </view>
 
   <view class="panel">
-    <view class="role-tabs">
-      <view
-        class="role-tab {{item.className}}"
-        wx:for="{{devRoles}}"
-        wx:key="key"
-        data-role="{{item.key}}"
-        bindtap="chooseDevRole"
-      >
-        {{item.name}}
-      </view>
-    </view>
-
-    <view class="notice">
-      <view class="notice-title">名远教育</view>
-      <view class="notice-text">当前开发模式会向若依后端申请所选角色的真实登录 token，方便继续联调角色权限和接口。</view>
-    </view>
-
-    <button
-      class="wechat-btn"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="handlePhoneLogin"
-      loading="{{submitting}}"
-    >手机号授权登录</button>
-
-    <button class="dev-btn" bindtap="handleDevLogin" loading="{{submitting}}">开发模拟登录</button>
+    <view class="panel-title">微信手机号登录</view>
+    <view class="panel-subtitle">登录后自动进入您已授权的工作台</view>
+    <view class="teacher-hint">授权手机号仅用于账号登录、匹配已有身份及家校服务，无需手动填写短信验证码。</view>
+    <view class="teacher-error" wx:if="{{loginError}}">{{loginError}}</view>
+    <button class="wechat-btn" open-type="getPhoneNumber" bindgetphonenumber="handlePhoneLogin" loading="{{submitting}}" disabled="{{configLoading || submitting}}">微信授权手机号登录</button>
+    <view class="register-note" bindtap="openPrivacy">查看《用户隐私保护指引》</view>
+    <view class="register-note">未注册手机号将自动创建家长账号</view>
   </view>
+  <view class="auth-footer">教师、教务及管理员身份由管理员授权<view>一个账号，多种身份，登录后自动识别</view></view>
 </view>

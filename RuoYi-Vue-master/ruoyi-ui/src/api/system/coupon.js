@@ -29,3 +29,5 @@ export function revokeCoupon(id, reason) {
 export function listParents(params) {
   return request({ url: '/system/coupon/parents', method: 'get', params })
 }
+
+export function couponOptions() { return request({url:'/system/coupon/options',method:'get'}) }

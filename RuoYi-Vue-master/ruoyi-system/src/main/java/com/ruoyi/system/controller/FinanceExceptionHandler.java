@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
     assignableTypes = {
       EduTuitionController.class,
       EduCouponController.class,
+      EduReferralController.class,
+      MiniAppReferralController.class,
       MiniAppTuitionController.class,
       TuitionReceiptController.class,
       FinanceEvidenceController.class,

@@ -64,3 +64,7 @@ export function historyEvidence(id) {
     responseType: 'blob',
   })
 }
+
+export function refundTargets(id) {
+  return request({ url: '/system/tuition/' + id + '/refund-targets', method: 'get' })
+}

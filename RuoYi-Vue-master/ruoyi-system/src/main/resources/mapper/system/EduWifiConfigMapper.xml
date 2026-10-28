@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.EduWifiConfigMapper">
+
+    <resultMap type="EduWifiConfig" id="EduWifiConfigResult">
+        <id     property="wifiId"      column="wifi_id"      />
+        <result property="campusName"  column="campus_name"  />
+        <result property="ssid"        column="ssid"         />
+        <result property="bssid"       column="bssid"        />
+        <result property="status"      column="status"       />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"  column="update_time"  />
+        <result property="remark"      column="remark"       />
+    </resultMap>
+
+    <!-- WiFi白名单列表 -->
+    <select id="selectList" parameterType="EduWifiConfig" resultMap="EduWifiConfigResult">
+        select wifi_id, campus_name, ssid, bssid, status, create_by, create_time, update_by, update_time, remark
+        from edu_wifi_config
+        <where>
+            <if test="campusName != null and campusName != ''"> and campus_name = #{campusName}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by campus_name, ssid
+    </select>
+
+    <!-- 按ID查询 -->
+    <select id="selectById" parameterType="Long" resultMap="EduWifiConfigResult">
+        select wifi_id, campus_name, ssid, bssid, status, create_by, create_time, update_by, update_time, remark
+        from edu_wifi_config where wifi_id = #{wifiId}
+    </select>
+
+    <!-- 新增 -->
+    <insert id="insert" parameterType="EduWifiConfig" useGeneratedKeys="true" keyProperty="wifiId">
+        insert into edu_wifi_config (campus_name, ssid, bssid, status, create_by, create_time, remark)
+        values (#{campusName}, #{ssid}, #{bssid}, #{status}, #{createBy}, #{createTime}, #{remark})
+    </insert>
+
+    <!-- 修改 -->
+    <update id="update" parameterType="EduWifiConfig">
+        update edu_wifi_config
+        set campus_name = #{campusName}, ssid = #{ssid}, bssid = #{bssid}, status = #{status},
+            update_by = #{updateBy}, update_time = #{updateTime}, remark = #{remark}
+        where wifi_id = #{wifiId}
+    </update>
+
+    <!-- 删除 -->
+    <delete id="deleteById" parameterType="Long">
+        delete from edu_wifi_config where wifi_id = #{wifiId}
+    </delete>
+
+</mapper>

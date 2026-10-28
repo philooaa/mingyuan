@@ -11,6 +11,7 @@ import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.entity.SysRole;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.service.ISysMenuService;
 import com.ruoyi.system.service.ISysRoleService;
 
@@ -45,6 +46,8 @@ public class SysPermissionService
         else
         {
             roles.addAll(roleService.selectRolePermissionByUserId(user.getUserId()));
+            // 前端既有业务页面按 admin 角色识别管理身份；后端超级管理员仍仅按 userId=1。
+            if (SecurityUtils.isBusinessAdmin(user)) roles.add(Constants.SUPER_ADMIN);
         }
         return roles;
     }
@@ -83,6 +86,11 @@ public class SysPermissionService
             {
                 perms.addAll(menuService.selectMenuPermsByUserId(user.getUserId()));
             }
+        }
+        if (SecurityUtils.isBusinessAdmin(user) && !user.isAdmin())
+        {
+            // 普通用户可管理；管理员身份授予仍由服务层仅允许原始 admin。
+            perms.removeIf(p -> p.contains("*") || p.startsWith("system:role:") || p.startsWith("system:menu:"));
         }
         return perms;
     }

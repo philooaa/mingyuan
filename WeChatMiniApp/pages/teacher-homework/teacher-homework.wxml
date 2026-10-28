@@ -2,19 +2,21 @@
   <view class="header"><view class="header-title">作业管理</view><button class="create" bindtap="create">+ 创建作业</button></view>
   <scroll-view wx:if="{{classTabs.length > 2}}" scroll-x class="class-tabs"><view wx:for="{{classTabs}}" wx:key="key" class="class-tab {{activeClass === item.key ? 'class-tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchClass">{{item.name}}</view></scroll-view>
   <view class="tabs"><view wx:for="{{statusTabs}}" wx:key="key" class="tab {{activeStatus === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchStatus">{{item.name}}</view></view>
-  <view class="card" wx:for="{{shown}}" wx:key="homeworkId" data-id="{{item.homeworkId}}" bindtap="openCard">
-    <view class="title">{{item.title || item.homeworkTitle || '未命名作业'}}</view>
-    <view class="meta">截止：{{item.deadline || '-'}}</view>
-    <view class="meta">发布对象：{{item.classText || item.scheduleName || '当前班级'}}</view>
-    <view class="meta" wx:if="{{item.progress}}">{{item.progress}}</view>
-    <view class="status">{{item.statusText}}</view>
-    <view class="actions" catchtap="noop">
-      <button wx:if="{{item.status === '0'}}" size="mini" data-id="{{item.homeworkId}}" bindtap="publish">发布</button>
-      <button wx:if="{{item.status === '0'}}" size="mini" data-id="{{item.homeworkId}}" bindtap="edit">编辑</button>
-      <button wx:if="{{item.status === '1'}}" size="mini" data-id="{{item.homeworkId}}" data-type="close" bindtap="action">关闭</button>
+  <view class="group" wx:for="{{groups}}" wx:key="scheduleId" wx:for-item="group">
+    <view class="group-head"><view class="group-name">{{group.displayName || group.name}}</view><view class="group-count">{{group.items.length}} 项作业</view></view>
+    <view class="card" wx:for="{{group.items}}" wx:key="homeworkId" data-id="{{item.homeworkId}}" data-schedule="{{group.scheduleId}}" data-sname="{{group.displayName || group.name}}" bindtap="openCard">
+      <view class="title">{{item.title || item.homeworkTitle || '未命名作业'}}</view>
+      <view class="meta">截止：{{item.deadline || '-'}}</view>
+      <view class="meta" wx:if="{{item.progress}}">{{item.progress}}</view>
+      <view class="status">{{item.statusText}}</view>
+      <view class="actions" catchtap="noop">
+        <button wx:if="{{item.status === '0'}}" size="mini" data-id="{{item.homeworkId}}" bindtap="publish">发布</button>
+        <button wx:if="{{item.status === '0' || item.status === '1'}}" size="mini" data-id="{{item.homeworkId}}" bindtap="edit">编辑</button>
+        <button wx:if="{{item.status === '1'}}" size="mini" data-id="{{item.homeworkId}}" data-type="close" bindtap="action">关闭</button>
+      </view>
     </view>
   </view>
-  <view class="empty" wx:if="{{!loading && !shown.length}}">该分类暂无作业</view>
+  <view class="empty" wx:if="{{!loading && !groups.length}}">该分类暂无作业</view>
   <view class="loading" wx:if="{{loading}}">加载中...</view>
   <view class="mask" wx:if="{{publish}}" catchtap="closePublish">
     <view class="panel" catchtap="noop">

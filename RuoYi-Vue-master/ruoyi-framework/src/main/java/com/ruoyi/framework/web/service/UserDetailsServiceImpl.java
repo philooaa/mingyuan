@@ -1,5 +1,6 @@
 package com.ruoyi.framework.web.service;
 
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,12 +8,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import com.ruoyi.common.constant.UserConstants;
+import com.ruoyi.common.core.domain.entity.SysRole;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.core.domain.model.LoginUser;
 import com.ruoyi.common.enums.UserStatus;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.MessageUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.mapper.SysRoleMapper;
 import com.ruoyi.system.service.ISysUserService;
 
 /**
@@ -34,10 +38,13 @@ public class UserDetailsServiceImpl implements UserDetailsService
     @Autowired
     private SysPermissionService permissionService;
 
+    @Autowired
+    private SysRoleMapper roleMapper;
+
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException
     {
-        // 支持教师/管理员使用用户名或手机号登录
+        // 网页端支持用户名或手机号；小程序登录由 MiniAppLoginService 独立处理。
         SysUser user = userService.selectUserByUserName(username);
         if (StringUtils.isNull(user) && StringUtils.isNotEmpty(username))
         {
@@ -60,6 +67,21 @@ public class UserDetailsServiceImpl implements UserDetailsService
         }
 
         passwordService.validate(user);
+
+        if (!user.isAdmin())
+        {
+            // 手机号查询的 LIMIT 1 可能只带回一个角色，按用户重新读取全部有效角色。
+            List<SysRole> roles = roleMapper.selectRolePermissionByUserId(user.getUserId()).stream()
+                    .filter(role -> UserConstants.ROLE_NORMAL.equals(role.getStatus())
+                            && UserConstants.NORMAL.equals(role.getDelFlag()))
+                    .toList();
+            if (roles.stream().noneMatch(role -> "education".equals(role.getRoleKey())
+                    || com.ruoyi.common.constant.EduRoleConstants.BUSINESS_ADMIN.equals(role.getRoleKey())))
+            {
+                throw new ServiceException("仅教务、业务管理员和超级管理员可登录管理网页，教师和家长请使用小程序");
+            }
+            user.setRoles(roles);
+        }
 
         return createLoginUser(user);
     }

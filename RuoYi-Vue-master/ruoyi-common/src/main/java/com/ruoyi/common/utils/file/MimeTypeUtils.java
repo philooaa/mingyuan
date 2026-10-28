@@ -34,7 +34,9 @@ public class MimeTypeUtils
             // 压缩文件
             "rar", "zip", "gz", "bz2",
             // 视频格式
-            "mp4", "avi", "rmvb",
+            "mp4", "avi", "rmvb", "mov", "m4v", "flv", "mkv", "webm", "wmv", "mpg", "mpeg", "3gp",
+            // 音频格式
+            "mp3", "wav", "m4a", "aac", "ogg", "flac", "amr", "wma",
             // pdf
             "pdf" };
 

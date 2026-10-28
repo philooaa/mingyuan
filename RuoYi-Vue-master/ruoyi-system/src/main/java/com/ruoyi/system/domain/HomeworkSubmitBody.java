@@ -6,6 +6,8 @@ public class HomeworkSubmitBody
 {
     private Long homeworkId;
     private Long enrollmentId;
+    private Long accountId;
+    public Long getAccountId(){return accountId;} public void setAccountId(Long v){accountId=v;}
     private List<EduHomeworkAnswer> answers;
     private List<EduHomeworkFile> files;
     private String description;

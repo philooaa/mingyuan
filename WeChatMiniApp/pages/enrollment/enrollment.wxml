@@ -1,7 +1,23 @@
 <view class="page">
   <view class="header">
-    <image class="logo" src="/images/logo.png" mode="widthFix"></image>
     <view class="header-title">课程报名</view>
+    <view class="header-subtitle">选老师、选课程，安排孩子的下一节课</view>
+  </view>
+
+  <view class="course-type-bar">
+    <view class="course-type-tab {{courseTypeIndex === index ? 'selected' : ''}}" wx:for="{{courseTypeOptions}}" wx:key="*this" data-index="{{index}}" bindtap="chooseCourseType">{{item === '班课' ? '班课报名' : '一对一预约'}}</view>
+  </view>
+
+  <view class="booking-wallet" wx:if="{{courseTypeIndex === 1}}">
+    <view class="wallet-heading"><view><view class="wallet-eyebrow">我的一对一课包</view><view class="wallet-child">{{creditAccount ? creditAccount.studentName + ' · ' + creditAccount.gradeName : '孩子专属课次账户'}}</view></view><view class="wallet-mark">1 : 1</view></view>
+    <view class="wallet-state" wx:if="{{accountsLoading}}">正在同步课次余额…</view>
+    <view class="wallet-state wallet-error" wx:elif="{{accountsError}}" bindtap="loadLessonAccounts">{{accountsError}} · 点击重试</view>
+    <block wx:elif="{{creditAccount}}">
+      <view class="wallet-stats"><view class="wallet-primary"><view class="wallet-value">{{creditAccount.availableCredits}}<text> 次</text></view><view class="wallet-label">可用课次</view></view><view class="wallet-secondary"><view class="wallet-small-value">{{creditAccount.reservedCredits}}</view><view class="wallet-label">预约占用</view></view><view class="wallet-secondary"><view class="wallet-small-value">{{creditAccount.consumedCredits}}</view><view class="wallet-label">已消耗</view></view></view>
+      <view class="wallet-actions"><view class="wallet-history" data-id="{{creditAccount.accountId}}" bindtap="creditHistory">课次记录 ›</view><button class="wallet-buy" bindtap="purchasePackage" disabled="{{submitting || showSheet}}">购买课包 ＋</button></view>
+    </block>
+    <view class="wallet-state" wx:else>请先选择或完善孩子信息<view class="wallet-history" bindtap="manageChildren">管理孩子信息 ›</view></view>
+    <view class="wallet-footnote">每节2小时 · 精英教师扣1次 · 资深教师扣2次</view>
   </view>
 
   <view class="filter-bar">
@@ -14,14 +30,44 @@
     <view class="icon-btn reset" bindtap="resetFilters">重置</view>
   </view>
 
+  <view class="teacher-filter">
+    <view class="teacher-filter-title" bindtap="toggleTeacherPicker">按教师查找 · {{selectedTeachers.length ? '已选 ' + selectedTeachers.length + ' 位' : '不限教师'}}　{{showTeacherPicker ? '收起' : '展开'}}</view>
+    <view class="teacher-tags"><view wx:for="{{selectedTeachers}}" wx:key="key" class="teacher-tag" data-key="{{item.key}}" bindtap="toggleTeacher">{{item.label}} ×</view></view>
+    <view wx:if="{{showTeacherPicker}}">
+      <input class="teacher-search" value="{{teacherKeyword}}" bindinput="searchTeacher" placeholder="输入教师姓名查找，可勾选多位教师" disabled="{{loading || submitting || showSheet}}" />
+      <view class="teacher-filter-actions"><button size="mini" bindtap="selectAllTeachers" disabled="{{loading || submitting || showSheet || !teacherOptions.length || allVisibleTeachersSelected}}">{{allVisibleTeachersSelected ? '已全选当前列表' : '全选当前列表'}}</button><button size="mini" bindtap="clearTeachers" disabled="{{loading || submitting || showSheet}}">清空筛选（不限教师）</button></view>
+      <view class="meta teacher-filter-hint">可同时勾选多位教师；全选只针对当前列表，搜索不会清除其他已选教师。未选教师时显示全部符合条件的课程。</view>
+      <scroll-view scroll-y class="teacher-options">
+        <checkbox-group bindchange="chooseTeachers"><label class="teacher-option {{item.selected ? 'selected' : ''}}" wx:for="{{teacherOptions}}" wx:key="key"><checkbox value="{{item.key}}" checked="{{item.selected}}" color="#0f58a8" disabled="{{loading || submitting || showSheet}}"/><text>{{item.label}}</text></label></checkbox-group>
+        <view wx:if="{{!teacherOptions.length}}" class="meta">未找到匹配的教师</view>
+      </scroll-view>
+    </view>
+  </view>
+
   <view class="section">
-    <view class="section-title">可报名课次</view>
-    <view class="empty" wx:if="{{showScheduleEmpty}}">暂无可报名课程</view>
-    <view class="schedule-card" wx:for="{{schedules}}" wx:key="scheduleId" data-id="{{item.scheduleId}}" bindtap="openEnroll">
+    <view class="section-title">{{courseTypeIndex === 1 ? '可报名一对一课程' : '可报名班课'}}</view>
+    <view class="meta" wx:if="{{courseTypeIndex === 1}}">先选择课程，再展开选择日期；每次报名一节2小时课程，由老师确认。</view>
+    <view class="empty" wx:if="{{showScheduleEmpty}}">{{courseTypeIndex === 1 ? '暂无符合条件的一对一课程' : '暂无符合条件的班课'}}</view>
+    <view wx:for="{{teacherGroups}}" wx:for-item="group" wx:key="key" class="teacher-group">
+      <view class="teacher-group-title">{{group.label}} · {{group.courses.length}} {{courseTypeIndex === 1 ? '门课程' : '个班次'}}</view>
+      <block wx:for="{{group.courses}}" wx:key="viewKey">
+      <view class="single-course-card" wx:if="{{courseTypeIndex === 1}}">
+        <view class="single-course-heading" data-id="{{item.scheduleId}}" bindtap="toggleCourseDates">
+          <view class="course-name">{{item.courseClassName}}</view>
+          <view class="meta">{{item.gradeText}} · {{item.subjectText}} · {{item.teacherName || '教师待配置'}}</view>
+          <view class="ui-time">{{item.periodName}} {{item.clockText}}</view>
+          <view class="meta">{{item.dateRangeText}}</view><view class="meta">{{item.placeText}}</view>
+          <view class="date-toggle">可报名{{item.availableLessonCount}}个日期 · {{item.expanded ? '收起日期' : '选择日期'}}　{{item.expanded ? '⌃' : '⌄'}}</view>
+        </view>
+        <view class="single-date-list" wx:if="{{item.expanded}}">
+          <view class="single-date-row" wx:for="{{item.lessons}}" wx:for-item="lesson" wx:key="viewKey" data-key="{{lesson.viewKey}}" bindtap="openEnroll"><view>{{lesson.timeText}}</view><view class="status {{lesson.statusClass}}">{{lesson.statusText}}</view></view>
+        </view>
+      </view>
+    <view class="schedule-card" wx:else data-key="{{item.viewKey}}" bindtap="openEnroll">
       <view class="card-main">
         <view class="course-name">{{item.courseClassName}}</view>
-        <view class="meta">{{item.gradeText}} · {{item.subjectText}} · {{item.teacherName}}</view>
-        <view class="meta">{{item.timeText}}</view>
+        <view class="meta">{{item.gradeText}} · {{item.subjectText}} · {{item.teacherName || '教师待配置'}}</view>
+        <view class="ui-time">{{item.timeText}}</view>
         <view class="meta">{{item.placeText}}</view>
       </view>
       <view class="card-side">
@@ -29,18 +75,26 @@
         <view class="status {{item.statusClass}}">{{item.statusText}}</view>
       </view>
     </view>
+      </block>
+    </view>
   </view>
 
   <view class="section">
-    <view class="section-title">我的报名</view>
-    <view class="empty" wx:if="{{showEnrollmentEmpty}}">还没有报名记录</view>
+    <view class="section-title">{{courseTypeIndex === 1 ? '我的一对一报名' : '我的班课报名'}}</view>
+    <view class="empty" wx:if="{{showEnrollmentEmpty}}">{{courseTypeIndex === 1 ? '暂无一对一报名记录' : '暂无班课报名记录'}}</view>
     <view class="enroll-card" wx:for="{{enrollments}}" wx:key="enrollmentId">
       <view>
         <view class="course-name">{{item.courseClassName}}</view>
         <view class="meta">{{item.studentName}} · {{item.gradeText}} · {{item.subjectText}}</view>
+        <view class="meta">授课教师：{{item.teacherName || '教师待配置'}}</view>
         <view class="meta">{{item.timeText}}</view>
+        <view class="meta" wx:if="{{item.classDate}}">{{item.settlementText}}<text wx:if="{{item.settlementMethod !== 'P'}}"> · {{item.paymentText}}</text><text wx:if="{{item.lessonCompletedTime}}"> · 已完成</text></view>
       </view>
-      <view><view class="done">{{item.statusText}}</view><button class="tuition-btn" size="mini" data-id="{{item.enrollmentId}}" bindtap="openTuition">缴费 / 退费</button></view>
+      <view><view class="done">{{item.statusText}}</view>
+        <view class="meta" wx:if="{{item.cancelRequestStatus === '1'}}">取消申请待处理</view>
+        <button size="mini" wx:if="{{item.canRequestCancel}}" data-id="{{item.enrollmentId}}" bindtap="requestCancel" disabled="{{submitting}}">申请取消</button>
+      <button wx:if="{{item.settlementMethod != 'P'}}" size="mini" data-id="{{item.enrollmentId}}" bindtap="openTuition">缴费 / 退费</button>
+        <button size="mini" wx:if="{{item.classDate}}" data-id="{{item.enrollmentId}}" bindtap="viewHistory">操作历史</button></view>
     </view>
   </view>
 
@@ -48,13 +102,14 @@
   <view class="sheet" wx:if="{{showSheet}}">
     <view class="sheet-title">确认报名</view>
     <view class="sheet-course">{{selectedSchedule.courseClassName}}</view>
+    <view class="sheet-meta">授课教师：{{selectedSchedule.teacherName || '教师待配置'}}</view>
     <view class="sheet-meta">{{selectedSchedule.timeText}}</view>
     <view class="sheet-meta">{{selectedSchedule.placeText}}</view>
-    <view class="sheet-meta">报名后请在“我的缴费”核对课程费用；未核价不代表免费。</view>
-    <view class="field">
-      <view class="label">学生姓名</view>
-      <input class="input" value="{{form.studentName}}" data-field="studentName" bindinput="handleFormInput" placeholder="请输入孩子姓名" />
-    </view>
+    <view class="settlement-options" wx:if="{{selectedSchedule.classDate}}"><view class="settlement-option {{settlementMethod === 'C' ? 'selected' : ''}}" bindtap="chooseSettlement" data-method="C">单次付费</view><view class="settlement-option {{settlementMethod === 'P' ? 'selected' : ''}}" bindtap="chooseSettlement" data-method="P">使用课包</view></view>
+    <view class="meta" wx:if="{{selectedSchedule.classDate && settlementMethod === 'C'}}">由管理员登记线下付款；可以先提交报名，等待老师确认。</view>
+    <view class="field"><view class="label">报名孩子</view><picker range="{{lessonAccountOptions}}" value="{{lessonAccountIndex}}" bindchange="chooseLessonAccount" disabled="{{submitting || accountsLoading || accountsError || scopeAccountId}}"><view>{{lessonAccountOptions[lessonAccountIndex] || '加载孩子资料…'}}　›</view></picker><view class="meta" bindtap="manageChildren">管理孩子信息 ›</view><view class="meta" wx:if="{{accountsError || childMissing}}" bindtap="loadLessonAccounts">{{accountsError || '孩子资料已变化，请重新选择'}} · 点击重试</view></view>
+    <view class="field" wx:if="{{newChild}}"><view class="label">孩子姓名</view><input class="input" value="{{form.studentName}}" data-field="studentName" bindinput="handleFormInput" maxlength="30" placeholder="请输入孩子姓名" disabled="{{submitting}}"/><view class="meta">年级：{{selectedSchedule.gradeText}}。报名成功后同步到孩子信息，自动建立零余额账户。</view></view>
+    <view class="meta" wx:if="{{selectedSchedule.classDate && settlementMethod === 'P'}}">请选择已有课包余额的孩子；普通／精英教师占1次，资深教师占2次，课后正式消耗。</view>
     <view class="field">
       <view class="label">联系电话</view>
       <input class="input" type="number" maxlength="11" value="{{form.contactPhone}}" data-field="contactPhone" bindinput="handleFormInput" placeholder="默认使用家长手机号" />

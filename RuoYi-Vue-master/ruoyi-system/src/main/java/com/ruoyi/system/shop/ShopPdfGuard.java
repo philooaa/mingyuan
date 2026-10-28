@@ -20,6 +20,8 @@ public class ShopPdfGuard implements HandlerInterceptor {
     }
     @Override public boolean preHandle(HttpServletRequest request,HttpServletResponse response,Object handler)throws Exception {
         String uri=request.getRequestURI(),resource=request.getParameter("resource"),file=request.getParameter("fileName");
+        // Homework attachments (publish/answer/review files) are exempt from the shop PDF guard.
+        if(uri.startsWith("/profile/")&&!db.rows("SELECT file_id FROM edu_homework_file WHERE file_path=? LIMIT 1",uri).isEmpty())return true;
         boolean denied=forbidden(uri,resource,file);
         if(!denied&&uri.contains("/profile/"))denied=!db.rows("SELECT material_id FROM edu_material WHERE file_path=? LIMIT 1",uri).isEmpty()
             ||!db.rows("SELECT item_id FROM edu_material_order_item WHERE asset_path=? LIMIT 1",uri).isEmpty();

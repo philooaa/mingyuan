@@ -1,0 +1,24 @@
+@import "referral.wxss";
+
+/* Native inputs need an explicit height: vertical padding clipped their text. */
+input{height:80rpx;padding:0 18rpx;line-height:normal;box-sizing:border-box}
+.coupon-sheet{display:flex;flex-direction:column;overflow:hidden;padding:0}
+.coupon-sheet-body{flex:1;height:0;min-height:0;width:100%}
+.coupon-sheet-content{padding:28rpx 24rpx 32rpx}
+.coupon-sheet-actions{flex-shrink:0;margin:0;padding:20rpx 24rpx;padding-bottom:calc(20rpx + env(safe-area-inset-bottom));background:#fff;border-top:1rpx solid #e8edf4}
+.coupon-sheet-actions button{min-width:0;line-height:80rpx}
+.coupon-sheet textarea{box-sizing:border-box;width:100%;height:144rpx;line-height:1.6}
+.coupon-sheet .meta{font-size:24rpx;line-height:1.6;color:#68778c}
+.subject-grid label{display:inline-flex;align-items:center}
+
+.page.with-reward-footer{padding-bottom:180rpx;padding-bottom:calc(180rpx + env(safe-area-inset-bottom))}
+.reward-footer{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:24rpx;padding:20rpx 28rpx;background:#fff;border-top:1rpx solid #e8edf4;box-shadow:0 -6rpx 24rpx rgba(33,51,77,.04);padding-bottom:calc(20rpx + env(safe-area-inset-bottom))}
+.reward-selection{font-size:27rpx;color:#21334d;line-height:1.5}
+.reward-selection .muted{font-size:23rpx}
+.selection-count{font-weight:700;color:#2459d9}
+.reward-submit{width:240rpx;flex-shrink:0;margin:0;font-size:30rpx;font-weight:600;border-radius:14rpx;line-height:84rpx}
+.reward-submit[disabled]{background:#e8edf5;color:#9aa5b5}
+
+.coupon-amount{font-size:34rpx;font-weight:700;color:#2459d9;margin:10rpx 0}.form-label{font-size:26rpx;font-weight:600;margin-top:22rpx}.subject-grid{display:flex;flex-wrap:wrap;gap:18rpx;padding:18rpx 0}.subject-grid label,.subject-all{font-size:26rpx}.subject-all{padding:18rpx 0}.sheet .row>picker{flex:1}
+
+.shade{top:0;right:0;bottom:0;left:0}.entry{position:relative;background:#fff;border:1rpx solid #e8edf4;border-radius:18rpx;padding:26rpx;margin-top:18rpx}.entry-title{font-size:30rpx;font-weight:650;color:#21334d;display:flex;align-items:center;gap:12rpx}.entry-note{font-size:24rpx;color:#68778c;line-height:1.6;margin-top:8rpx;padding-right:20rpx}.primary-entry{background:#2459d9;border-color:#2459d9}.primary-entry .entry-title,.primary-entry .entry-note{color:#fff}.chevron{margin-left:auto;color:#9aa5b5;font-size:36rpx;font-weight:400}.primary-entry .chevron{color:#fff}.entry-badge{background:#df4545;color:#fff;border-radius:99rpx;padding:0 10rpx;line-height:32rpx;min-width:18rpx;text-align:center;font-size:22rpx}.group-title{font-size:26rpx;color:#68778c;margin:30rpx 0 4rpx}.step-title{margin-top:32rpx}.reward-form{margin-top:24rpx}.empty-template{background:#f5f7fb;margin:20rpx 0}.filters{align-items:center}.filters input{height:76rpx;box-sizing:border-box;min-width:0;margin:10rpx 0;flex-basis:100%}.filters picker{flex:1}.filters button{flex:0 0 auto;margin:0}.filters button::after{border:0}

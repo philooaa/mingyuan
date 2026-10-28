@@ -15,6 +15,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="rateJunior1on1"      column="rate_junior_1on1" />
         <result property="rateSenior1on1"      column="rate_senior_1on1" />
         <result property="classHoursPerSession" column="class_hours_per_session" />
+        <result property="commissionAmount"      column="commission_amount" />
         <result property="status"              column="status" />
         <result property="delFlag"             column="del_flag" />
         <result property="createBy"            column="create_by" />
@@ -22,11 +23,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="updateBy"            column="update_by" />
         <result property="updateTime"          column="update_time" />
         <result property="remark"              column="remark" />
+        <result property="primaryClassCount"   column="primary_class_count" />
+        <result property="jhClassCount"        column="jh_class_count" />
+        <result property="oneOnOneClassCount"  column="one_on_one_class_count" />
     </resultMap>
 
     <sql id="selectConfigVo">
         select config_id, teacher_id, teacher_name, base_salary, rate_primary_class, rate_jh_class,
                rate_primary_1on1, rate_junior_1on1, rate_senior_1on1, class_hours_per_session,
+               commission_amount,
                status, del_flag, create_by, create_time, update_by, update_time, remark
         from edu_teacher_salary_config
     </sql>
@@ -46,9 +51,56 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where config_id = #{configId}
     </select>
 
+    <!--
+      薪资标准维护列表：以教师账号为主体，未配置薪资标准的教师同样返回。
+      门数口径与薪资结算一致（EduTeacherSalaryRecordServiceImpl）：
+        学段：初一~初三=中学，高一~高三=中学，其余=小学；class_mode 1=班课 2=一对一
+        门数：按 course_class_name 去重（排课表一个班会有多条时段行）
+    -->
+    <select id="selectTeacherSalaryList" parameterType="EduTeacherSalaryConfig" resultMap="EduTeacherSalaryConfigResult">
+        select u.user_id as teacher_id,
+               coalesce(nullif(trim(u.user_name), ''), u.nick_name) as teacher_name,
+               c.config_id, c.base_salary, c.rate_primary_class, c.rate_jh_class,
+               c.rate_primary_1on1, c.rate_junior_1on1, c.rate_senior_1on1,
+               c.class_hours_per_session, c.commission_amount, c.status, c.del_flag,
+               c.create_by, c.create_time, c.update_by, c.update_time, c.remark,
+               (select count(distinct s.course_class_name) from edu_course_schedule s
+                 where s.teacher_id = u.user_id and s.del_flag = '0' and s.status = '0'
+                   and s.term_name in ('寒假', '春季')
+                   and s.class_mode = '1'
+                   and s.grade_name not in ('初一','初二','初三','高一','高二','高三')) as primary_class_count,
+               (select count(distinct s.course_class_name) from edu_course_schedule s
+                 where s.teacher_id = u.user_id and s.del_flag = '0' and s.status = '0'
+                   and s.term_name in ('寒假', '春季')
+                   and s.class_mode = '1'
+                   and s.grade_name in ('初一','初二','初三','高一','高二','高三')) as jh_class_count,
+               (select count(distinct s.course_class_name) from edu_course_schedule s
+                 where s.teacher_id = u.user_id and s.del_flag = '0' and s.status = '0'
+                   and s.term_name in ('寒假', '春季')
+                   and s.class_mode = '2') as one_on_one_class_count
+        from sys_user u
+        inner join sys_user_role ur on ur.user_id = u.user_id
+        inner join sys_role r on r.role_id = ur.role_id and r.role_key = 'teacher' and r.status = '0'
+        left join edu_teacher_salary_config c on c.teacher_id = u.user_id and c.del_flag = '0'
+        <where> u.del_flag = '0' and u.status = '0'
+            <if test="teacherId != null"> and u.user_id = #{teacherId}</if>
+            <if test="teacherName != null and teacherName != ''">
+                and (u.user_name like concat('%', #{teacherName}, '%')
+                     or u.nick_name like concat('%', #{teacherName}, '%'))
+            </if>
+        </where>
+        order by u.user_id
+    </select>
+
     <select id="selectConfigByTeacherId" resultMap="EduTeacherSalaryConfigResult">
         <include refid="selectConfigVo"/>
         where teacher_id = #{teacherId} and del_flag = '0'
+    </select>
+
+    <select id="selectDeletedByTeacherId" resultMap="EduTeacherSalaryConfigResult">
+        <include refid="selectConfigVo"/>
+        where teacher_id = #{teacherId} and del_flag = '2'
+        order by config_id desc limit 1
     </select>
 
     <insert id="insertConfig" parameterType="EduTeacherSalaryConfig" useGeneratedKeys="true" keyProperty="configId">
@@ -63,6 +115,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rateJunior1on1 != null">rate_junior_1on1,</if>
             <if test="rateSenior1on1 != null">rate_senior_1on1,</if>
             <if test="classHoursPerSession != null">class_hours_per_session,</if>
+            <if test="commissionAmount != null">commission_amount,</if>
             <if test="status != null and status != ''">status,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
@@ -78,6 +131,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rateJunior1on1 != null">#{rateJunior1on1},</if>
             <if test="rateSenior1on1 != null">#{rateSenior1on1},</if>
             <if test="classHoursPerSession != null">#{classHoursPerSession},</if>
+            <if test="commissionAmount != null">#{commissionAmount},</if>
             <if test="status != null and status != ''">#{status},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
@@ -97,7 +151,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rateJunior1on1 != null">rate_junior_1on1 = #{rateJunior1on1},</if>
             <if test="rateSenior1on1 != null">rate_senior_1on1 = #{rateSenior1on1},</if>
             <if test="classHoursPerSession != null">class_hours_per_session = #{classHoursPerSession},</if>
+            <if test="commissionAmount != null">commission_amount = #{commissionAmount},</if>
             <if test="status != null and status != ''">status = #{status},</if>
+            <if test="delFlag != null and delFlag != ''">del_flag = #{delFlag},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate(),

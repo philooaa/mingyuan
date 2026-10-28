@@ -10,3 +10,11 @@ button,
 input {
   box-sizing: border-box;
 }
+
+/* Native single-line controls need room for the full glyph on Android and iOS. */
+input {
+  height: 80rpx;
+  min-height: 64rpx;
+  min-width: 0;
+  line-height: normal;
+}

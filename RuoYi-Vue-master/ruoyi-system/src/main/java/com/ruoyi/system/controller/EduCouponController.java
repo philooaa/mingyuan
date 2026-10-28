@@ -24,6 +24,8 @@ public class EduCouponController {
   public TableDataInfo list(@RequestParam Map<String, String> q) {
     return EduTuitionController.table(coupons.listTemplates(q));
   }
+  @PreAuthorize("@ss.hasPermi('system:coupon:list')")
+  @GetMapping("/options") public AjaxResult options(){return EduTuitionController.ok(coupons.options(SecurityUtils.getUserId()));}
 
   @PreAuthorize("@ss.hasPermi('system:coupon:add')")
   @Log(

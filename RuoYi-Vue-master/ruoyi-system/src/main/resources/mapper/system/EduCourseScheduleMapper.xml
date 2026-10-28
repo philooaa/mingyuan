@@ -8,6 +8,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="scheduleId"    column="schedule_id"    />
         <result property="scheduleCode"    column="schedule_code"    />
         <result property="classroomId"    column="classroom_id"    />
+        <result property="lessonLocation" column="lesson_location" />
         <result property="courseYear"    column="course_year"    />
         <result property="termName"    column="term_name"    />
         <result property="periodName"    column="period_name"    />
@@ -20,8 +21,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="gradeName"    column="grade_name"    />
         <result property="subjectName"    column="subject_name"    />
         <result property="teacherName"    column="teacher_name"    />
+        <result property="teacherId"    column="teacher_id"    />
         <result property="classType"    column="class_type"    />
+        <result property="classMode"    column="class_mode"    />
         <result property="enrolledCount"    column="enrolled_count"    />
+        <result property="enrollLimit"    column="enroll_limit"    />
+        <result property="unitPrice"    column="unit_price"    />
         <result property="recruitStatus"    column="recruit_status"    />
         <result property="courseClassName"    column="course_class_name"    />
         <result property="sourceSheet"    column="source_sheet"    />
@@ -37,12 +42,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectEduCourseScheduleVo">
-        select schedule_id, schedule_code, classroom_id, course_year, term_name, period_name, time_slot, start_time, end_time, start_date, end_date, class_pattern, grade_name, subject_name, teacher_name, class_type, enrolled_count, recruit_status, course_class_name, source_sheet, source_row, source_col, status, del_flag, create_by, create_time, update_by, update_time, remark from edu_course_schedule
+        select schedule_id, schedule_code, classroom_id, lesson_location, course_year, term_name, period_name, time_slot, start_time, end_time, start_date, end_date, class_pattern, grade_name, subject_name, teacher_name, teacher_id, class_type, class_mode, enrolled_count, enroll_limit, unit_price, recruit_status, course_class_name, source_sheet, source_row, source_col, status, del_flag, create_by, create_time, update_by, update_time, remark from edu_course_schedule
     </sql>
 
     <select id="selectEduCourseScheduleList" parameterType="EduCourseSchedule" resultMap="EduCourseScheduleResult">
         <include refid="selectEduCourseScheduleVo"/>
-        <where>  
+        <where>
+            del_flag = '0'
+            <if test="params.teacherUserId != null">and teacher_id = #{params.teacherUserId}</if>
             <if test="scheduleCode != null  and scheduleCode != ''"> and schedule_code = #{scheduleCode}</if>
             <if test="classroomId != null "> and classroom_id = #{classroomId}</if>
             <if test="courseYear != null "> and course_year = #{courseYear}</if>
@@ -64,11 +71,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="sourceCol != null  and sourceCol != ''"> and source_col = #{sourceCol}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
         </where>
+        order by course_year desc, term_name, period_name, start_time, schedule_id
     </select>
     
     <select id="selectEduCourseScheduleByScheduleId" parameterType="Long" resultMap="EduCourseScheduleResult">
         <include refid="selectEduCourseScheduleVo"/>
-        where schedule_id = #{scheduleId}
+        where schedule_id = #{scheduleId} and del_flag = '0'
+    </select>
+
+    <select id="lockSchedule" resultMap="EduCourseScheduleResult">
+        <include refid="selectEduCourseScheduleVo"/> where schedule_id = #{scheduleId} and del_flag = '0' for update
     </select>
 
     <insert id="insertEduCourseSchedule" parameterType="EduCourseSchedule" useGeneratedKeys="true" keyProperty="scheduleId">
@@ -76,6 +88,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="scheduleCode != null and scheduleCode != ''">schedule_code,</if>
             <if test="classroomId != null">classroom_id,</if>
+            <if test="lessonLocation != null">lesson_location,</if>
             <if test="courseYear != null">course_year,</if>
             <if test="termName != null and termName != ''">term_name,</if>
             <if test="periodName != null and periodName != ''">period_name,</if>
@@ -88,9 +101,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="gradeName != null and gradeName != ''">grade_name,</if>
             <if test="subjectName != null and subjectName != ''">subject_name,</if>
             <if test="teacherName != null">teacher_name,</if>
+            <if test="teacherId != null">teacher_id,</if>
             <if test="classType != null">class_type,</if>
             <if test="classMode != null and classMode != ''">class_mode,</if>
             <if test="enrolledCount != null">enrolled_count,</if>
+            <if test="enrollLimit != null">enroll_limit,</if>
+            <if test="unitPrice != null">unit_price,</if>
             <if test="recruitStatus != null">recruit_status,</if>
             <if test="courseClassName != null and courseClassName != ''">course_class_name,</if>
             <if test="sourceSheet != null">source_sheet,</if>
@@ -107,6 +123,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="scheduleCode != null and scheduleCode != ''">#{scheduleCode},</if>
             <if test="classroomId != null">#{classroomId},</if>
+            <if test="lessonLocation != null">#{lessonLocation},</if>
             <if test="courseYear != null">#{courseYear},</if>
             <if test="termName != null and termName != ''">#{termName},</if>
             <if test="periodName != null and periodName != ''">#{periodName},</if>
@@ -119,8 +136,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="gradeName != null and gradeName != ''">#{gradeName},</if>
             <if test="subjectName != null and subjectName != ''">#{subjectName},</if>
             <if test="teacherName != null">#{teacherName},</if>
+            <if test="teacherId != null">#{teacherId},</if>
             <if test="classType != null">#{classType},</if>
+            <if test="classMode != null and classMode != ''">#{classMode},</if>
             <if test="enrolledCount != null">#{enrolledCount},</if>
+            <if test="enrollLimit != null">#{enrollLimit},</if>
+            <if test="unitPrice != null">#{unitPrice},</if>
             <if test="recruitStatus != null">#{recruitStatus},</if>
             <if test="courseClassName != null and courseClassName != ''">#{courseClassName},</if>
             <if test="sourceSheet != null">#{sourceSheet},</if>
@@ -140,7 +161,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update edu_course_schedule
         <trim prefix="SET" suffixOverrides=",">
             <if test="scheduleCode != null and scheduleCode != ''">schedule_code = #{scheduleCode},</if>
-            <if test="classroomId != null">classroom_id = #{classroomId},</if>
+            <if test="classMode == '2' and lessonLocation != null">classroom_id = null,</if>
+            <if test="classroomId != null and !(classMode == '2' and lessonLocation != null)">classroom_id = #{classroomId},</if>
+            <if test="lessonLocation != null">lesson_location = #{lessonLocation},</if>
             <if test="courseYear != null">course_year = #{courseYear},</if>
             <if test="termName != null and termName != ''">term_name = #{termName},</if>
             <if test="periodName != null and periodName != ''">period_name = #{periodName},</if>
@@ -153,9 +176,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="gradeName != null and gradeName != ''">grade_name = #{gradeName},</if>
             <if test="subjectName != null and subjectName != ''">subject_name = #{subjectName},</if>
             <if test="teacherName != null">teacher_name = #{teacherName},</if>
+            <if test="teacherId != null">teacher_id = #{teacherId},</if>
             <if test="classType != null">class_type = #{classType},</if>
             <if test="classMode != null and classMode != ''">class_mode = #{classMode},</if>
             <if test="enrolledCount != null">enrolled_count = #{enrolledCount},</if>
+            <if test="enrollLimit != null">enroll_limit = #{enrollLimit},</if>
+            <if test="unitPrice != null">unit_price = #{unitPrice},</if>
             <if test="recruitStatus != null">recruit_status = #{recruitStatus},</if>
             <if test="courseClassName != null and courseClassName != ''">course_class_name = #{courseClassName},</if>
             <if test="sourceSheet != null">source_sheet = #{sourceSheet},</if>
@@ -185,15 +211,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <!-- 可视化课表：按 年+学期+期次 查询所有排课，可联教室表按校区过滤 -->
     <select id="selectTimetableGrid" parameterType="EduCourseSchedule" resultMap="EduCourseScheduleResult">
-        SELECT s.schedule_id, s.schedule_code, s.classroom_id, s.course_year, s.term_name, s.period_name,
+        SELECT s.schedule_id, s.schedule_code, s.classroom_id, s.lesson_location, s.course_year, s.term_name, s.period_name,
                s.time_slot, s.start_time, s.end_time, s.start_date, s.end_date, s.class_pattern,
-               s.grade_name, s.subject_name, s.teacher_name,
-               s.class_type, s.enrolled_count, s.recruit_status, s.course_class_name,
+               s.grade_name, s.subject_name, s.teacher_name, s.teacher_id,
+               s.class_type, s.class_mode, s.enrolled_count, s.enroll_limit, s.recruit_status, s.course_class_name,
                s.status, s.del_flag, s.create_by, s.create_time, s.update_by, s.update_time, s.remark
         FROM edu_course_schedule s
         LEFT JOIN edu_classroom c ON c.classroom_id = s.classroom_id
         <where>
             s.del_flag = '0' AND s.status = '0'
+            <if test="params.teacherUserId != null">and s.teacher_id = #{params.teacherUserId}</if>
             <if test="courseYear != null "> and s.course_year = #{courseYear}</if>
             <if test="termName   != null and termName   != ''"> and s.term_name   = #{termName}</if>
             <if test="periodName != null and periodName != ''"> and s.period_name = #{periodName}</if>
@@ -201,11 +228,41 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="timeSlot    != null and timeSlot    != ''"> and s.time_slot    = #{timeSlot}</if>
             <if test="gradeName   != null and gradeName   != ''"> and s.grade_name   = #{gradeName}</if>
             <if test="subjectName != null and subjectName != ''"> and s.subject_name = #{subjectName}</if>
-            <if test="teacherName != null and teacherName != ''"> and s.teacher_name = #{teacherName}</if>
+            <!-- 教师筛选一律按 teacher_id（Controller 已把旧参数 teacherName 解析成 teacherUserId）。
+                 不要再加 teacher_name 条件：教师重名时会静默查出别人的课。 -->
+            <if test="params.teacherUserId != null">and s.teacher_id = #{params.teacherUserId}</if>
             <if test="classType   != null and classType   != ''"> and s.class_type   = #{classType}</if>
             <!-- 用 classroom 表按校区过滤 -->
             <if test="remark != null and remark != ''"> and c.campus_name = #{remark}</if>
         </where>
         ORDER BY s.course_year, s.term_name, s.period_name, c.campus_name, c.classroom_id, s.time_slot
     </select>
+
+    <!-- 数据中实际出现过的「学期-期次」组合（含导入占位值，如 未识别学期/未识别期次） -->
+    <select id="selectTermPeriodPairs" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT term_name AS termName, period_name AS periodName
+        FROM edu_course_schedule
+        WHERE del_flag = '0' AND term_name IS NOT NULL AND term_name &lt;&gt; ''
+        ORDER BY term_name, period_name
+    </select>
+
+    <!--
+      可视化课表：一次性交换两个教室在「年份 + 学期 + 期次」下的全部排课。
+      用单条 UPDATE + CASE 完成 A<->B 对调（MySQL 按行的原值求值，不会互相覆盖），
+      因此是原子操作，不需要临时占位值，也不存在中间态。
+    -->
+    <update id="swapClassroom">
+        UPDATE edu_course_schedule
+        SET classroom_id = CASE classroom_id
+                WHEN #{classroomIdA} THEN #{classroomIdB}
+                WHEN #{classroomIdB} THEN #{classroomIdA}
+            END,
+            update_time = NOW()
+            <if test="updateBy != null and updateBy != ''">, update_by = #{updateBy}</if>
+        WHERE del_flag = '0'
+          AND classroom_id IN (#{classroomIdA}, #{classroomIdB})
+          <if test="courseYear != null">AND course_year = #{courseYear}</if>
+          <if test="termName != null and termName != ''">AND term_name = #{termName}</if>
+          <if test="periodName != null and periodName != ''">AND period_name = #{periodName}</if>
+    </update>
 </mapper>

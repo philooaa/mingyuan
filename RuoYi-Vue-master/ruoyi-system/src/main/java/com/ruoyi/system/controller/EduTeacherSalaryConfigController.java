@@ -37,12 +37,15 @@ public class EduTeacherSalaryConfigController extends BaseController
 
     /**
      * 查询薪资标准列表
+     *
+     * 以教师账号为主体返回：未配置薪资标准的教师也会出现在列表中（configId 为空），
+     * 并附带该教师负责的小学班课门数、中学班课门数、一对一门数。
      */
     @PreAuthorize("@ss.hasPermi('system:salaryConfig:list')")
     @GetMapping("/list")
     public AjaxResult list(EduTeacherSalaryConfig config)
     {
-        List<EduTeacherSalaryConfig> list = configService.selectConfigList(config);
+        List<EduTeacherSalaryConfig> list = configService.selectTeacherSalaryList(config);
         return success(list);
     }
 

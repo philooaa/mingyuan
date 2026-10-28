@@ -55,6 +55,9 @@ public class TokenService
     @Autowired
     private RedisCache redisCache;
 
+    @Autowired
+    private MiniAppDevelopmentSession developmentSession;
+
     /**
      * 获取用户身份信息
      * 
@@ -69,6 +72,11 @@ public class TokenService
             try
             {
                 Claims claims = parseToken(token);
+                String developmentVersion = claims.get("miniapp_dev_session", String.class);
+                if (developmentVersion != null && !developmentSession.matches(developmentVersion))
+                {
+                    return null;
+                }
                 // 解析对应的权限以及用户信息
                 String uuid = (String) claims.get(Constants.LOGIN_USER_KEY);
                 String userKey = getTokenKey(uuid);
@@ -114,6 +122,16 @@ public class TokenService
      */
     public String createToken(LoginUser loginUser)
     {
+        return createToken(loginUser, null);
+    }
+
+    public String createDevelopmentToken(LoginUser loginUser)
+    {
+        return createToken(loginUser, developmentSession.getVersion());
+    }
+
+    private String createToken(LoginUser loginUser, String developmentVersion)
+    {
         String token = IdUtils.fastUUID();
         loginUser.setToken(token);
         setUserAgent(loginUser);
@@ -122,6 +140,10 @@ public class TokenService
         Map<String, Object> claims = new HashMap<>();
         claims.put(Constants.LOGIN_USER_KEY, token);
         claims.put(Constants.JWT_USERNAME, loginUser.getUsername());
+        if (developmentVersion != null)
+        {
+            claims.put("miniapp_dev_session", developmentVersion);
+        }
         return createToken(claims);
     }
 

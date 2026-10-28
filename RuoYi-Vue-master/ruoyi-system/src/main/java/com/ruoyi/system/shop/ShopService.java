@@ -15,6 +15,7 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.system.finance.FinanceRules;
 
 @Service
 public class ShopService {
@@ -239,7 +240,7 @@ public class ShopService {
             log(order,"MOCK_REFUND",o,str(o,"orderStatus"),"2",actor,"ADMIN","模拟全额退款："+reason);return order(order,actor,true);});
     }
     public Map<String,Object> order(long order,long user,boolean admin) {
-        var o=db.one("SELECT o.*,u.nick_name AS parent_name FROM edu_material_order o LEFT JOIN sys_user u ON u.user_id=o.parent_id WHERE o.order_id=?"+(admin?"":" AND o.parent_id=?"),admin?new Object[]{order}:new Object[]{order,user});
+        var o=db.one("SELECT o.*,"+FinanceRules.parentNameSql("u")+" AS parent_name FROM edu_material_order o LEFT JOIN sys_user u ON u.user_id=o.parent_id WHERE o.order_id=?"+(admin?"":" AND o.parent_id=?"),admin?new Object[]{order}:new Object[]{order,user});
         Map<String,Object> dto=new LinkedHashMap<>();
         for(String k:List.of("orderId","orderCode","parentId","parentName","orderStatus","payStatus","aftersaleStatus","goodsAmount","shippingAmount","payableAmount","amount","refundedAmount","totalQuantity","deliveryType","receiverName","receiverPhone","provinceName","cityName","districtName","detailAddress","buyerRemark","createTime","expireTime","payTime"))dto.put(k,o.get(k));
         if(admin)dto.put("adminRemark",o.get("adminRemark"));
@@ -300,7 +301,7 @@ public class ShopService {
         List<Object> args=new ArrayList<>();StringBuilder where=new StringBuilder(" WHERE 1=1");
         if(!admin){where.append(" AND o.parent_id=?");args.add(user);}
         filter(where,args,q,"orderCode","o.order_code",true);filter(where,args,q,"payStatus","o.pay_status",false);filter(where,args,q,"orderStatus","o.order_status",false);
-        if(admin)filter(where,args,q,"parentName","u.nick_name",true);
+        if(admin)filter(where,args,q,"parentName",FinanceRules.parentSearchSql("u"),true);
         if(q.get("title")!=null&&!q.get("title").isBlank()){where.append(" AND EXISTS(SELECT 1 FROM edu_material_order_item i WHERE i.order_id=o.order_id AND i.material_title LIKE ?)");args.add("%"+q.get("title")+"%");}
         for(String key:List.of("beginTime","endTime"))if(q.get(key)!=null&&!q.get(key).isBlank()){
             try{LocalDate date=LocalDate.parse(q.get(key).substring(0,10));where.append(key.equals("beginTime")?" AND o.create_time>=?":" AND o.create_time<?");args.add(Timestamp.valueOf(key.equals("beginTime")?date.atStartOfDay():date.plusDays(1).atStartOfDay()));}catch(Exception e){throw new ServiceException("日期格式无效");}

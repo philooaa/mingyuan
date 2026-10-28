@@ -26,19 +26,28 @@ public class MiniAppTuitionController {
   }
 
   @GetMapping("/tuition/{id}")
-  public AjaxResult detail(@PathVariable long id) {
+  public AjaxResult detail(@PathVariable long id,@RequestParam(required=false) Long accountId) {
+    child(id,accountId);
     return EduTuitionController.ok(tuition.bill(id, SecurityUtils.getUserId(), false));
+  }
+
+  @GetMapping("/tuition/{id}/refund-targets")
+  public AjaxResult refundTargets(@PathVariable long id,@RequestParam(required=false) Long accountId) {
+    child(id,accountId);
+    return EduTuitionController.ok(tuition.refundTargets(id, SecurityUtils.getUserId(), false));
   }
 
   @PostMapping("/tuition/{id}/quote")
   public AjaxResult quote(
       @PathVariable long id, @RequestBody(required = false) Map<String, Object> b) {
+    child(id,b);
     return EduTuitionController.ok(
         tuition.quote(id, SecurityUtils.getUserId(), false, b == null ? Map.of() : b));
   }
 
   @PostMapping("/tuition/{id}/payments")
   public AjaxResult payment(@PathVariable long id, @RequestBody Map<String, Object> b) {
+    child(id,b);
     return EduTuitionController.ok(tuition.createPayment(id, SecurityUtils.getUserId(), false, b));
   }
 
@@ -55,6 +64,7 @@ public class MiniAppTuitionController {
 
   @PostMapping("/tuition/refunds")
   public AjaxResult apply(@RequestBody Map<String, Object> b) {
+    if(b.get("accountId")!=null){var p=tuition.payment(FinanceRules.id(b.get("paymentId")),SecurityUtils.getUserId(),false);child(FinanceRules.id(p.get("enrollmentId")),b);}
     return EduTuitionController.ok(tuition.applyRefund(SecurityUtils.getUserId(), false, b));
   }
 
@@ -77,4 +87,6 @@ public class MiniAppTuitionController {
   public TableDataInfo coupons(@RequestParam Map<String, String> q) {
     return EduTuitionController.table(coupons.myCoupons(SecurityUtils.getUserId(), q));
   }
+  private void child(long enrollment,Map<String,Object> body){if(body!=null && body.get("accountId")!=null)child(enrollment,FinanceRules.id(body.get("accountId")));}
+  private void child(long enrollment,Long account){if(account!=null)tuition.checkChild(enrollment,SecurityUtils.getUserId(),account);}
 }

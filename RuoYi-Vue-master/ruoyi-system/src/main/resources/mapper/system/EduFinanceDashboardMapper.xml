@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.EduFinanceDashboardMapper">
+
+    <!-- 课时费：合同=有效报名×排课单价；收入=其中已支付。兼容历史状态值 -->
+    <!-- 课程收入改为按「收款流水」口径：实收金额（SUCCESS 付款）净额扣减已成功退款 -->
+    <select id="selectLessonMonthly" resultType="java.util.HashMap">
+        select date_format(p.paid_time, '%Y-%m') as month,
+               sum(p.amount) as contractAmount,
+               sum(p.amount) - coalesce(sum(r.refund_amount), 0) as confirmedAmount
+        from edu_tuition_payment p
+        left join (
+            select rf.payment_id, sum(rf.approved_amount) as refund_amount
+            from edu_tuition_refund rf
+            where rf.refund_status = 'SUCCESS'
+            group by rf.payment_id
+        ) r on r.payment_id = p.payment_id
+        where p.payment_status = 'SUCCESS'
+          and p.paid_time is not null
+          and date_format(p.paid_time, '%Y-%m') between #{begin} and #{end}
+        group by month
+    </select>
+
+    <!-- 资料商城：合同=未关闭订单应付；收入=已支付(应付-退款) -->
+    <select id="selectShopMonthly" resultType="java.util.HashMap">
+        select date_format(o.create_time, '%Y-%m') as month,
+               sum(case when o.order_status &lt;&gt; 'CLOSED' then o.payable_amount else 0 end) as contractAmount,
+               sum(case when o.pay_status = '1' then o.payable_amount - o.refunded_amount else 0 end) as confirmedAmount
+        from edu_material_order o
+        where o.del_flag = '0'
+          and date_format(o.create_time, '%Y-%m') between #{begin} and #{end}
+        group by month
+    </select>
+
+    <select id="selectSalaryMonthly" resultType="java.util.HashMap">
+        select salary_month as month, sum(coalesce(total_amount, 0)) as salaryAmount
+        from edu_teacher_salary_record
+        where del_flag = '0' and salary_month between #{begin} and #{end}
+        group by salary_month
+    </select>
+
+    <select id="selectExpenseMonthly" resultType="java.util.HashMap">
+        select date_format(expense_date, '%Y-%m') as month, sum(amount) as expenseAmount
+        from edu_finance_expense
+        where del_flag = '0' and date_format(expense_date, '%Y-%m') between #{begin} and #{end}
+        group by month
+    </select>
+
+    <select id="selectExpenseByType" resultType="java.util.HashMap">
+        select expense_type as expenseType, sum(amount) as expenseAmount
+        from edu_finance_expense
+        where del_flag = '0' and date_format(expense_date, '%Y-%m') between #{begin} and #{end}
+        group by expense_type
+    </select>
+
+</mapper>

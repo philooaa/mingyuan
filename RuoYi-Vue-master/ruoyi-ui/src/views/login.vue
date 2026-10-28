@@ -57,6 +57,7 @@
     <!--  底部  -->
     <div class="el-login-footer">
       <span>{{ footerContent }}</span>
+      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" style="margin-left: 12px; color: inherit;">苏ICP备2026079073号-2</a>
     </div>
   </div>
 </template>

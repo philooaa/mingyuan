@@ -1,6 +1,7 @@
+const childContext = require('../../utils/child-context')
 const { request } = require('../../utils/request')
 
-Page({
+Page(childContext.page({
   data: {
     loading: false,
     courses: [],
@@ -12,7 +13,8 @@ Page({
     showSheet: false
   },
 
-  onLoad() {
+  onLoad(options={}) {
+    this.accountId=options.accountId?String(options.accountId):'';this.setData({childScoped:!!this.accountId})
     this.loadSummary()
   },
 
@@ -23,7 +25,7 @@ Page({
   async loadSummary() {
     this.setData({ loading: true })
     try {
-      const res = await request({ url: '/miniapp/parent/attendance' })
+      const res = await request({ url: '/miniapp/parent/attendance',...(this.accountId?{data:{accountId:this.accountId}}:{}) })
       const courses = this.decorateCourses(res.data || [])
       const totals = courses.reduce((acc, item) => {
         acc.attended += Number(item.attendedCount || 0)
@@ -61,7 +63,7 @@ Page({
 
   async openDetails(e) {
     const courseClassName = e.currentTarget.dataset.name
-    const selectedCourse = this.data.courses.find((item) => item.courseClassName === courseClassName)
+    const selectedCourse = this.data.courses.find(item=>this.accountId?String(item.enrollmentId)===String(e.currentTarget.dataset.id):item.courseClassName===courseClassName)
     if (!selectedCourse) return
 
     this.setData({
@@ -73,7 +75,7 @@ Page({
     try {
       const res = await request({
         url: '/miniapp/parent/attendance/details',
-        data: { courseClassName }
+        data: { courseClassName,...(this.accountId?{accountId:this.accountId,enrollmentId:selectedCourse.enrollmentId}:{}) }
       })
       this.setData({ details: this.decorateDetails(res.data || []) })
     } catch (error) {
@@ -90,6 +92,7 @@ Page({
         timeText: this.buildTimeText(item),
         placeText: this.joinText([item.campusName, item.classroomName]),
         statusText: this.statusText(item.attendanceStatus),
+        reviewText: item.reviewStatus == null ? '' : item.reviewStatus==='1' ? '教务已确认' : item.reviewStatus==='2' ? '审核异常，教务核查中' : '教师已登记',
         statusClass: done ? 'done' : ''
       }
     })
@@ -99,7 +102,7 @@ Page({
     const start = item.startTime ? String(item.startTime).slice(0, 5) : ''
     const end = item.endTime ? String(item.endTime).slice(0, 5) : ''
     const clock = start && end ? `${start}-${end}` : (item.timeSlot || '')
-    return this.joinText([item.termName, item.periodName, clock])
+    return this.joinText([item.classDate || item.termName, item.classDate?'':item.periodName, clock])
   },
 
   joinText(parts) {
@@ -108,7 +111,11 @@ Page({
 
   statusText(status) {
     if (status === '1') return '已上课'
-    if (status === '2') return '已取消'
+    if (status === '2') return this.accountId?'录播':'已取消'
+    if (status === '3') return '请假'
+    if (status === '4') return '试听到课'
+    if (status === '5') return '调课到课'
+    if (status === '6') return '未到课'
     return '未上课'
   },
 
@@ -119,4 +126,4 @@ Page({
       showSheet: false
     })
   }
-})
+}, {route:'/pages/attendance/attendance',detail:false}))

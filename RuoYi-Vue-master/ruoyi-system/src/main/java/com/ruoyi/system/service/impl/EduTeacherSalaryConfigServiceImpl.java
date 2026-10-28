@@ -29,6 +29,12 @@ public class EduTeacherSalaryConfigServiceImpl implements IEduTeacherSalaryConfi
     }
 
     @Override
+    public List<EduTeacherSalaryConfig> selectTeacherSalaryList(EduTeacherSalaryConfig config)
+    {
+        return configMapper.selectTeacherSalaryList(config);
+    }
+
+    @Override
     public EduTeacherSalaryConfig selectConfigById(Long configId)
     {
         return configMapper.selectConfigById(configId);
@@ -42,12 +48,22 @@ public class EduTeacherSalaryConfigServiceImpl implements IEduTeacherSalaryConfi
         {
             throw new ServiceException("该教师已存在薪资标准，请直接修改");
         }
-        config.setCreateTime(DateUtils.getNowDate());
-        config.setCreateBy(SecurityUtils.getUsername());
         if (config.getStatus() == null || config.getStatus().isEmpty())
         {
             config.setStatus("0");
         }
+        // teacher_id 上有唯一键：该教师此前删除过标准时复用旧行复活，避免重复插入撞唯一键
+        EduTeacherSalaryConfig deleted = configMapper.selectDeletedByTeacherId(config.getTeacherId());
+        if (deleted != null)
+        {
+            config.setConfigId(deleted.getConfigId());
+            config.setDelFlag("0");
+            config.setUpdateBy(SecurityUtils.getUsername());
+            config.setUpdateTime(DateUtils.getNowDate());
+            return configMapper.updateConfig(config);
+        }
+        config.setCreateTime(DateUtils.getNowDate());
+        config.setCreateBy(SecurityUtils.getUsername());
         return configMapper.insertConfig(config);
     }
 

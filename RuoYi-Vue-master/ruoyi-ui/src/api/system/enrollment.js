@@ -35,10 +35,10 @@ export function updateEnrollment(data) {
   })
 }
 
-// 删除课程报名
-export function delEnrollment(enrollmentId) {
+// 取消课程报名，保留报名及考勤历史
+export function cancelEnrollment(enrollmentId) {
   return request({
-    url: '/system/enrollment/' + enrollmentId,
-    method: 'delete'
+    url: '/system/enrollment/' + enrollmentId + '/cancel',
+    method: 'put'
   })
 }

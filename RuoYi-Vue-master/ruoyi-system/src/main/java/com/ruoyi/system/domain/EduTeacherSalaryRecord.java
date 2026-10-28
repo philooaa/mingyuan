@@ -64,7 +64,11 @@ public class EduTeacherSalaryRecord extends BaseEntity
     @Excel(name = "课时费合计(元)")
     private BigDecimal lessonAmount;
 
-    /** 应发合计（底薪+课时费） */
+    /** 提成金额（元，取自薪资标准中配置的固定提成） */
+    @Excel(name = "提成(元)")
+    private BigDecimal commissionAmount;
+
+    /** 应发合计（底薪+课时费+提成） */
     @Excel(name = "应发合计(元)")
     private BigDecimal totalAmount;
 
@@ -130,6 +134,8 @@ public class EduTeacherSalaryRecord extends BaseEntity
     public void setTotalHours(BigDecimal totalHours) { this.totalHours = totalHours; }
     public BigDecimal getLessonAmount() { return lessonAmount; }
     public void setLessonAmount(BigDecimal lessonAmount) { this.lessonAmount = lessonAmount; }
+    public BigDecimal getCommissionAmount() { return commissionAmount; }
+    public void setCommissionAmount(BigDecimal commissionAmount) { this.commissionAmount = commissionAmount; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
     public String getConfirmStatus() { return confirmStatus; }

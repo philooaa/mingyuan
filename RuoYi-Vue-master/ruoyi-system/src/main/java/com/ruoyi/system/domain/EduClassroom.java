@@ -30,13 +30,12 @@ public class EduClassroom extends BaseEntity
     @Excel(name = "教室名称")
     private String classroomName;
 
-    /** 教室规格（大/中/小） */
-    @Excel(name = "教室规格", readConverterExp = "大=/中/小")
-    private String classroomSize;
-
-    /** 建议容量 */
-    @Excel(name = "建议容量")
-    private Long capacity;
+    /**
+     * 课表编码：学校课表里那一列的编号（万达 W1~W12、百家湖 B1~B5）。
+     * 导入课表时按此编码精确匹配教室，不再依赖「校区教室列表的第 N 个」这种位置猜测。
+     */
+    @Excel(name = "课表编码")
+    private String sheetCode;
 
     /** 状态（0正常 1停用） */
     @Excel(name = "状态", readConverterExp = "0=正常,1=停用")
@@ -82,24 +81,14 @@ public class EduClassroom extends BaseEntity
         return classroomName;
     }
 
-    public void setClassroomSize(String classroomSize) 
+    public void setSheetCode(String sheetCode) 
     {
-        this.classroomSize = classroomSize;
+        this.sheetCode = sheetCode;
     }
 
-    public String getClassroomSize() 
+    public String getSheetCode() 
     {
-        return classroomSize;
-    }
-
-    public void setCapacity(Long capacity) 
-    {
-        this.capacity = capacity;
-    }
-
-    public Long getCapacity() 
-    {
-        return capacity;
+        return sheetCode;
     }
 
     public void setStatus(String status) 
@@ -119,8 +108,7 @@ public class EduClassroom extends BaseEntity
             .append("classroomCode", getClassroomCode())
             .append("campusName", getCampusName())
             .append("classroomName", getClassroomName())
-            .append("classroomSize", getClassroomSize())
-            .append("capacity", getCapacity())
+            .append("sheetCode", getSheetCode())
             .append("status", getStatus())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())

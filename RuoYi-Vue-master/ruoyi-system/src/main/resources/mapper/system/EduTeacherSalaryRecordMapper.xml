@@ -28,6 +28,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="totalLessons"         column="total_lessons" />
         <result property="totalHours"           column="total_hours" />
         <result property="lessonAmount"         column="lesson_amount" />
+        <result property="commissionAmount"     column="commission_amount" />
         <result property="totalAmount"          column="total_amount" />
         <result property="confirmStatus"        column="confirm_status" />
         <result property="confirmBy"            column="confirm_by" />
@@ -47,7 +48,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                primary_1on1_count, primary_1on1_hours, primary_1on1_amount,
                junior_1on1_count, junior_1on1_hours, junior_1on1_amount,
                senior_1on1_count, senior_1on1_hours, senior_1on1_amount,
-               total_lessons, total_hours, lesson_amount, total_amount,
+               total_lessons, total_hours, lesson_amount, commission_amount, total_amount,
                confirm_status, confirm_by, confirm_time, del_flag,
                create_by, create_time, update_by, update_time, remark
         from edu_teacher_salary_record
@@ -82,7 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          primary_1on1_count, primary_1on1_hours, primary_1on1_amount,
          junior_1on1_count, junior_1on1_hours, junior_1on1_amount,
          senior_1on1_count, senior_1on1_hours, senior_1on1_amount,
-         total_lessons, total_hours, lesson_amount, total_amount,
+         total_lessons, total_hours, lesson_amount, commission_amount, total_amount,
          confirm_status, create_by, create_time, remark)
         values
         (#{teacherId}, #{teacherName}, #{salaryMonth}, #{baseSalary},
@@ -91,7 +92,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          #{primary1on1Count}, #{primary1on1Hours}, #{primary1on1Amount},
          #{junior1on1Count}, #{junior1on1Hours}, #{junior1on1Amount},
          #{senior1on1Count}, #{senior1on1Hours}, #{senior1on1Amount},
-         #{totalLessons}, #{totalHours}, #{lessonAmount}, #{totalAmount},
+         #{totalLessons}, #{totalHours}, #{lessonAmount}, #{commissionAmount}, #{totalAmount},
          '0', #{createBy}, sysdate(), #{remark})
     </insert>
 
@@ -118,6 +119,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalLessons != null">total_lessons = #{totalLessons},</if>
             <if test="totalHours != null">total_hours = #{totalHours},</if>
             <if test="lessonAmount != null">lesson_amount = #{lessonAmount},</if>
+            <if test="commissionAmount != null">commission_amount = #{commissionAmount},</if>
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
             <if test="confirmStatus != null and confirmStatus != ''">confirm_status = #{confirmStatus},</if>
             <if test="confirmBy != null">confirm_by = #{confirmBy},</if>
@@ -135,9 +137,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </foreach>
     </update>
 
-    <!-- 全部教师账号 -->
+    <!-- 全部教师账号：teacherName 保持昵称（历史调用方依赖），realName 为登录名（真实姓名） -->
     <select id="selectTeacherUsers" resultType="java.util.HashMap">
-        select u.user_id as teacherId, u.nick_name as teacherName
+        select u.user_id as teacherId, u.nick_name as teacherName, u.user_name as realName,
+               (select p.teacher_subject from edu_teacher_profile p where p.user_id = u.user_id) as teacherSubject
         from sys_user u
         inner join sys_user_role ur on ur.user_id = u.user_id
         inner join sys_role r on r.role_id = ur.role_id and r.role_key = 'teacher' and r.status = '0'
@@ -166,9 +169,32 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                sum(case when r.sign_status in ('1','4','5') then 1 else 0 end) as attendedRows
         from edu_class_sign_in r
         inner join edu_course_schedule s on s.schedule_id = r.schedule_id and s.del_flag = '0'
-        where r.del_flag = '0' and s.teacher_id is not null
+        where r.del_flag = '0' and r.review_status = '1' and s.teacher_id is not null
           and date_format(r.class_date, '%Y-%m') = #{salaryMonth}
         group by s.teacher_id, r.schedule_id, r.class_date, s.class_mode, stage, s.start_time, s.end_time
+    </select>
+    <!--
+      薪资课时来源：寒假 / 春季排课（暑假、秋季为历史数据，不参与薪资计算）。
+      class_pattern：WEEKLY=每周一次（period_name 指明周六/周日）；DAILY_5_1=上5休1。
+      起止日期齐全，可脱离考勤直接推算某月应上课次。
+    -->
+    <select id="selectTermSchedules" resultType="java.util.HashMap">
+        select s.schedule_id as scheduleId,
+               s.teacher_id as teacherId,
+               s.course_class_name as courseClassName,
+               s.grade_name as gradeName,
+               s.class_pattern as classPattern,
+               s.period_name as periodName,
+               s.class_mode as classMode,
+               s.start_time as startTime,
+               s.end_time as endTime,
+               s.start_date as startDate,
+               s.end_date as endDate
+        from edu_course_schedule s
+        where s.del_flag = '0' and s.status = '0' and s.teacher_id is not null
+          and s.term_name in ('寒假', '春季')
+          and s.start_date is not null and s.end_date is not null
+        order by s.teacher_id, s.schedule_id
     </select>
 
 </mapper>

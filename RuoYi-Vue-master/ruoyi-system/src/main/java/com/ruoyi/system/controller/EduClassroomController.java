@@ -47,6 +47,16 @@ public class EduClassroomController extends BaseController
     }
 
     /**
+     * 校区分类统计（教室管理页顶部的「全部 / 万达校区 / 百家湖校区」分类）
+     */
+    @PreAuthorize("@ss.hasPermi('system:classroom:list')")
+    @GetMapping("/campusStats")
+    public AjaxResult campusStats()
+    {
+        return success(eduClassroomService.selectCampusStats());
+    }
+
+    /**
      * 导出教室信息列表
      */
     @PreAuthorize("@ss.hasPermi('system:classroom:export')")

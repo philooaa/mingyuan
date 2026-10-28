@@ -1,8 +1,10 @@
+@import "../../styles/education-ui.wxss";
 .page {
   min-height: 100vh;
   background: #f4f6fa;
   padding-bottom: 180rpx;
 }
+.detail-reload { margin:12rpx 28rpx; text-align:right; color:#58719b; font-size:24rpx; }
 
 .header {
   padding: 40rpx 32rpx 20rpx;
@@ -32,7 +34,7 @@
   margin-right: 20rpx;
 }
 
-.date-picker {
+.date-value {
   padding: 10rpx 24rpx;
   background: #fff;
   border-radius: 999rpx;
@@ -228,3 +230,25 @@
 .submit-btn.disabled {
   opacity: 0.6;
 }
+
+.status-btn.disabled { opacity: 0.5; }
+
+/* 教育业务页面：紧凑布局与信息层级 */
+
+.header { padding:26rpx 28rpx 18rpx; }
+.header-title { font-size:34rpx; color:#202b3d; line-height:1.5; }
+.header-subtitle { color:#68778c; line-height:1.6; }
+.date-bar { margin:0 24rpx 16rpx; padding:18rpx 20rpx; background:#fff; border:1rpx solid #e8edf4; border-radius:14rpx; flex-wrap:wrap; gap:10rpx; }
+.date-label { margin-right:4rpx; font-size:24rpx; }
+.date-value { color:#2459d9; background:#edf2ff; border-radius:8rpx; padding:10rpx 16rpx; }
+.stats { border:1rpx solid #e8edf4; border-radius:14rpx; padding:20rpx 0; }
+.stat.main .num { color:#2459d9; }
+.num { font-size:32rpx; }
+.label { color:#68778c; font-size:23rpx; }
+.student-row { border:1rpx solid #e8edf4; border-radius:16rpx; padding:24rpx; }
+.student-name { font-size:30rpx; }
+.status-btn { border-radius:10rpx; padding:16rpx 0; font-size:25rpx; }
+.status-btn.active { background:#2459d9; }
+.add-btn { border-radius:12rpx; font-size:25rpx; font-weight:500; }
+.submit-wrap { background:#ffffffed; border-top:1rpx solid #e8edf4; }
+.submit-btn { background:#2459d9; border-radius:14rpx; padding:22rpx 0; font-size:28rpx; }

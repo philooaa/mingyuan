@@ -1,0 +1,15 @@
+// 在视图层同步刻度，避免滚动事件跨逻辑层 setData 造成延迟。
+function moveAxis(owner, top) {
+  var axis = owner.selectComponent('.time-axis')
+  if (axis) axis.setStyle({ transform: 'translate3d(0,' + (-top) + 'px,0)' })
+}
+
+function scroll(event, owner) {
+  moveAxis(owner, event.detail.scrollTop)
+}
+
+function reset(value, oldValue, owner) {
+  moveAxis(owner, 0)
+}
+
+module.exports = { scroll: scroll, reset: reset }

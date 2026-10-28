@@ -29,6 +29,8 @@ public class EduHomework extends BaseEntity
     private String targetIds;
     private Long matchedScheduleId;
     private String matchedScheduleName;
+    /** 按班级统计的提交情况，格式 scheduleId:提交数:已批阅数，逗号分隔 */
+    private String targetCounts;
     public Long getHomeworkId(){return homeworkId;} public void setHomeworkId(Long v){homeworkId=v;}
     public Long getScheduleId(){return scheduleId;} public void setScheduleId(Long v){scheduleId=v;}
     public Long getTeacherId(){return teacherId;} public void setTeacherId(Long v){teacherId=v;}
@@ -52,4 +54,5 @@ public class EduHomework extends BaseEntity
     public String getTargetIds(){return targetIds;} public void setTargetIds(String v){targetIds=v;}
     public Long getMatchedScheduleId(){return matchedScheduleId;} public void setMatchedScheduleId(Long v){matchedScheduleId=v;}
     public String getMatchedScheduleName(){return matchedScheduleName;} public void setMatchedScheduleName(String v){matchedScheduleName=v;}
+    public String getTargetCounts(){return targetCounts;} public void setTargetCounts(String v){targetCounts=v;}
 }

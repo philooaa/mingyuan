@@ -4,12 +4,18 @@
 -- =================================================================
 
 -- =================================================================
--- 1. 唯一约束：同一教室×同年×同学期×同期次×同时段只能有1条排课
+-- 1. 索引：同一教室×同年×同学期×同期次×同时段的网格查询加速
 -- =================================================================
--- （如果表中已有同格重复排课，先手动清理再执行 ALTER）
-ALTER TABLE edu_course_schedule
-  ADD UNIQUE KEY uk_course_timetable_cell
-  (classroom_id, course_year, term_name, period_name, time_slot, del_flag);
+-- 说明：自 2026-10-12 起允许同格存在多条排课（课表界面用红色感叹号提示冲突），
+--       因此这里改为普通索引。若历史环境仍是 UNIQUE KEY，执行
+--       database/migrations/20261012_allow_timetable_conflicts.sql 降级。
+SET @idx := (SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'edu_course_schedule'
+               AND INDEX_NAME IN ('uk_course_timetable_cell','idx_course_timetable_cell'));
+SET @sql := IF(@idx = 0,
+               'ALTER TABLE edu_course_schedule ADD INDEX idx_course_timetable_cell (classroom_id, course_year, term_name, period_name, time_slot)',
+               'SELECT ''课表网格索引已存在，跳过'' AS notice');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- =================================================================
 -- 2. 字典：学期（暑假/秋季/春季）

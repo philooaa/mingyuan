@@ -1,0 +1,11 @@
+<view class="page">
+ <view class="heading">优惠券管理</view><view class="muted">选择要处理的事务</view>
+ <view class="entry primary-entry" data-section="issue" bindtap="openSection"><view class="entry-title">发放优惠券<text class="chevron">›</text></view><view class="entry-note">选择券模板，按手机号查找家长并发放</view></view>
+ <view class="entry" data-section="templates" bindtap="openSection"><view class="entry-title">券模板<text class="chevron">›</text></view><view class="entry-note">创建、编辑和启用优惠券模板</view></view>
+ <view class="entry" data-section="grants" bindtap="openSection"><view class="entry-title">发放记录<text class="chevron">›</text></view><view class="entry-note">查看普通券与推荐奖励券，处理撤回</view></view>
+ <view class="group-title">推荐事务</view>
+ <view class="entry" data-section="records" bindtap="openSection"><view class="entry-title">推荐审核<text class="entry-badge" wx:if="{{pendingBadge}}">{{pendingBadge}}</text><text class="chevron">›</text></view><view class="entry-note">核对达标推荐，为新老家长发放奖励</view></view>
+ <view class="entry" data-section="bindings" bindtap="openSection"><view class="entry-title">绑定记录<text class="chevron">›</text></view><view class="entry-note">查看推荐关系、待达标状态和纠错历史</view></view>
+ <view class="entry" data-section="anomalies" bindtap="openSection"><view class="entry-title">异常处理<text class="entry-badge" wx:if="{{anomalyBadge}}">{{anomalyBadge}}</text><text class="chevron">›</text></view><view class="entry-note">核查取消、退款等异常事项</view></view>
+ <view class="error" wx:if="{{error}}">{{error}}<button bindtap="load">重试</button></view>
+</view>

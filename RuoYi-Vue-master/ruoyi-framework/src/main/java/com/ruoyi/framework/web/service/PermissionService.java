@@ -96,6 +96,8 @@ public class PermissionService
         {
             return false;
         }
+        if (Constants.SUPER_ADMIN.equals(StringUtils.trim(role))
+                && SecurityUtils.isBusinessAdmin(loginUser.getUser())) return true;
         for (SysRole sysRole : loginUser.getUser().getRoles())
         {
             String roleKey = sysRole.getRoleKey();

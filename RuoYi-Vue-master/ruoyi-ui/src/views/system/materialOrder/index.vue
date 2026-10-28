@@ -3,7 +3,7 @@
     <el-form ref="queryForm" :model="queryParams" size="small" :inline="true" v-show="showSearch">
       <el-form-item label="订单编码" prop="orderCode"><el-input v-model="queryParams.orderCode" clearable @keyup.enter.native="handleQuery" /></el-form-item>
       <el-form-item label="商品名称" prop="title"><el-input v-model="queryParams.title" clearable @keyup.enter.native="handleQuery" /></el-form-item>
-      <el-form-item label="家长昵称" prop="parentName"><el-input v-model="queryParams.parentName" clearable @keyup.enter.native="handleQuery" /></el-form-item>
+      <el-form-item label="家长" prop="parentName"><el-input v-model="queryParams.parentName" clearable @keyup.enter.native="handleQuery" /></el-form-item>
       <el-form-item label="支付状态" prop="payStatus"><el-select v-model="queryParams.payStatus" clearable><el-option label="未支付" value="0" /><el-option label="已支付" value="1" /><el-option label="已退款" value="2" /></el-select></el-form-item>
       <el-form-item label="订单状态" prop="orderStatus"><el-select v-model="queryParams.orderStatus" clearable><el-option v-for="(label, value) in orderStates" :key="value" :value="value" :label="label" /></el-select></el-form-item>
       <el-form-item label="下单时间"><el-date-picker v-model="dateRange" value-format="yyyy-MM-dd" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" /></el-form-item>
@@ -47,7 +47,7 @@
             <el-descriptions-item label="支付状态">{{ payText(detailRow.payStatus) }}</el-descriptions-item>
             <el-descriptions-item label="售后状态">{{ aftersaleText(detailRow.aftersaleStatus) }}</el-descriptions-item>
             <el-descriptions-item label="交付方式">{{ detailRow.deliveryType === 'PHYSICAL' ? '纸质配送' : '电子下载' }}</el-descriptions-item>
-            <el-descriptions-item label="家长昵称">{{ detailRow.parentName }}</el-descriptions-item>
+            <el-descriptions-item label="家长">{{ detailRow.parentName }}</el-descriptions-item>
             <el-descriptions-item label="数量">{{ detailRow.totalQuantity }}</el-descriptions-item>
             <el-descriptions-item label="商品金额">¥{{ money(detailRow.goodsAmount) }}</el-descriptions-item>
             <el-descriptions-item label="运费">¥{{ money(detailRow.shippingAmount) }}</el-descriptions-item>

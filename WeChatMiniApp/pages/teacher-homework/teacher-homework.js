@@ -1,14 +1,24 @@
 const { request } = require('../../utils/request')
 function valueOf(item, names, fallback = '') { for (const n of names) if (item[n] !== undefined && item[n] !== null) return item[n]; return fallback }
+// 卡片按班级展示本班提交情况（后端 targetCounts 为 scheduleId:提交数:已批阅数）
+function classCard(item, scheduleId) {
+  if (item.status !== '1' && item.status !== '2') return item
+  const scoped = (item.targetCountMap || {})[String(scheduleId)]
+  const submitted = scoped ? scoped.submitted : 0
+  const reviewed = scoped ? scoped.reviewed : 0
+  return { ...item, progress: submitted ? `本班提交 ${submitted} 人，已批阅 ${reviewed} 人` : '本班暂无提交' }
+}
 const statuses = { 0: '草稿', 1: '已发布', 2: '已关闭', draft: '草稿', published: '已发布', closed: '已关闭' }
 const statusTabs = [
   { key: 'all', name: '全部' },
   { key: '0', name: '草稿' },
   { key: '1', name: '已发布' },
-  { key: '2', name: '已关闭' }
+  { key: '2', name: '已关闭' },
+  { key: 'pending', name: '待批阅' }
 ]
 Page({
-  data: { list: [], shown: [], classTabs: [], activeClass: '', statusTabs, activeStatus: 'all', loading: false, schedules: [], scheduleNames: {}, publish: false, publishItem: null, publishClasses: [] },
+  data: { list: [], shown: [], groups: [], classTabs: [], activeClass: '', statusTabs, activeStatus: 'all', loading: false, schedules: [], scheduleNames: {}, publish: false, publishItem: null, publishClasses: [] },
+  onLoad(options = {}) { if (options.filter === 'pending') this.setData({ activeStatus: 'pending' }) },
   onShow() { this.loadList() },
   async loadSchedules() {
     if (this.data.schedules.length) return
@@ -38,21 +48,31 @@ Page({
         const targetIds = String(valueOf(item, ['targetIds'], '')).split(',').filter(Boolean)
         const classIds = status === '0' || !targetIds.length ? [String(valueOf(item, ['scheduleId'], ''))] : targetIds
         const classNames = classIds.map(id => names[id] || valueOf(item, ['scheduleName'], '未知班级'))
+        const targetCountMap = {}
+        String(valueOf(item, ['targetCounts'], '')).split(',').filter(Boolean).forEach(pair => {
+          const parts = pair.split(':')
+          if (parts[0]) targetCountMap[parts[0]] = { submitted: Number(parts[1]) || 0, reviewed: Number(parts[2]) || 0 }
+        })
         return {
           ...item,
           homeworkId: valueOf(item, ['homeworkId', 'id']),
           status,
           statusText: statuses[status] || valueOf(item, ['statusText'], '未知状态'),
+          pendingCount: Math.max(0, submissionCount - reviewedCount),
           progress,
+          targetCountMap,
           classIds,
           classNames,
           classText: classNames.join('、')
         }
       })
-      // 班级 Tab：只列出有作业的班级
+      // 班级 Tab：只列出有作业的班级；同名班级（同一课程名多个排课）标注 ID 便于区分
       const seen = {}
       const classTabs = [{ key: 'all', name: '全部班级' }]
       list.forEach(item => item.classIds.forEach((id, i) => { if (!seen[id]) { seen[id] = true; classTabs.push({ key: id, name: item.classNames ? item.classNames[i] : names[id] || '未命名班级' }) } }))
+      const tabNameCount = {}
+      classTabs.forEach(t => { if (t.key !== 'all') tabNameCount[t.name] = (tabNameCount[t.name] || 0) + 1 })
+      classTabs.forEach(t => { if (t.key !== 'all' && tabNameCount[t.name] > 1) t.name = `${t.name}（ID:${t.key}）` })
       const activeClass = classTabs.some(t => t.key === this.data.activeClass) ? this.data.activeClass : 'all'
       this.setData({ list, classTabs, activeClass })
       this.applyFilter()
@@ -65,23 +85,41 @@ Page({
   applyFilter() {
     const { list, activeClass, activeStatus } = this.data
     let shown = activeClass === 'all' ? list : list.filter(item => item.classIds.indexOf(activeClass) >= 0)
-    // 全部/班级默认视图不显示已关闭作业，已关闭仅在"已关闭"分类中查看
+    // 默认视图仍隐藏已关闭作业；待批阅包含关闭后尚未批完的提交。
     if (activeStatus === 'all') shown = shown.filter(item => item.status !== '2')
+    else if (activeStatus === 'pending') shown = shown.filter(item => item.pendingCount > 0)
     else shown = shown.filter(item => item.status === activeStatus)
-    this.setData({ shown })
+    // 按班级分组：同一作业发布到多个班级时，在每个班级下各出现一次
+    const names = this.data.scheduleNames
+    const groupMap = {}
+    const order = []
+    shown.forEach(item => {
+      const ids = activeClass === 'all' ? item.classIds : [activeClass]
+      ids.forEach(id => {
+        if (!id || id === 'undefined' || id === 'null') return
+        if (!groupMap[id]) { groupMap[id] = { scheduleId: id, name: names[id] || '未命名班级', items: [] }; order.push(id) }
+        groupMap[id].items.push(classCard(item, id))
+      })
+    })
+    const groups = order.map(id => groupMap[id])
+    const nameCount = {}
+    groups.forEach(g => { nameCount[g.name] = (nameCount[g.name] || 0) + 1 })
+    groups.forEach(g => { g.displayName = nameCount[g.name] > 1 ? `${g.name}（ID:${g.scheduleId}）` : g.name })
+    this.setData({ shown, groups })
   },
   switchClass(e) { this.setData({ activeClass: e.currentTarget.dataset.key }); this.applyFilter() },
   switchStatus(e) { this.setData({ activeStatus: e.currentTarget.dataset.key }); this.applyFilter() },
   create() { wx.navigateTo({ url: '/pages/teacher-homework-create/teacher-homework-create' }) },
   edit(e) { wx.navigateTo({ url: `/pages/teacher-homework-create/teacher-homework-create?homeworkId=${e.currentTarget.dataset.id}` }) },
   async openCard(e) {
-    const id = e.currentTarget.dataset.id
+    const { id, schedule, sname } = e.currentTarget.dataset
     const item = this.data.list.find(row => String(row.homeworkId) === String(id)) || {}
     if (item.status === '0') {
       wx.navigateTo({ url: `/pages/teacher-homework-create/teacher-homework-create?homeworkId=${id}` })
       return
     }
-    wx.navigateTo({ url: `/pages/teacher-homework-review/teacher-homework-review?id=${id}` })
+    const qs = `id=${id}&title=${encodeURIComponent(item.title || item.homeworkTitle || '')}&scheduleId=${schedule || ''}&scheduleName=${encodeURIComponent(sname || '')}`
+    wx.navigateTo({ url: `/pages/teacher-homework-review/teacher-homework-review?${qs}` })
   },
   async publish(e) {
     const id = e.currentTarget.dataset.id
@@ -122,5 +160,6 @@ Page({
     }
     try { await request({ url: `/miniapp/teacher/homework/${id}/${type}`, method: 'POST' }); wx.showToast({ title: type === 'publish' ? '已发布' : '已关闭', icon: 'success' }); this.loadList() } catch (x) { wx.showToast({ title: x.message || '操作失败', icon: 'none' }) }
   },
+  // 调整已发布作业的截止时间
   noop() {}
 })

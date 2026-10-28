@@ -1,0 +1,23 @@
+<view class="page">
+  <view wx:if="{{error}}" class="empty">{{error}}</view><view wx:if="{{loading}}" class="empty">加载中…</view>
+  <block wx:if="{{enrollment}}">
+    <view class="card"><view class="ui-row"><view class="title">{{enrollment.studentName}}</view><text class="ui-pill ui-pill-muted">{{enrollment.enrollmentText}}</text></view><view class="muted">{{enrollment.payText}}</view>
+      <view class="muted">报名编码：{{enrollment.enrollmentCode}}</view><view class="muted">家长用户 ID：{{enrollment.parentId}}</view>
+      <view class="ui-kv" bindtap="call"><text>联系电话</text><text class="ui-link">{{enrollment.contactPhone || '未提供'}} {{enrollment.contactPhone ? '拨打 ›' : ''}}</text></view>
+      <view class="ui-kv"><text>学生手机号</text><text>{{enrollment.studentPhone || '未提供'}}</text></view><view class="ui-kv"><text>费用金额</text><text>暂未提供</text></view>
+      <view wx:if="{{enrollment.cancelTime}}">取消时间：{{enrollment.cancelTime}}</view><view wx:if="{{enrollment.cancelReason}}">取消原因：{{enrollment.cancelReason}}</view>
+      <view wx:if="{{enrollment.remark}}">备注：{{enrollment.remark}}</view>
+    </view>
+    <view class="card" bindtap="openClass"><view class="title">所属班次 ›</view>
+      <block wx:if="{{schedule}}"><view>{{schedule.course}}</view><view>{{schedule.teacherName}} · {{schedule.time}}</view><view>{{schedule.room}}</view>
+        <view>{{schedule.courseYear}} {{schedule.termName}} · {{schedule.startDate}} 至 {{schedule.endDate}}</view><view>已报名 {{schedule.enrolledCount}} 人 · {{schedule.recruitText}}</view>
+      </block><view wx:else>班次 {{enrollment.scheduleId}}（排课已删除或不可用）</view>
+    </view>
+    <view class="card"><view class="title">上课记录</view><view class="ui-metrics"><view class="ui-metric"><view>{{enrollment.attendedLessonCount}}</view>已复核到课</view><view class="ui-metric"><view>{{enrollment.pendingLessonCount}}</view>待复核</view><view class="ui-metric"><view>{{enrollment.recordedLessonCount}}</view>录播</view><view class="ui-metric"><view>{{enrollment.leaveLessonCount}}</view>请假</view></view><view class="muted">供人工核对退款，不自动计算退款或扣课。</view>
+      <view wx:for="{{history}}" wx:key="key" class="history"><view>{{item.date}} · {{item.signText}} · {{item.reviewText}}</view><view wx:if="{{item.remark}}" class="muted">{{item.remark}}</view></view>
+      <view wx:if="{{!history.length}}" class="muted">暂无课次签到记录</view>
+    </view>
+    <button type="warn" disabled="{{enrollment.classDate || enrollment.cancelled || cancelling || loading}}" loading="{{cancelling}}" bindtap="cancel">{{enrollment.classDate ? '单次报名由老师处理' : enrollment.cancelled ? '报名已取消' : '取消报名'}}</button>
+    <view class="empty">取消后保留历史，退款需另行处理</view>
+  </block>
+</view>

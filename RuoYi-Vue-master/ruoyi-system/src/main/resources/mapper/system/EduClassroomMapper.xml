@@ -9,8 +9,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="classroomCode"    column="classroom_code"    />
         <result property="campusName"    column="campus_name"    />
         <result property="classroomName"    column="classroom_name"    />
-        <result property="classroomSize"    column="classroom_size"    />
-        <result property="capacity"    column="capacity"    />
+        <result property="sheetCode"    column="sheet_code"    />
         <result property="status"    column="status"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -20,7 +19,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectEduClassroomVo">
-        select classroom_id, classroom_code, campus_name, classroom_name, classroom_size, capacity, status, create_by, create_time, update_by, update_time, remark from edu_classroom
+        select classroom_id, classroom_code, campus_name, classroom_name, sheet_code, status, create_by, create_time, update_by, update_time, remark from edu_classroom
     </sql>
 
     <select id="selectEduClassroomList" parameterType="EduClassroom" resultMap="EduClassroomResult">
@@ -29,15 +28,24 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="classroomCode != null  and classroomCode != ''"> and classroom_code = #{classroomCode}</if>
             <if test="campusName != null  and campusName != ''"> and campus_name like concat('%', #{campusName}, '%')</if>
             <if test="classroomName != null  and classroomName != ''"> and classroom_name like concat('%', #{classroomName}, '%')</if>
-            <if test="classroomSize != null  and classroomSize != ''"> and classroom_size = #{classroomSize}</if>
-            <if test="capacity != null "> and capacity = #{capacity}</if>
+            <if test="sheetCode != null  and sheetCode != ''"> and sheet_code = #{sheetCode}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
         </where>
+        order by campus_name, classroom_id
     </select>
     
     <select id="selectEduClassroomByClassroomId" parameterType="Long" resultMap="EduClassroomResult">
         <include refid="selectEduClassroomVo"/>
         where classroom_id = #{classroomId}
+    </select>
+
+    <!-- 校区分类统计：教室管理页顶部的「全部 / 万达校区 / 百家湖校区」分类用，不受分页影响 -->
+    <select id="selectCampusStats" resultType="java.util.LinkedHashMap">
+        select campus_name as campusName, count(*) as roomCount
+        from edu_classroom
+        where campus_name is not null and campus_name &lt;&gt; ''
+        group by campus_name
+        order by campus_name
     </select>
 
     <insert id="insertEduClassroom" parameterType="EduClassroom" useGeneratedKeys="true" keyProperty="classroomId">
@@ -46,8 +54,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="classroomCode != null and classroomCode != ''">classroom_code,</if>
             <if test="campusName != null and campusName != ''">campus_name,</if>
             <if test="classroomName != null and classroomName != ''">classroom_name,</if>
-            <if test="classroomSize != null">classroom_size,</if>
-            <if test="capacity != null">capacity,</if>
+            <if test="sheetCode != null">sheet_code,</if>
             <if test="status != null">status,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -59,8 +66,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="classroomCode != null and classroomCode != ''">#{classroomCode},</if>
             <if test="campusName != null and campusName != ''">#{campusName},</if>
             <if test="classroomName != null and classroomName != ''">#{classroomName},</if>
-            <if test="classroomSize != null">#{classroomSize},</if>
-            <if test="capacity != null">#{capacity},</if>
+            <if test="sheetCode != null">#{sheetCode},</if>
             <if test="status != null">#{status},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -76,8 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="classroomCode != null and classroomCode != ''">classroom_code = #{classroomCode},</if>
             <if test="campusName != null and campusName != ''">campus_name = #{campusName},</if>
             <if test="classroomName != null and classroomName != ''">classroom_name = #{classroomName},</if>
-            <if test="classroomSize != null">classroom_size = #{classroomSize},</if>
-            <if test="capacity != null">capacity = #{capacity},</if>
+            <if test="sheetCode != null">sheet_code = #{sheetCode},</if>
             <if test="status != null">status = #{status},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>

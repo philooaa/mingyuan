@@ -1,10 +1,7 @@
 const { request } = require('./request')
 const ordersUrl = '/miniapp/parent/material/orders'
 const addressUrl = '/miniapp/parent/addresses'
-function imageUrl(value) {
-  if (!value) return ''
-  return /^https?:\/\//i.test(value) ? value : `${getApp().globalData.baseUrl}/${String(value).replace(/^\/+/, '')}`
-}
+const imageUrl = require('./public-file-url')
 function cents(value) {
   if (!/^\d+(\.\d{1,2})?$/.test(String(value))) throw new Error('金额格式不正确')
   const [whole, fraction = ''] = String(value).split('.')

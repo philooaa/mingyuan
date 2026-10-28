@@ -1,0 +1,5 @@
+@import "../admin-enrollment/admin-enrollment.wxss";
+
+/* 教育业务页面：紧凑布局与信息层级 */
+
+.card > .row:first-child { margin-top:0; padding-top:0; border-top:0; }

@@ -1,0 +1,62 @@
+<view class="page">
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索姓名/昵称/学科" value="{{keyword}}" confirm-type="search" bindinput="onKeyword"/>
+  </view>
+
+  <view wx:if="{{loading}}" class="tip">加载中…</view>
+  <view wx:elif="{{showEmpty}}" class="tip">暂无教师数据</view>
+
+  <view wx:else class="list">
+    <view class="row" wx:for="{{list}}" wx:key="teacherId" data-id="{{item.teacherId}}" bindtap="openDetail">
+      <view class="row-main">
+        <view class="row-name">{{item.teacherName}}</view>
+        <view class="row-sub" wx:if="{{item.showNick}}">昵称：{{item.nickName}}</view>
+        <view class="row-sub">任教科目：{{item.subjectText}}</view>
+        <view class="row-sub">带课 {{item.lessonCount}} 节　基本工资：{{item.baseSalary != null ? item.baseSalary : '未设置'}}</view>
+      </view>
+      <view class="row-tags">
+        <text class="badge {{item.hasConfig ? 'ok' : 'warn'}}">{{item.hasConfig ? '已设标准' : '未设标准'}}</text>
+        <text class="edit-link" catchtap="openEdit" data-id="{{item.teacherId}}">编辑标准</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 详情弹层 -->
+  <view wx:if="{{detail}}" class="mask" bindtap="closeDetail">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">{{detail.teacherName}}</text>
+        <text class="sheet-close" bindtap="closeDetail">关闭</text>
+      </view>
+      <view class="info"><text class="info-k">姓名</text><text class="info-v">{{detail.teacherName}}</text></view>
+      <view class="info" wx:if="{{detail.showNick}}"><text class="info-k">昵称</text><text class="info-v">{{detail.nickName}}</text></view>
+      <view class="info"><text class="info-k">登录账号</text><text class="info-v">{{detail.userName || (detailLoading ? '加载中…' : '—')}}</text></view>
+      <view class="info"><text class="info-k">手机号</text><text class="info-v">{{detail.phonenumber || (detailLoading ? '加载中…' : '—')}}</text></view>
+      <view class="info"><text class="info-k">角色</text><text class="info-v">{{detail.roles || (detailLoading ? '加载中…' : '—')}}</text></view>
+      <view class="info"><text class="info-k">账号状态</text><text class="info-v">{{detail.status || (detailLoading ? '加载中…' : '—')}}</text></view>
+      <view class="info"><text class="info-k">任教科目</text><text class="info-v">{{detail.subjectText}}</text></view>
+      <view class="info"><text class="info-k">带课节数</text><text class="info-v">{{detail.lessonCount}} 节</text></view>
+      <view class="info"><text class="info-k">基本工资</text><text class="info-v">{{detail.baseSalary != null ? detail.baseSalary : '未设置'}}</text></view>
+      <button class="btn-primary" data-id="{{detail.teacherId}}" bindtap="openEdit">编辑薪资标准</button>
+    </view>
+  </view>
+
+  <!-- 薪资标准编辑弹层 -->
+  <view wx:if="{{editVisible}}" class="mask" bindtap="closeEdit">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">薪资标准 · {{editForm.teacherName}}</text>
+        <text class="sheet-close" bindtap="closeEdit">取消</text>
+      </view>
+      <view class="form-item"><text class="form-label">基本工资</text><input class="form-input" type="digit" data-field="baseSalary" value="{{editForm.baseSalary}}" placeholder="元/月"/></view>
+      <view class="form-item"><text class="form-label">小学班课(元/节)</text><input class="form-input" type="digit" data-field="ratePrimaryClass" value="{{editForm.ratePrimaryClass}}" placeholder="0"/></view>
+      <view class="form-item"><text class="form-label">初中班课(元/节)</text><input class="form-input" type="digit" data-field="rateJhClass" value="{{editForm.rateJhClass}}" placeholder="0"/></view>
+      <view class="form-item"><text class="form-label">小学一对一(元/节)</text><input class="form-input" type="digit" data-field="ratePrimary1on1" value="{{editForm.ratePrimary1on1}}" placeholder="0"/></view>
+      <view class="form-item"><text class="form-label">初中一对一(元/节)</text><input class="form-input" type="digit" data-field="rateJunior1on1" value="{{editForm.rateJunior1on1}}" placeholder="0"/></view>
+      <view class="form-item"><text class="form-label">高中一对一(元/节)</text><input class="form-input" type="digit" data-field="rateSenior1on1" value="{{editForm.rateSenior1on1}}" placeholder="0"/></view>
+      <view class="form-item"><text class="form-label">每节课时数</text><input class="form-input" type="digit" data-field="classHoursPerSession" value="{{editForm.classHoursPerSession}}" placeholder="如 2"/></view>
+      <view class="form-item"><text class="form-label">备注</text><input class="form-input" data-field="remark" value="{{editForm.remark}}" placeholder="选填"/></view>
+      <button class="btn-primary" bindtap="saveEdit">保存</button>
+    </view>
+  </view>
+</view>

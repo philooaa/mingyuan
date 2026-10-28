@@ -9,7 +9,7 @@ import com.ruoyi.common.core.domain.BaseEntity;
 
 /**
  * 课程报名对象 edu_enrollment
- * 
+ *
  * @author ruoyi
  * @date 2026-08-05
  */
@@ -19,6 +19,18 @@ public class EduEnrollment extends BaseEntity
 
     /** 报名ID */
     private Long enrollmentId;
+    private Long lessonAccountId;
+    private String studentRequestKey;
+    public Long getLessonAccountId() { return lessonAccountId; }
+    public void setLessonAccountId(Long value) { lessonAccountId=value; }
+    public String getStudentRequestKey() { return studentRequestKey; }
+    public void setStudentRequestKey(String value) { studentRequestKey=value; }
+    private java.time.LocalDate classDate;
+    private String cancelRequestStatus;
+    public java.time.LocalDate getClassDate() { return classDate; }
+    public void setClassDate(java.time.LocalDate value) { classDate = value; }
+    public String getCancelRequestStatus() { return cancelRequestStatus; }
+    public void setCancelRequestStatus(String value) { cancelRequestStatus = value; }
 
     /** 报名编码 */
     @Excel(name = "报名编码")
@@ -68,6 +80,14 @@ public class EduEnrollment extends BaseEntity
     /** 删除标志（0代表存在 2代表删除） */
     private String delFlag;
 
+    /** 关联课程及家长联系电话，非新增表字段。 */
+    private String courseClassName;
+    private String parentPhone;
+    public String getCourseClassName() { return courseClassName; }
+    public void setCourseClassName(String value) { this.courseClassName = value; }
+    public String getParentPhone() { return parentPhone; }
+    public void setParentPhone(String value) { this.parentPhone = value; }
+
     /** 排课-年级（关联查询，非表字段） */
     private String gradeName;
 
@@ -83,132 +103,154 @@ public class EduEnrollment extends BaseEntity
     /** 排课-招生状态（关联查询，非表字段：0招生中 1停招 2满班） */
     private String recruitStatus;
 
-    public void setEnrollmentId(Long enrollmentId) 
+    /** 按课次签到统计，非报名表字段；取消后仍保留。 */
+    @Excel(name = "已复核到课次数")
+    private Long attendedLessonCount;
+
+    @Excel(name = "待复核到课次数")
+    private Long pendingLessonCount;
+
+    @Excel(name = "录播次数")
+    private Long recordedLessonCount;
+
+    @Excel(name = "请假次数")
+    private Long leaveLessonCount;
+
+    public Long getAttendedLessonCount() { return attendedLessonCount; }
+    public void setAttendedLessonCount(Long count) { this.attendedLessonCount = count; }
+    public Long getPendingLessonCount() { return pendingLessonCount; }
+    public void setPendingLessonCount(Long count) { this.pendingLessonCount = count; }
+    public Long getRecordedLessonCount() { return recordedLessonCount; }
+    public void setRecordedLessonCount(Long count) { this.recordedLessonCount = count; }
+    public Long getLeaveLessonCount() { return leaveLessonCount; }
+    public void setLeaveLessonCount(Long count) { this.leaveLessonCount = count; }
+
+    public void setEnrollmentId(Long enrollmentId)
     {
         this.enrollmentId = enrollmentId;
     }
 
-    public Long getEnrollmentId() 
+    public Long getEnrollmentId()
     {
         return enrollmentId;
     }
 
-    public void setEnrollmentCode(String enrollmentCode) 
+    public void setEnrollmentCode(String enrollmentCode)
     {
         this.enrollmentCode = enrollmentCode;
     }
 
-    public String getEnrollmentCode() 
+    public String getEnrollmentCode()
     {
         return enrollmentCode;
     }
 
-    public void setScheduleId(Long scheduleId) 
+    public void setScheduleId(Long scheduleId)
     {
         this.scheduleId = scheduleId;
     }
 
-    public Long getScheduleId() 
+    public Long getScheduleId()
     {
         return scheduleId;
     }
 
-    public void setParentId(Long parentId) 
+    public void setParentId(Long parentId)
     {
         this.parentId = parentId;
     }
 
-    public Long getParentId() 
+    public Long getParentId()
     {
         return parentId;
     }
 
-    public void setStudentName(String studentName) 
+    public void setStudentName(String studentName)
     {
         this.studentName = studentName;
     }
 
-    public String getStudentName() 
+    public String getStudentName()
     {
         return studentName;
     }
 
-    public void setStudentPhone(String studentPhone) 
+    public void setStudentPhone(String studentPhone)
     {
         this.studentPhone = studentPhone;
     }
 
-    public String getStudentPhone() 
+    public String getStudentPhone()
     {
         return studentPhone;
     }
 
-    public void setContactPhone(String contactPhone) 
+    public void setContactPhone(String contactPhone)
     {
         this.contactPhone = contactPhone;
     }
 
-    public String getContactPhone() 
+    public String getContactPhone()
     {
         return contactPhone;
     }
 
-    public void setEnrollmentStatus(String enrollmentStatus) 
+    public void setEnrollmentStatus(String enrollmentStatus)
     {
         this.enrollmentStatus = enrollmentStatus;
     }
 
-    public String getEnrollmentStatus() 
+    public String getEnrollmentStatus()
     {
         return enrollmentStatus;
     }
 
-    public void setPayStatus(String payStatus) 
+    public void setPayStatus(String payStatus)
     {
         this.payStatus = payStatus;
     }
 
-    public String getPayStatus() 
+    public String getPayStatus()
     {
         return payStatus;
     }
 
-    public void setCancelTime(Date cancelTime) 
+    public void setCancelTime(Date cancelTime)
     {
         this.cancelTime = cancelTime;
     }
 
-    public Date getCancelTime() 
+    public Date getCancelTime()
     {
         return cancelTime;
     }
 
-    public void setCancelReason(String cancelReason) 
+    public void setCancelReason(String cancelReason)
     {
         this.cancelReason = cancelReason;
     }
 
-    public String getCancelReason() 
+    public String getCancelReason()
     {
         return cancelReason;
     }
 
-    public void setStatus(String status) 
+    public void setStatus(String status)
     {
         this.status = status;
     }
 
-    public String getStatus() 
+    public String getStatus()
     {
         return status;
     }
 
-    public void setDelFlag(String delFlag) 
+    public void setDelFlag(String delFlag)
     {
         this.delFlag = delFlag;
     }
 
-    public String getDelFlag() 
+    public String getDelFlag()
     {
         return delFlag;
     }

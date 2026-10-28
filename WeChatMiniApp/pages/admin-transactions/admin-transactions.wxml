@@ -1,0 +1,2 @@
+<import src="../../templates/personal-account.wxml" />
+<template is="personal-account" data="{{administrator,tab,keyword,loading,submitting,error,parentId,detail,personalAccounts,accounts,records,pageNum,total,pendingCount,pendingBadge,pendingOnly,showForm,formKind,form,parents,parentOptions,parentIndex,grades,gradeIndex,showHistory,history,historyTitle,childOptions,childIndex,showLink,linkEnrollment,linkReason,parentKeyword,account}}" />

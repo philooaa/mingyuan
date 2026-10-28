@@ -92,7 +92,7 @@ Page({
         for (const file of response.tempFiles) {
           if (!/\.(png|jpe?g)$/i.test(file.tempFilePath) || file.size > 5 * 1024 * 1024) throw new Error('请选择5MB以内JPG/PNG图片')
           const result = await shop.upload('/common/upload', { path: file.tempFilePath, size: file.size })
-          const imageUrl = result.url || result.fileName
+          const imageUrl = shop.imageUrl(result.fileName || result.url)
           this._formDirty = true
           if (kind === 'cover') this.setData({ 'form.coverUrl': imageUrl })
           else this.setData({ 'form.images': this.data.form.images.concat({ imageType: kind, imageUrl, sortOrder: this.data.form.images.length }) })

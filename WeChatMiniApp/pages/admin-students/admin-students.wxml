@@ -1,0 +1,53 @@
+<view class="page">
+  <view class="search-bar">
+    <input class="search-input" placeholder="搜索学生姓名/手机/班级/科目/教师" value="{{keyword}}" confirm-type="search" bindinput="onKeyword"/>
+  </view>
+
+  <view class="filter-tabs">
+    <text wx:for="{{statusOptions}}" wx:key="value" class="tab {{filterStatus === item.value ? 'tab-active' : ''}}" data-value="{{item.value}}" bindtap="onStatus">{{item.label}}</text>
+  </view>
+
+  <view class="count-bar">共 {{total}} 名学生</view>
+
+  <view wx:if="{{loading}}" class="tip">加载中…</view>
+  <view wx:elif="{{showEmpty}}" class="tip">暂无学生档案</view>
+
+  <view wx:else class="list">
+    <view class="row" wx:for="{{shown}}" wx:key="key" data-key="{{item.key}}" bindtap="openDetail">
+      <view class="row-head">
+        <text class="row-name">{{item.studentName}}</text>
+        <text class="badge {{item.activeCount > 0 ? 'ok' : 'gray'}}">{{item.statusText}}</text>
+      </view>
+      <view class="row-sub">{{item.studentPhone || '无手机号'}}　共报名 {{item.courseCount}} 门课</view>
+      <view class="row-sub">最近报名：{{item.latestDate || '—'}}</view>
+    </view>
+    <view wx:if="{{hasMore}}" class="more-tip">上拉加载更多…</view>
+    <view wx:else class="more-tip">没有更多了</view>
+  </view>
+
+  <view wx:if="{{detail}}" class="mask" bindtap="closeDetail">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">{{detail.studentName}} · 学生档案</text>
+        <text class="sheet-close" bindtap="closeDetail">关闭</text>
+      </view>
+      <view class="info"><text class="info-k">学生手机</text><text class="info-v">{{detail.studentPhone || '—'}}</text></view>
+      <view class="info"><text class="info-k">联系手机</text><text class="info-v">{{detail.contactPhone || '—'}}</text></view>
+      <view class="info"><text class="info-k">家长手机</text><text class="info-v">{{detail.parentPhone || '—'}}</text></view>
+      <view class="info"><text class="info-k">报名课程</text><text class="info-v">{{detail.courseCount}} 门（在读 {{detail.activeCount}} 门）</text></view>
+
+      <view class="section-title">报名课程</view>
+      <view class="course" wx:for="{{detail.courses}}" wx:key="enrollmentId" wx:for-item="c">
+        <view class="course-head">
+          <text class="course-name">{{c.courseClassName}}</text>
+          <text class="badge {{c.active ? 'ok' : 'gray'}}">{{c.enrollmentStatus}}</text>
+        </view>
+        <view class="course-sub">{{c.gradeName}} · {{c.subjectName}} · {{c.classType}}</view>
+        <view class="course-sub">教师：{{c.teacherName}}　缴费：{{c.payStatus}}</view>
+        <view class="course-sub">报名：{{c.createTime}}　编号：{{c.enrollmentCode}}</view>
+        <view class="course-sub" wx:if="{{c.remark}}">备注：{{c.remark}}</view>
+      </view>
+      <view wx:if="{{!detail.courses.length}}" class="tip">暂无报名课程</view>
+    </view>
+  </view>
+</view>

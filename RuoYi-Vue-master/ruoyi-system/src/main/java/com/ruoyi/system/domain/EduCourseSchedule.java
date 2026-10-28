@@ -1,6 +1,8 @@
 package com.ruoyi.system.domain;
 
 import java.util.Date;
+import java.time.LocalTime;
+import org.springframework.format.annotation.DateTimeFormat;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -28,12 +30,16 @@ public class EduCourseSchedule extends BaseEntity
     @Excel(name = "教室ID")
     private Long classroomId;
 
+    private String lessonLocation;
+    public String getLessonLocation() { return lessonLocation; }
+    public void setLessonLocation(String value) { lessonLocation = value; }
+
     /** 课程年份 */
     @Excel(name = "课程年份")
     private Long courseYear;
 
-    /** 学期（暑假/秋季） */
-    @Excel(name = "学期", readConverterExp = "暑=假/秋季")
+    /** 学期（暑假/秋季/寒假/春季） */
+    @Excel(name = "学期")
     private String termName;
 
     /** 期次或上课日 */
@@ -45,14 +51,16 @@ public class EduCourseSchedule extends BaseEntity
     private String timeSlot;
 
     /** 开始时间 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "开始时间", width = 30, dateFormat = "yyyy-MM-dd")
-    private Date startTime;
+    @JsonFormat(pattern = "HH:mm:ss")
+    @DateTimeFormat(pattern = "HH:mm:ss")
+    @Excel(name = "开始时间", width = 30)
+    private LocalTime startTime;
 
     /** 结束时间 */
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    @Excel(name = "结束时间", width = 30, dateFormat = "yyyy-MM-dd")
-    private Date endTime;
+    @JsonFormat(pattern = "HH:mm:ss")
+    @DateTimeFormat(pattern = "HH:mm:ss")
+    @Excel(name = "结束时间", width = 30)
+    private LocalTime endTime;
 
     /** 开课日期（本期第一次上课日） */
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -76,6 +84,12 @@ public class EduCourseSchedule extends BaseEntity
     @Excel(name = "科目")
     private String subjectName;
 
+    /** 教师用户ID，归属以ID为准，不按姓名推断 */
+    private Long teacherId;
+
+    public Long getTeacherId() { return teacherId; }
+    public void setTeacherId(Long teacherId) { this.teacherId = teacherId; }
+
     /** 教师姓名 */
     @Excel(name = "教师姓名")
     private String teacherName;
@@ -91,6 +105,14 @@ public class EduCourseSchedule extends BaseEntity
     /** 已报名人数 */
     @Excel(name = "已报名人数")
     private Long enrolledCount;
+
+    /** 报名上限（NULL 或 0 表示不限） */
+    @Excel(name = "报名上限")
+    private Integer enrollLimit;
+
+    /** 课时单价（元/人·次） */
+    @Excel(name = "课时单价(元)")
+    private java.math.BigDecimal unitPrice;
 
     /** 招生状态（0可报名 1停招 2满班） */
     @Excel(name = "招生状态", readConverterExp = "0=可报名,1=停招,2=满班")
@@ -189,22 +211,22 @@ public class EduCourseSchedule extends BaseEntity
         return timeSlot;
     }
 
-    public void setStartTime(Date startTime) 
+    public void setStartTime(LocalTime startTime)
     {
         this.startTime = startTime;
     }
 
-    public Date getStartTime() 
+    public LocalTime getStartTime()
     {
         return startTime;
     }
 
-    public void setEndTime(Date endTime) 
+    public void setEndTime(LocalTime endTime)
     {
         this.endTime = endTime;
     }
 
-    public Date getEndTime() 
+    public LocalTime getEndTime()
     {
         return endTime;
     }
@@ -299,6 +321,26 @@ public class EduCourseSchedule extends BaseEntity
         return enrolledCount;
     }
 
+    public void setEnrollLimit(Integer enrollLimit)
+    {
+        this.enrollLimit = enrollLimit;
+    }
+
+    public Integer getEnrollLimit()
+    {
+        return enrollLimit;
+    }
+
+    public void setUnitPrice(java.math.BigDecimal unitPrice)
+    {
+        this.unitPrice = unitPrice;
+    }
+
+    public java.math.BigDecimal getUnitPrice()
+    {
+        return unitPrice;
+    }
+
     public void setRecruitStatus(String recruitStatus) 
     {
         this.recruitStatus = recruitStatus;
@@ -389,6 +431,7 @@ public class EduCourseSchedule extends BaseEntity
             .append("teacherName", getTeacherName())
             .append("classType", getClassType())
             .append("enrolledCount", getEnrolledCount())
+            .append("enrollLimit", getEnrollLimit())
             .append("recruitStatus", getRecruitStatus())
             .append("courseClassName", getCourseClassName())
             .append("sourceSheet", getSourceSheet())

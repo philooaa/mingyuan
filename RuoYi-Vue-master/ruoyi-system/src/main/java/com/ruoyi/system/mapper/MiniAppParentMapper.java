@@ -27,14 +27,14 @@ public interface MiniAppParentMapper
     public int countScheduleAvailable(@Param("scheduleId") Long scheduleId);
 
     public int countActiveEnrollment(@Param("scheduleId") Long scheduleId, @Param("parentId") Long parentId,
-            @Param("studentName") String studentName);
+            @Param("studentName") String studentName, @Param("lessonAccountId") Long lessonAccountId);
 
     public int increaseScheduleEnrollment(@Param("scheduleId") Long scheduleId);
 
     public int insertParentEnrollment(@Param("enrollmentCode") String enrollmentCode,
             @Param("scheduleId") Long scheduleId, @Param("parentId") Long parentId,
             @Param("studentName") String studentName, @Param("studentPhone") String studentPhone,
-            @Param("contactPhone") String contactPhone, @Param("createBy") String createBy);
+            @Param("contactPhone") String contactPhone, @Param("createBy") String createBy, @Param("lessonAccountId") Long lessonAccountId);
 
     public Long selectEnrollmentIdByCode(@Param("enrollmentCode") String enrollmentCode);
 

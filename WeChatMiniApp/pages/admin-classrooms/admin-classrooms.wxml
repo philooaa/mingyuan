@@ -1,0 +1,45 @@
+<view class="page">
+  <view class="top-bar">
+    <text class="count-text">共 {{total}} 间教室</text>
+    <button class="add-btn" size="mini" bindtap="openAdd">＋ 新增教室</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="tip">加载中…</view>
+
+  <view wx:else class="groups">
+    <view class="group" wx:for="{{groups}}" wx:key="campus" wx:for-item="g">
+      <view class="group-head">
+        <text class="group-title">{{g.campus}}校区</text>
+        <text class="group-count">{{g.realCount}} 间</text>
+      </view>
+      <view class="room" wx:for="{{g.rooms}}" wx:key="classroomId" wx:for-item="r">
+        <view class="room-main">
+          <view class="room-name">{{r.classroomName}}</view>
+          <view class="room-sub">{{r.classroomCode}}　带课 {{r.used}} 节</view>
+        </view>
+        <view class="room-ops">
+          <text class="op" data-id="{{r.classroomId}}" bindtap="openEdit">编辑</text>
+          <text class="op del {{r.used > 0 ? 'disabled' : ''}}" data-id="{{r.classroomId}}" data-name="{{r.classroomName}}" data-used="{{r.used}}" bindtap="remove">删除</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{editVisible}}" class="mask" bindtap="closeEdit">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">{{editForm.classroomId ? '编辑教室' : '新增教室'}}</text>
+        <text class="sheet-close" bindtap="closeEdit">取消</text>
+      </view>
+      <view class="form-item"><text class="form-label">教室名称</text><input class="form-input" data-field="classroomName" value="{{editForm.classroomName}}" placeholder="如 万达24-7"/></view>
+      <view class="form-item"><text class="form-label">教室编号</text><input class="form-input" data-field="classroomCode" value="{{editForm.classroomCode}}" placeholder="如 ROOM024"/></view>
+      <view class="form-item">
+        <text class="form-label">所属校区</text>
+        <picker class="form-picker" range="{{campusOptions}}" value="{{editForm.campusIndex}}" bindchange="onCampus">
+          <view class="picker-val">{{campusOptions[editForm.campusIndex]}}</view>
+        </picker>
+      </view>
+      <button class="btn-primary" bindtap="save">保存</button>
+    </view>
+  </view>
+</view>

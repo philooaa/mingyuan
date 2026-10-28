@@ -233,6 +233,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int insertRole(SysRole role)
     {
+        SecurityUtils.requireSuperAdmin();
         // 新增角色信息
         roleMapper.insertRole(role);
         return insertRoleMenu(role);
@@ -248,6 +249,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int updateRole(SysRole role)
     {
+        SecurityUtils.requireSuperAdmin();
         // 修改角色信息
         roleMapper.updateRole(role);
         // 删除角色与菜单关联
@@ -264,6 +266,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Override
     public int updateRoleStatus(SysRole role)
     {
+        SecurityUtils.requireSuperAdmin();
         return roleMapper.updateRole(role);
     }
 
@@ -277,6 +280,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int authDataScope(SysRole role)
     {
+        SecurityUtils.requireSuperAdmin();
         // 修改角色信息
         roleMapper.updateRole(role);
         // 删除角色与部门关联
@@ -292,6 +296,7 @@ public class SysRoleServiceImpl implements ISysRoleService
      */
     public int insertRoleMenu(SysRole role)
     {
+        SecurityUtils.requireSuperAdmin();
         int rows = 1;
         // 新增用户与角色管理
         List<SysRoleMenu> list = new ArrayList<SysRoleMenu>();
@@ -316,6 +321,7 @@ public class SysRoleServiceImpl implements ISysRoleService
      */
     public int insertRoleDept(SysRole role)
     {
+        SecurityUtils.requireSuperAdmin();
         int rows = 1;
         // 新增角色与部门（数据权限）管理
         List<SysRoleDept> list = new ArrayList<SysRoleDept>();
@@ -343,6 +349,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int deleteRoleById(Long roleId)
     {
+        SecurityUtils.requireSuperAdmin();
         // 删除角色与菜单关联
         roleMenuMapper.deleteRoleMenuByRoleId(roleId);
         // 删除角色与部门关联
@@ -360,6 +367,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Transactional
     public int deleteRoleByIds(Long[] roleIds)
     {
+        SecurityUtils.requireSuperAdmin();
         for (Long roleId : roleIds)
         {
             checkRoleAllowed(new SysRole(roleId));
@@ -386,6 +394,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Override
     public int deleteAuthUser(SysUserRole userRole)
     {
+        SecurityUtils.requireSuperAdmin();
         return userRoleMapper.deleteUserRoleInfo(userRole);
     }
 
@@ -399,6 +408,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Override
     public int deleteAuthUsers(Long roleId, Long[] userIds)
     {
+        SecurityUtils.requireSuperAdmin();
         return userRoleMapper.deleteUserRoleInfos(roleId, userIds);
     }
 
@@ -412,6 +422,7 @@ public class SysRoleServiceImpl implements ISysRoleService
     @Override
     public int insertAuthUsers(Long roleId, Long[] userIds)
     {
+        SecurityUtils.requireSuperAdmin();
         // 新增用户与角色管理
         List<SysUserRole> list = new ArrayList<SysUserRole>();
         for (Long userId : userIds)

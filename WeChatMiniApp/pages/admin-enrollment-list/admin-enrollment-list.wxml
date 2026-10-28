@@ -1,0 +1,13 @@
+<view class="page">
+  <view class="empty" wx:if="{{scheduleError}}">班次资料加载失败：{{scheduleError}}（仍可查询名单）</view>
+  <view class="card" wx:if="{{schedule}}"><view class="title">{{schedule.course}}</view><view>{{schedule.teacherName}} · {{schedule.time}}</view>
+    <view class="muted">{{schedule.courseYear}} {{schedule.termName}} · {{schedule.room}}</view><view>已报名 {{schedule.enrolledCount}} 人</view></view>
+  <view class="card"><view class="title">{{scheduleId ? '班次报名名单' : '全局报名搜索'}}</view><view class="search"><input value="{{keyword}}" placeholder="学生姓名 / 家长手机号" bindinput="input" bindconfirm="search"/><button size="mini" bindtap="search">搜索</button></view><view class="muted">共 {{total}} 条，包含已取消报名</view></view>
+  <view wx:for="{{list}}" wx:key="enrollmentId" class="card" bindtap="open" data-id="{{item.enrollmentId}}">
+    <view class="row"><text class="title">{{item.studentName}}</text><text class="ui-pill ui-pill-muted">{{item.enrollmentText}} ›</text></view>
+    <view>{{item.payText}} · 已复核到课 {{item.attendedLessonCount}} 次</view>
+    <view class="muted" wx:if="{{!scheduleId}}">{{item.gradeName}} {{item.subjectName}} · {{item.teacherName}} · 班次 {{item.scheduleId}}</view>
+  </view>
+  <view class="empty" wx:if="{{error}}">{{error}}</view><view class="empty" wx:elif="{{!loading && !list.length}}">没有找到报名记录</view>
+  <view class="empty">{{loading ? '加载中…' : (total > list.length ? '上滑加载更多' : '已显示全部记录')}}</view>
+</view>

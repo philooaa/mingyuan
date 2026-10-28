@@ -96,6 +96,13 @@ public class SysUser extends BaseEntity
     /** 角色ID */
     private Long roleId;
 
+    /** 用户列表展示的全部角色名称，不对应用户表字段。 */
+    private String roleNames;
+
+    public String getRoleNames() { return roleNames; }
+
+    public void setRoleNames(String roleNames) { this.roleNames = roleNames; }
+
     public SysUser()
     {
 

@@ -24,6 +24,10 @@ BEGIN
  END IF;
 END$$
 DELIMITER ;
+-- Unified child/date identity. Existing course and dated one-to-one records remain distinct.
+CALL tuition_column('edu_enrollment','lesson_account_id','bigint','NULL',TRUE);
+CALL tuition_column('edu_enrollment','student_id','bigint','NULL',TRUE);
+CALL tuition_column('edu_enrollment','class_date','date','NULL',TRUE);
 CALL tuition_column('edu_course_schedule','tuition_price','decimal(10,2)','NULL DEFAULT NULL',TRUE);
 -- Adding with HISTORY_PENDING marks old rows atomically; interrupted installs cannot
 -- lose the old/new distinction. Change the default only after every safety check.
@@ -43,6 +47,7 @@ CALL tuition_column('edu_enrollment','billing_close_reason','varchar(255)','NULL
 CALL tuition_column('edu_enrollment','history_verification_snapshot','json','NULL',TRUE);
 -- UTF8 literals are 待确认 / 报名成功; hex avoids MySQL metadata charset drift.
 CALL tuition_column('edu_enrollment','active_enrollment_guard','tinyint','GENERATED ALWAYS AS (CASE WHEN del_flag=''0'' AND enrollment_status IN (''0'',''1'',CONVERT(0xe5be85e7a1aee8aea4 USING utf8mb4),CONVERT(0xe68aa5e5908de68890e58a9f USING utf8mb4)) THEN 1 END) STORED',TRUE);
+CALL tuition_column('edu_enrollment','tuition_identity_guard','varchar(100)','GENERATED ALWAYS AS (CONCAT(IF(lesson_account_id IS NULL,CONCAT(''LEGACY:'',student_name),CONCAT(''CHILD:'',lesson_account_id)),'':'',IFNULL(CAST(class_date AS CHAR CHARSET utf8mb4),''CLASS''))) STORED',TRUE);
 CREATE TABLE IF NOT EXISTS edu_tuition_payment (
 payment_id bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
 create_by varchar(64) NOT NULL DEFAULT 'SYSTEM', update_by varchar(64) NOT NULL DEFAULT 'SYSTEM', version int NOT NULL DEFAULT 0, remark varchar(500) NULL,
@@ -234,14 +239,15 @@ DELIMITER $$
 DROP PROCEDURE IF EXISTS tuition_active_index$$
 CREATE PROCEDURE tuition_active_index()
 BEGIN
- IF EXISTS(SELECT 1 FROM edu_enrollment WHERE active_enrollment_guard=1 GROUP BY schedule_id,parent_id,student_name HAVING COUNT(*)>1) THEN
+ IF EXISTS(SELECT 1 FROM edu_enrollment WHERE active_enrollment_guard=1 GROUP BY schedule_id,parent_id,tuition_identity_guard HAVING COUNT(*)>1) THEN
    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Duplicate active enrollments require review';
  END IF;
- IF EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='edu_enrollment' AND index_name='uk_edu_enrollment_once' AND seq_in_index=4) THEN
-   IF (SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='edu_enrollment' AND index_name='uk_edu_enrollment_once')<>'schedule_id,parent_id,student_name,active_enrollment_guard' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Tuition enrollment unique index conflict'; END IF;
- ELSE
+ IF EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='edu_enrollment' AND index_name='uk_edu_enrollment_once') THEN
+   IF (SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='edu_enrollment' AND index_name='uk_edu_enrollment_once') NOT IN ('schedule_id,parent_id,student_name','schedule_id,parent_id,student_name,active_enrollment_guard','schedule_id,parent_id,tuition_identity_guard,active_enrollment_guard') THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Tuition enrollment unique index conflict'; END IF;
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='edu_enrollment' AND index_name='uk_edu_enrollment_once' AND column_name='tuition_identity_guard') THEN
    IF EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='edu_enrollment' AND index_name='uk_edu_enrollment_once') THEN ALTER TABLE edu_enrollment DROP INDEX uk_edu_enrollment_once; END IF;
-   ALTER TABLE edu_enrollment ADD UNIQUE KEY uk_edu_enrollment_once(schedule_id,parent_id,student_name,active_enrollment_guard);
+   ALTER TABLE edu_enrollment ADD UNIQUE KEY uk_edu_enrollment_once(schedule_id,parent_id,tuition_identity_guard,active_enrollment_guard);
  END IF;
 END$$
 CALL tuition_active_index()$$
@@ -482,7 +488,8 @@ CALL tuition_verify_nullable('edu_user_coupon','version','NO');
 CALL tuition_verify_nullable('edu_user_coupon','remark','YES');
 CALL tuition_verify_index('edu_user_coupon','PRIMARY','user_coupon_id',TRUE);
 CALL tuition_verify_generated('edu_enrollment','active_enrollment_guard','CASE WHEN del_flag=''0'' AND enrollment_status IN (''0'',''1'',CONVERT(0xe5be85e7a1aee8aea4 USING utf8mb4),CONVERT(0xe68aa5e5908de68890e58a9f USING utf8mb4)) THEN 1 END');
-CALL tuition_verify_index('edu_enrollment','uk_edu_enrollment_once','schedule_id,parent_id,student_name,active_enrollment_guard',TRUE);
+CALL tuition_verify_generated('edu_enrollment','tuition_identity_guard','CONCAT(IF(lesson_account_id IS NULL,CONCAT(''LEGACY:'',student_name),CONCAT(''CHILD:'',lesson_account_id)),'':'',IFNULL(CAST(class_date AS CHAR CHARSET utf8mb4),''CLASS''))');
+CALL tuition_verify_index('edu_enrollment','uk_edu_enrollment_once','schedule_id,parent_id,tuition_identity_guard,active_enrollment_guard',TRUE);
 CALL tuition_verify_fk('edu_enrollment','fk_te_coupon','user_coupon_id','edu_user_coupon','user_coupon_id');
 CALL tuition_verify_fk('edu_enrollment','fk_te_pricer','price_confirmed_by','sys_user','user_id');
 DROP PROCEDURE tuition_verify_index;

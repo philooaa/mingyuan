@@ -1,8 +1,8 @@
 {
   "miniprogramRoot": "",
-  "projectname": "\u540d\u8fdc\u6559\u80b2",
-  "description": "\u540d\u8fdc\u6559\u80b2\u5fae\u4fe1\u5c0f\u7a0b\u5e8f",
-  "appid": "wx6ee47a91c24779e2",
+  "projectname": "名远教育",
+  "description": "名远教育微信小程序",
+  "appid": "wxbaf508167aaaaafb",
   "compileType": "miniprogram",
   "libVersion": "3.8.12",
   "packOptions": {
@@ -10,12 +10,12 @@
     "include": []
   },
   "setting": {
-    "urlCheck": false,
+    "urlCheck": true,
     "coverView": true,
-    "es6": false,
+    "es6": true,
     "postcss": true,
     "minified": false,
-    "enhance": false,
+    "enhance": true,
     "showShadowRootInWxmlPanel": true,
     "packNpmRelationList": [],
     "babelSetting": {

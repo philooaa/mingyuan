@@ -43,6 +43,9 @@ public interface IEduEnrollmentService
      */
     public int updateEduEnrollment(EduEnrollment eduEnrollment);
 
+    /** 取消报名，保留报名及已出勤历史，只释放一次名额。 */
+    public int cancelEduEnrollmentByEnrollmentIds(Long[] enrollmentIds);
+
     /**
      * 批量删除课程报名
      * 

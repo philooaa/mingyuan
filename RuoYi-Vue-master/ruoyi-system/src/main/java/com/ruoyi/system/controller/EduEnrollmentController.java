@@ -92,13 +92,27 @@ public class EduEnrollmentController extends BaseController
     }
 
     /**
-     * 删除课程报名
+     * 取消课程报名；保留原删除地址与权限，兼容已有菜单和客户端。
      */
     @PreAuthorize("@ss.hasPermi('system:enrollment:remove')")
-    @Log(title = "课程报名", businessType = BusinessType.DELETE)
+    @Log(title = "取消课程报名", businessType = BusinessType.UPDATE)
 	@DeleteMapping("/{enrollmentIds}")
     public AjaxResult remove(@PathVariable Long[] enrollmentIds)
     {
-        return toAjax(eduEnrollmentService.deleteEduEnrollmentByEnrollmentIds(enrollmentIds));
+        return cancelResult(enrollmentIds);
+    }
+
+    @PreAuthorize("@ss.hasPermi('system:enrollment:remove')")
+    @Log(title = "取消课程报名", businessType = BusinessType.UPDATE)
+    @PutMapping("/{enrollmentIds}/cancel")
+    public AjaxResult cancel(@PathVariable Long[] enrollmentIds)
+    {
+        return cancelResult(enrollmentIds);
+    }
+
+    private AjaxResult cancelResult(Long[] enrollmentIds)
+    {
+        int count = eduEnrollmentService.cancelEduEnrollmentByEnrollmentIds(enrollmentIds);
+        return AjaxResult.success(count == 0 ? "所选报名已取消" : "取消报名成功", count);
     }
 }

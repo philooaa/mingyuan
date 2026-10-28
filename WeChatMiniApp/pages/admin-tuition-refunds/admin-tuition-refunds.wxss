@@ -1,0 +1,5 @@
+@import '../../utils/tuition.wxss';
+.review-form { margin-top: 26rpx; }
+.review-note { width: 100%; min-height: 160rpx; box-sizing: border-box; margin: 18rpx 0; padding: 20rpx; background: #f5f8fc; border-radius: 14rpx; font-size: 27rpx; }
+.detail-field { padding: 18rpx 0; border-bottom: 1rpx solid #edf1f7; line-height: 1.7; word-break: break-all; }
+.detail-label { color: #77869b; font-size: 24rpx; }

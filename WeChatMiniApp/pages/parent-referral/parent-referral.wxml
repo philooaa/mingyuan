@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="heading">邀请好友</view>
+  <view class="card">
+    <view class="title">我的专属推荐码</view>
+    <block wx:if="{{home.eligible}}"><view class="code">{{home.referralCode}}</view><button class="primary" bindtap="copyCode">复制推荐码</button></block>
+    <view class="muted" wx:else>正常家长账号在后台确认首笔课程收款后，可取得专属推荐码。</view>
+  </view>
+  <view class="card">
+    <view class="title">我的推荐人</view>
+    <block wx:if="{{home.binding}}"><view>{{home.binding.referrerName}}</view><view class="muted">{{home.binding.lockedAt ? '收款后关系已锁定' : '已绑定；如有错误请在首次收款前联系管理员'}}</view></block>
+    <block wx:elif="{{home.canBind}}"><view class="muted" wx:if="{{home.bindDeadline}}">补绑截止：{{home.deadlineText}} · 剩余{{home.remainingText}}</view><input maxlength="16" value="{{code}}" placeholder="填写好友的16位推荐码" bindinput="inputCode" disabled="{{busy}}"/><button class="primary" bindtap="bind" disabled="{{busy || loading}}" loading="{{busy}}">确认推荐人并绑定</button></block>
+    <view class="muted" wx:else>{{home.historicalCustomer ? '历史已缴费家长不能补绑新人关系' : '未绑定；首次确认收款7天后不能自助补绑'}}</view>
+  </view>
+  <view class="tabs"><view class="{{kind==='bindings'?'active':''}}" data-kind="bindings" bindtap="tab">推荐关系</view><view class="{{kind==='rewards'?'active':''}}" data-kind="rewards" bindtap="tab">我的奖励</view></view>
+  <view class="error" wx:if="{{error}}">{{error}}<button bindtap="load">重新加载</button></view>
+  <view class="card" wx:for="{{rows}}" wx:key="rowId"><view class="row"><text>关系 #{{item.bindingId}}<text wx:if="{{item.rewardId}}"> · 奖励 #{{item.rewardId}}</text></text><text class="pill">{{item.label}}</text></view><view class="muted">新家长：{{item.inviteeName}} · 推荐人：{{item.referrerName}}</view><view wx:if="{{item.couponName}}">{{item.couponName}} · ¥{{item.discountAmount}} · {{item.couponLabel}}</view><view class="muted">{{item.timeText}}</view></view>
+  <view class="empty" wx:if="{{loading}}">加载中…</view><view class="empty" wx:elif="{{!error && !rows.length}}">暂无记录</view>
+  <view class="buttons" wx:if="{{total>20}}"><button size="mini" bindtap="previous" disabled="{{loading || busy || pageNum===1}}">上一页</button><text>{{pageNum}} · 共{{total}}条</text><button size="mini" bindtap="next" disabled="{{loading || busy || pageNum*20>=total}}">下一页</button></view>
+  <button bindtap="coupons">查看我的优惠券</button>
+</view>

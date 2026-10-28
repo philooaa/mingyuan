@@ -309,6 +309,7 @@ public class SysMenuServiceImpl implements ISysMenuService
     @Override
     public int insertMenu(SysMenu menu)
     {
+        SecurityUtils.requireSuperAdmin();
         return menuMapper.insertMenu(menu);
     }
 
@@ -321,6 +322,7 @@ public class SysMenuServiceImpl implements ISysMenuService
     @Override
     public int updateMenu(SysMenu menu)
     {
+        SecurityUtils.requireSuperAdmin();
         return menuMapper.updateMenu(menu);
     }
 
@@ -334,6 +336,7 @@ public class SysMenuServiceImpl implements ISysMenuService
     @Transactional
     public void updateMenuSort(String[] menuIds, String[] orderNums)
     {
+        SecurityUtils.requireSuperAdmin();
         try
         {
             for (int i = 0; i < menuIds.length; i++)
@@ -359,6 +362,7 @@ public class SysMenuServiceImpl implements ISysMenuService
     @Override
     public int deleteMenuById(Long menuId)
     {
+        SecurityUtils.requireSuperAdmin();
         return menuMapper.deleteMenuById(menuId);
     }
 

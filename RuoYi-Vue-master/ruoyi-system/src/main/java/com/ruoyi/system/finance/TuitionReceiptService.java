@@ -45,12 +45,20 @@ public class TuitionReceiptService {
           + " u.user_id=e.parent_id ";
   private static final String COLUMNS =
       "SELECT"
-          + " r.*,e.enrollment_id,e.enrollment_code,e.student_name,e.contact_phone,p.finance_mode,p.payment_no,u.nick_name"
+          + " r.*,e.enrollment_id,e.enrollment_code,e.student_name,e.contact_phone,p.finance_mode,p.payment_no,"
+          + FinanceRules.parentNameSql("u")
           + " AS parent_name";
 
   public Map<String, Object> list(long actor, boolean admin, Map<String, String> q) {
+    if (admin) FinanceRules.tuitionStaff(db, actor);
     StringBuilder where = new StringBuilder(" WHERE 1=1");
     List<Object> args = new ArrayList<>();
+    if (q.get("accountId") != null && !q.get("accountId").isBlank()) {
+      long account = FinanceRules.id(q.get("accountId"));
+      if (!admin) db.one("SELECT account_id FROM edu_student_lesson_account WHERE account_id=? AND parent_id=?", account, actor);
+      where.append(" AND e.lesson_account_id=?");
+      args.add(account);
+    }
     if (!admin) {
       where.append(" AND e.parent_id=?");
       args.add(actor);
@@ -106,6 +114,7 @@ public class TuitionReceiptService {
   }
 
   public Map<String, Object> receipt(long id, long actor, boolean admin) {
+    if (admin) FinanceRules.tuitionStaff(db, actor);
     var row =
         db.one(
             COLUMNS
@@ -134,6 +143,7 @@ public class TuitionReceiptService {
   }
 
   public Map<String, Object> issue(long paymentId, long actor) {
+    new CouponService(db).admin(actor);
     long id =
         db.transactions()
             .execute(
@@ -201,12 +211,14 @@ public class TuitionReceiptService {
   }
 
   public Map<String, Object> retry(long id, long actor) {
+    new CouponService(db).admin(actor);
     receipt(id, actor, true);
     generatePending(id);
     return receipt(id, actor, true);
   }
 
   public Map<String, Object> replace(long id, long actor, String reason) {
+    new CouponService(db).admin(actor);
     if (reason == null || reason.isBlank() || reason.length() > 255)
       throw new ServiceException("请填写255字以内的作废补开原因");
     long replacement =

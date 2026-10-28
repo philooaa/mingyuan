@@ -1,0 +1,2 @@
+<import src="../../templates/class-leave.wxml" />
+<template is="classLeave" data="{{teacher,loading,submitting,error,rows,total,pageNum,state,pendingCount,pendingBadge,showForm,reason,options,children,courses,lessons,childIndex,courseIndex,lessonIndex,lessonsLoading,lessonError,historyId,history,historyLoading}}" />

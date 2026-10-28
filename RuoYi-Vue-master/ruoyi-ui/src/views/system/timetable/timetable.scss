@@ -1,6 +1,7 @@
 /* =========================================================
    名远教育 · 可视化课表 样式
-   原则：单元格间距紧凑 → 可同时看到教室×时段；按学科色板区分
+   布局：横轴 = 教室（按校区表头分组），纵轴 = 时段
+   同一格允许多门课程（同时间同地点冲突 → 红色感叹号）
    ========================================================= */
 
 .timetable-page {
@@ -24,184 +25,315 @@
   }
 }
 
+/* ===== 图例 / 问题汇总 ===== */
+.tt-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+  padding: 6px 10px; margin-bottom: 10px;
+  background: #fafbfc; border: 1px solid #ebeef5; border-radius: 4px;
+  font-size: 12px; color: #606266;
+
+  .lg-item { display: inline-flex; align-items: center; gap: 4px; }
+  .lg-warn { color: #f56c6c; }
+  .lg-conflict { color: #f56c6c; font-weight: 600; }
+  .lg-incomplete { color: #e6a23c; font-weight: 600; }
+  .lg-unrecognized { color: #f56c6c; font-weight: 600; }
+  .lg-dim { color: #909399; margin-left: auto; }
+}
+
 .tt-grid-wrapper {
   overflow: auto;
-  max-height: calc(100vh - 280px);
+  max-height: calc(100vh - 320px);
 }
 
 .tt-container.fullscreen .tt-grid-wrapper {
-  max-height: calc(100vh - 120px);
+  max-height: calc(100vh - 150px);
 }
 
+/* ===== 表格骨架 ===== */
 .tt-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  min-width: 1400px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: auto;
+  min-width: 1600px;
   font-size: 12px;
 
   th, td {
-    border: 1px solid #ebeef5;
+    border-right: 1px solid #ebeef5;
+    border-bottom: 1px solid #ebeef5;
     vertical-align: top;
     padding: 0;
   }
-  th {
+  th { border-top: 1px solid #ebeef5; }
+  th:first-child, td:first-child { border-left: 1px solid #ebeef5; }
+
+  thead th {
     background: #fafafa;
     font-weight: 600;
     color: #606266;
     position: sticky;
-    top: 0;
     z-index: 3;
+  }
+  thead tr:nth-child(1) th { top: 0; height: 34px; }
+  thead tr:nth-child(2) th { top: 34px; height: 34px; }
+}
+
+/* 左上角表头 */
+.tt-corner {
+  width: 96px;
+  min-width: 96px;
+  text-align: left;
+  padding: 4px 8px !important;
+  background: #f0f2f5 !important;
+  border-right: 2px solid #dcdfe6 !important;
+  position: sticky;
+  left: 0;
+  z-index: 5 !important;
+  .corner-line1 { font-size: 11px; color: #909399; line-height: 1.3; white-space: nowrap; }
+  .corner-line2 { font-size: 11px; color: #303133; font-weight: 600; line-height: 1.4; white-space: nowrap; }
+}
+
+/* 校区表头（跨列） */
+.tt-th-campus {
+  background: linear-gradient(90deg, #ecf5ff, #f7fbff) !important;
+  color: #409EFF !important;
+  font-size: 13px;
+  text-align: center;
+  padding: 6px 8px !important;
+  border-right: 2px solid #dce8fa !important;
+  white-space: nowrap;
+  .campus-count { color: #909399; font-weight: normal; font-size: 11px; margin-left: 4px; }
+}
+
+/* 教室表头 */
+.tt-th-room {
+  min-width: 132px;
+  padding: 5px 6px !important;
+  text-align: center;
+  background: #fbfcfd !important;
+  color: #303133;
+  font-weight: 600;
+  .room-name {
+    display: block;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 150px; margin: 0 auto;
+  }
+  /* 课表编码（W1~W12 / B1~B5）：导入时按它匹配教室，显示出来便于核对 */
+  .room-code {
+    display: inline-block;
+    margin-top: 2px;
+    padding: 0 4px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 14px;
+    color: #409eff;
+    background: #ecf5ff;
+    border: 1px solid #d9ecff;
+    border-radius: 2px;
   }
 }
 
-.tt-corner {
-  width: 240px;
-  text-align: left;
-  padding: 8px 10px !important;
-  background: #f0f2f5;
-  border-right: 2px solid #dcdfe6;
-  position: sticky;
-  left: 0;
-  z-index: 4;
-  .corner-line1 { font-size: 11px; color: #909399; line-height: 1.4; }
-  .corner-line2 { font-size: 12px; color: #303133; font-weight: 600; line-height: 1.6; margin-top: 2px; }
+/* 未指定教室 列表头（有课程没匹配到教室 → 问题列，标红） */
+.tt-th-unspec {
+  min-width: 132px;
+  background: #fdecec !important;
+  color: #f56c6c !important;
+  text-align: center;
+  border-left: 2px solid #f56c6c !important;
+  padding: 5px 6px !important;
 }
 
-.tt-th-time {
-  width: 150px;
-  .time-label { font-size: 12px; color: #303133; padding: 6px 0; line-height: 1.4; }
-}
-
-.tt-campus-row .tt-campus-cell {
-  background: linear-gradient(90deg, #ecf5ff, #ffffff);
-  padding: 6px 14px !important;
-  font-weight: 600;
-  color: #409EFF;
-  text-align: left;
-  font-size: 13px;
-  border-top: 2px solid #dce8fa;
-  .campus-count { color: #909399; font-weight: normal; font-size: 11px; margin-left: 8px; }
-}
-
-.tt-classroom-row:hover {
-  background: #fafcff;
-}
-
-.tt-classroom-cell {
-  width: 240px;
-  background: #fafafa;
-  padding: 8px 10px !important;
+/* 时段行首 */
+.tt-time-cell {
+  width: 104px;
+  min-width: 104px;
+  padding: 6px 8px !important;
+  background: #f7f9fb;
+  border-right: 2px solid #dcdfe6 !important;
   position: sticky;
   left: 0;
   z-index: 2;
-  border-right: 2px solid #ebeef5;
-  display: flex; align-items: center; gap: 8px;
-  height: 90px;
-  .size-tag {
-    display: inline-block; padding: 2px 8px; border-radius: 10px;
-    font-size: 11px; font-weight: 600;
-    &.size-l { background: #f56c6c; color: #fff; }  /* 大 = 红 */
-    &.size-m { background: #e6a23c; color: #fff; }  /* 中 = 橙 */
-    &.size-s { background: #67c23a; color: #fff; }  /* 小 = 绿 */
-    &.size-n { background: #c0c4cc; color: #fff; }
+  .time-label {
+    font-size: 12px; color: #303133; font-weight: 600;
+    line-height: 1.4; white-space: nowrap;
   }
-  .cls-name {
-    font-size: 13px; font-weight: 600; color: #303133;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 160px;
-  }
+  .time-warn { color: #f56c6c; font-size: 12px; margin-top: 2px; }
 }
 
+/* 数据格 */
 .tt-grid-cell {
-  height: 90px;
+  min-width: 132px;
   transition: background .15s;
-  &:hover { background: #f5faff; cursor: pointer; }
-  .tt-cell { width: 100%; height: 100%; padding: 4px 6px; box-sizing: border-box; }
+  &:hover { background: #f5faff; }
+  .tt-cell { width: 100%; }
 }
 
-/* ===== 单元格内容组件 ===== */
-.tt-cell {
-  width: 100%; height: 100%;
-  display: flex; flex-direction: column; justify-content: space-between;
-  position: relative;
+/* 未指定教室列 / 未指定时段行 / 未识别时段行 —— 都属于「有问题」，统一红色调 */
+.tt-unspec-cell { background: #fff5f5; border-left: 2px solid #fbc4c4; }
+.tt-unspec-row .tt-time-cell { background: #fff4f4; border-top: 2px solid #fbc4c4; }
+.tt-unspec-row .tt-grid-cell { background: #fffbfb; }
+.tt-unspec-row .time-label { color: #f56c6c; }
 
-  &.has-schedule {
-    border-radius: 4px;
-    padding: 4px 6px;
+/* 导入时格式未识别产生的时段行（未识别时段） */
+.tt-slot-row.is-placeholder-row .tt-time-cell { background: #fff4f4; border-top: 2px solid #fbc4c4; }
+.tt-slot-row.is-placeholder-row .tt-grid-cell { background: #fffbfb; }
+.tt-slot-row.is-placeholder-row .time-label { color: #f56c6c; }
+
+/* ===== 单元格组件 ===== */
+.tt-cell {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 3px 4px;
+  box-sizing: border-box;
+  position: relative;
+  min-height: 88px;
+
+  /* ★ 所有红色感叹号格子：整格红色高亮 */
+  &.has-issue,
+  &.is-conflict {
+    background: #fdecec;
+    box-shadow: inset 0 0 0 2px #f56c6c;
+    border-radius: 3px;
+  }
+  /* 冲突：同一时间、同一地点有多门课程 —— 再叠一层红色虚线框，与「信息不完整」区分 */
+  &.is-conflict {
+    outline: 2px dashed #f56c6c;
+    outline-offset: -4px;
+    background: #fce4e4;
+  }
+  /* 有问题的格子里的卡片改为白底，让红色高亮更明显 */
+  &.has-issue .tt-card,
+  &.is-conflict .tt-card {
+    background-color: #fff;
+    border-left-width: 4px;
   }
 }
 
-/* 学科背景色（浅色） */
-.tt-cell-subject-none      .tt-card { background: #f4f4f5; }
-.tt-cell-subject-chinese   .tt-card { background: #e9f5ff; border-left: 3px solid #409EFF; }   /* 语文=蓝 */
-.tt-cell-subject-math      .tt-card { background: #fff3e9; border-left: 3px solid #e6a23c; }   /* 数学=橙 */
-.tt-cell-subject-english   .tt-card { background: #e9fbf4; border-left: 3px solid #67c23a; }   /* 英语=绿青 */
-.tt-cell-subject-physics   .tt-card { background: #f4ecff; border-left: 3px solid #909399; }   /* 物理=紫灰 */
-.tt-cell-subject-chemistry .tt-card { background: #eafff2; border-left: 3px solid #27ae60; }   /* 化学=深绿 */
-.tt-cell-subject-bio       .tt-card { background: #ecfff5; border-left: 3px solid #16a085; }
-.tt-cell-subject-history   .tt-card { background: #ffecec; border-left: 3px solid #c0392b; }
-.tt-cell-subject-geo       .tt-card { background: #e9f7ff; border-left: 3px solid #2980b9; }
-.tt-cell-subject-politics  .tt-card { background: #ffeaf4; border-left: 3px solid #e91e63; }
-.tt-cell-subject-science   .tt-card { background: #ecf5ff; border-left: 3px solid #1f618d; }
-.tt-cell-subject-it        .tt-card { background: #f0eaff; border-left: 3px solid #6c5ce7; }
-.tt-cell-subject-other     .tt-card { background: #f6f8fa; border-left: 3px solid #909399; }
+.conflict-flag {
+  position: absolute;
+  right: 2px; bottom: 2px;
+  width: 17px; height: 17px; line-height: 17px;
+  border-radius: 50%;
+  background: #f56c6c; color: #fff;
+  font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(245,108,108,.5);
+  cursor: help;
+  z-index: 6;
+  i { font-size: 11px; }
+}
+
+/* 卡片（一格可多条） */
+.tt-card-wrap { display: block; }
 
 .tt-card {
-  width: 100%; height: 100%;
-  border-radius: 4px; padding: 6px 8px;
-  box-sizing: border-box; position: relative;
-  display: flex; flex-direction: column; justify-content: space-between;
+  border-radius: 4px;
+  padding: 5px 7px;
+  box-sizing: border-box;
+  position: relative;
+  display: flex; flex-direction: column; gap: 1px;
   box-shadow: 0 1px 2px rgba(0,0,0,.05);
-  .card-grade   { font-size: 12px; color: #606266; font-weight: 600; }
-  .card-subject { font-size: 14px; color: #303133; font-weight: 700; line-height: 1.5; }
-  .card-teacher { font-size: 12px; color: #606266; }
+  border-left: 3px solid #909399;
+  background: #f6f8fa;
+
+  .card-grade   { font-size: 12px; color: #606266; font-weight: 600; line-height: 1.35; padding-right: 16px; }
+  .card-subject { font-size: 13px; color: #303133; font-weight: 700; line-height: 1.35; word-break: break-all; }
+  .card-teacher { font-size: 12px; color: #606266; line-height: 1.35; }
+  .card-location {
+    font-size: 11px; line-height: 1.35;
+    word-break: break-all;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
   .card-type-tag {
     display: inline-block;
-    margin-left: 6px;
-    padding: 0 6px;
+    margin-left: 5px;
+    padding: 0 5px;
     background: rgba(0,0,0,.07);
     color: #555;
-    border-radius: 10px;
-    font-size: 11px;
+    border-radius: 9px;
+    font-size: 10px;
     font-weight: 500;
   }
   .card-footer {
     display: flex; justify-content: space-between; align-items: center;
-    font-size: 11px; color: #909399;
+    font-size: 11px; color: #909399; margin-top: 1px;
   }
   .card-status {
-    padding: 0 6px; border-radius: 10px; color: #fff;
+    padding: 0 5px; border-radius: 9px; color: #fff;
     &.rs-0 { background: #67c23a; }
     &.rs-1 { background: #909399; }
     &.rs-2 { background: #f56c6c; }
   }
+
+  /* 缺失字段提示：右上角红色感叹号（实心红圆，与冲突角标区分在位置） */
+  &.has-issue { background-image: linear-gradient(0deg, rgba(245,108,108,.08), rgba(245,108,108,.08)); }
+  .issue-flag {
+    position: absolute; top: 2px; right: 2px;
+    width: 16px; height: 16px; line-height: 16px;
+    border-radius: 50%;
+    background: #f56c6c; color: #fff;
+    font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 3px rgba(245,108,108,.45);
+    cursor: help;
+    z-index: 4;
+    i { font-size: 10px; }
+  }
+
   .card-actions {
     position: absolute;
-    top: 4px; right: 6px;
+    top: 2px; right: 3px;
     display: none;
+    z-index: 3;
     i {
-      cursor: pointer; padding: 2px 4px; border-radius: 3px;
-      margin-left: 4px; background: rgba(255,255,255,.9);
+      cursor: pointer; padding: 1px 3px; border-radius: 3px;
+      margin-left: 3px; font-size: 13px;
+      background: rgba(255,255,255,.95);
+      color: #606266;
+      box-shadow: 0 0 2px rgba(0,0,0,.12);
       &:hover { background: #ecf5ff; color: #409EFF; }
     }
   }
+  /* 有缺失提示时，操作按钮让位给感叹号 */
+  &.has-issue .card-actions { right: 20px; }
 }
 .tt-card:hover .card-actions { display: inline-block; }
 
-/* 空白格 */
+/* 缺失文字 */
+.text-missing { color: #f56c6c !important; }
+.miss-icon { font-size: 11px; margin-right: 1px; }
+
+/* 学科色板（类名加在 .tt-card 上） */
+.tt-card.tt-card-none      { background: #f4f4f5; border-left-color: #c0c4cc; }
+.tt-card.tt-card-chinese   { background: #e9f5ff; border-left-color: #409EFF; }  /* 语文=蓝 */
+.tt-card.tt-card-math      { background: #fff3e9; border-left-color: #e6a23c; }  /* 数学=橙 */
+.tt-card.tt-card-english   { background: #e9fbf4; border-left-color: #67c23a; }  /* 英语=绿青 */
+.tt-card.tt-card-physics   { background: #f4ecff; border-left-color: #909399; }  /* 物理=紫灰 */
+.tt-card.tt-card-chemistry { background: #eafff2; border-left-color: #27ae60; }
+.tt-card.tt-card-bio       { background: #ecfff5; border-left-color: #16a085; }
+.tt-card.tt-card-history   { background: #ffecec; border-left-color: #c0392b; }
+.tt-card.tt-card-geo       { background: #e9f7ff; border-left-color: #2980b9; }
+.tt-card.tt-card-politics  { background: #ffeaf4; border-left-color: #e91e63; }
+.tt-card.tt-card-science   { background: #ecf5ff; border-left-color: #1f618d; }
+.tt-card.tt-card-it        { background: #f0eaff; border-left-color: #6c5ce7; }
+.tt-card.tt-card-other     { background: #f6f8fa; border-left-color: #909399; }
+
+/* ===== 空白格 / 追加 ===== */
 .tt-empty-cell {
-  width: 100%; height: 100%;
+  flex: 1;
+  min-height: 24px;
   display: flex; align-items: center; justify-content: center;
   color: #dcdfe6;
-  .empty-placeholder { font-size: 16px; }
+  .empty-placeholder { font-size: 15px; }
   .add-icon {
-    font-size: 20px; color: #c0c4cc;
+    font-size: 18px; color: #c0c4cc;
     transition: all .15s;
     opacity: 0;
-    padding: 4px 8px;
+    padding: 3px 8px;
+    cursor: pointer;
   }
+  /* 已有课程时，+ 常显（用于在同格再排一门冲突课） */
+  &.is-add-more .add-icon { opacity: .55; }
 }
+
 .tt-grid-cell:hover .tt-empty-cell .add-icon {
   opacity: 1; color: #409EFF;
 }
@@ -210,4 +342,141 @@
   padding: 40px 0;
   text-align: center;
   color: #909399;
+}
+
+/* ===== 课表导入预览表：格式不对（有告警）的行整行标红 ===== */
+.imp-warn-text { color: #f56c6c; font-size: 12px; }
+
+/* 教室名后面的课表编码小标签（如 万达24-1 W6） */
+.imp-room-code {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 3px;
+  font-size: 10px;
+  line-height: 14px;
+  color: #409eff;
+  background: #ecf5ff;
+  border: 1px solid #d9ecff;
+  border-radius: 2px;
+}
+
+::v-deep .el-table .imp-row-warn td {
+  background: #fef0f0 !important;
+}
+::v-deep .el-table .imp-row-warn:hover > td {
+  background: #fce4e4 !important;
+}
+
+/* ===== 导入弹窗：按学期（工作表）分别设置上课起止日期 ===== */
+.imp-range-block {
+  margin: 0 0 10px 90px;
+  padding: 10px 12px 4px;
+  background: #f7f9fc;
+  border: 1px solid #e4e9f2;
+  border-radius: 4px;
+}
+.imp-range-head {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #303133;
+}
+.imp-range-sub {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: normal;
+  color: #8993a4;
+}
+.imp-range-table ::v-deep .el-table__cell {
+  padding: 4px 0;
+}
+
+/* ===== 交换教室列 弹窗 ===== */
+.swap-scope {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+.swap-scope .swap-scope-label { font-size: 13px; color: #606266; }
+.swap-scope .swap-scope-tip { font-size: 12px; color: #909399; margin-left: 4px; }
+
+.swap-preview {
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  background: #fafbfc;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  min-height: 40px;
+}
+.swap-preview .swap-row {
+  display: flex;
+  align-items: center;
+  line-height: 26px;
+  font-size: 13px;
+}
+.swap-preview .swap-tag {
+  display: inline-block;
+  width: 18px; height: 18px;
+  margin-right: 8px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 12px;
+  color: #fff;
+  background: #409eff;
+  border-radius: 3px;
+}
+.swap-preview .swap-tag-b { background: #67c23a; }
+.swap-preview .swap-name { color: #303133; }
+.swap-preview .swap-num {
+  margin-left: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #f56c6c;
+}
+.swap-preview .swap-unit { margin-left: 3px; color: #909399; font-size: 12px; }
+
+.swap-warn {
+  padding: 8px 12px;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 4px;
+  color: #b88230;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.swap-warn b { color: #d46b08; }
+
+/* ===== 课次（按具体日期）弹窗：停课 / 恢复 ===== */
+.occ-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.occ-head .occ-title { font-size: 14px; font-weight: 600; color: #303133; margin-left: 4px; }
+.occ-head .occ-tip { font-size: 12px; color: #909399; margin-left: 6px; }
+.occ-head .occ-tip b { color: #409eff; }
+
+.occ-sum {
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #606266;
+}
+.occ-sum .occ-sum-tip { font-size: 12px; color: #909399; margin-left: 6px; }
+
+/* 已停课的课次整行置灰，和正常课次区分开 */
+::v-deep .el-table .occ-row-cancelled td {
+  background: #f4f4f5 !important;
+  color: #a8abb2 !important;
+}
+::v-deep .el-table .occ-row-cancelled:hover > td {
+  background: #ebebeb !important;
 }

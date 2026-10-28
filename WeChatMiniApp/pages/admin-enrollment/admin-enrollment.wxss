@@ -1,0 +1,32 @@
+@import "../../styles/education-ui.wxss";
+.page { padding: 24rpx; background: #f4f7fb; min-height: 100vh; color: #24344b; }
+.card { background: white; border-radius: 20rpx; padding: 28rpx; margin-bottom: 20rpx; line-height: 1.9; }
+.title { font-size: 32rpx; font-weight: 600; }
+.muted { color: #718096; font-size: 25rpx; }
+.search { display: flex; align-items: center; gap: 16rpx; margin-top: 20rpx; }
+.search input { flex: 1; min-width: 0; font-size: 27rpx; background: #f4f7fb; padding: 16rpx; border-radius: 10rpx; }
+.search button { margin: 0; flex-shrink: 0; }
+.filter { margin-top: 18rpx; color: #2563eb; }
+.group-title, .row { display: flex; justify-content: space-between; gap: 16rpx; }
+.group-title { padding: 20rpx 8rpx; font-weight: 600; }
+.group-title text { color: #718096; font-size: 26rpx; }
+.row { margin-top: 10rpx; font-size: 26rpx; }
+.empty { text-align: center; color: #718096; padding: 24rpx; font-size: 26rpx; }
+.history { border-top: 1rpx solid #eef1f5; padding-top: 16rpx; margin-top: 16rpx; font-size: 27rpx; }
+
+/* 教育业务页面：紧凑布局与信息层级 */
+
+.page { padding:24rpx; box-sizing:border-box; }
+.card { border:1rpx solid #e8edf4; border-radius:16rpx; box-shadow:none; padding:24rpx; line-height:1.7; margin-bottom:16rpx; }
+.title { font-size:30rpx; line-height:1.5; color:#202b3d; font-weight:700; word-break:break-word; }
+.page > .card:first-child > .title { font-size:36rpx; }
+.muted { color:#68778c; font-size:24rpx; line-height:1.7; }
+.search { gap:12rpx; margin-top:18rpx; }
+.search input { height:72rpx; min-height:72rpx; background:#f4f6fa; border:1rpx solid #e8edf4; border-radius:10rpx; font-size:26rpx; padding:0 16rpx; line-height:normal; }
+.search button { background:#2459d9; color:#fff; border-radius:10rpx; font-size:25rpx; padding:0 22rpx; line-height:72rpx; }
+.filter { padding:16rpx 0 0; color:#2459d9; font-size:26rpx; border-top:1rpx solid #edf1f6; }
+.group-title { font-size:28rpx; color:#202b3d; padding:20rpx 4rpx 14rpx; }
+.group-title text { font-weight:400; font-size:24rpx; }
+.row { padding-top:14rpx; border-top:1rpx solid #edf1f6; margin-top:14rpx; align-items:center; font-size:25rpx; }
+.history { font-size:25rpx; line-height:1.7; }
+.history > view:first-child { color:#202b3d; font-weight:500; }

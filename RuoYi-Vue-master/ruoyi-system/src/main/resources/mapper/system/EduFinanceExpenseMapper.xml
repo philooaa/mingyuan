@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.EduFinanceExpenseMapper">
+
+    <resultMap type="EduFinanceExpense" id="EduFinanceExpenseResult">
+        <result property="expenseId"    column="expense_id" />
+        <result property="expenseType"  column="expense_type" />
+        <result property="title"        column="title" />
+        <result property="amount"       column="amount" />
+        <result property="detail"       column="detail" />
+        <result property="expenseDate"  column="expense_date" />
+        <result property="registerBy"   column="register_by" />
+        <result property="status"       column="status" />
+        <result property="delFlag"      column="del_flag" />
+        <result property="createBy"     column="create_by" />
+        <result property="createTime"   column="create_time" />
+        <result property="updateBy"     column="update_by" />
+        <result property="updateTime"   column="update_time" />
+        <result property="remark"       column="remark" />
+    </resultMap>
+
+    <sql id="selectExpenseVo">
+        select expense_id, expense_type, title, amount, detail, expense_date, register_by,
+               status, del_flag, create_by, create_time, update_by, update_time, remark
+        from edu_finance_expense
+    </sql>
+
+    <select id="selectExpenseList" parameterType="EduFinanceExpense" resultMap="EduFinanceExpenseResult">
+        <include refid="selectExpenseVo"/>
+        <where> del_flag = '0'
+            <if test="expenseType != null and expenseType != ''"> and expense_type = #{expenseType}</if>
+            <if test="title != null and title != ''"> and title like concat('%', #{title}, '%')</if>
+            <if test="params.beginDate != null and params.beginDate != ''"> and expense_date &gt;= #{params.beginDate}</if>
+            <if test="params.endDate != null and params.endDate != ''"> and expense_date &lt;= #{params.endDate}</if>
+        </where>
+        order by expense_date desc, expense_id desc
+    </select>
+
+    <select id="selectExpenseById" parameterType="Long" resultMap="EduFinanceExpenseResult">
+        <include refid="selectExpenseVo"/>
+        where expense_id = #{expenseId}
+    </select>
+
+    <insert id="insertExpense" parameterType="EduFinanceExpense" useGeneratedKeys="true" keyProperty="expenseId">
+        insert into edu_finance_expense
+        (expense_type, title, amount, detail, expense_date, register_by, status, create_by, create_time, remark)
+        values
+        (#{expenseType}, #{title}, #{amount}, #{detail}, #{expenseDate}, #{registerBy}, '0', #{createBy}, sysdate(), #{remark})
+    </insert>
+
+    <update id="updateExpense" parameterType="EduFinanceExpense">
+        update edu_finance_expense
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="expenseType != null and expenseType != ''">expense_type = #{expenseType},</if>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="detail != null and detail != ''">detail = #{detail},</if>
+            <if test="expenseDate != null">expense_date = #{expenseDate},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate(),
+        </trim>
+        where expense_id = #{expenseId}
+    </update>
+
+    <update id="deleteExpenseByIds">
+        update edu_finance_expense set del_flag = '2' where expense_id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+</mapper>

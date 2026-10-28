@@ -1,6 +1,6 @@
 <template>
   <div class="app-container tree-sidebar-manage-wrap">
-    <tree-panel title="组织机构" :tree-data="deptOptions" search-placeholder="请输入部门名称" storage-key="dept-sidebar-width" :defaultExpandAll="true" @node-click="handleNodeClick" @refresh="getDeptTree" ref="deptTreeRef" />
+    <tree-panel title="角色" title-icon-class="el-icon-user-solid" :tree-data="roleTreeOptions" search-placeholder="请输入角色名称" storage-key="user-role-sidebar-width" :defaultExpandAll="true" @node-click="handleNodeClick" @refresh="getRoleTree" ref="roleTreeRef" />
     <div class="tree-sidebar-content">
       <div class="content-inner">
         <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
@@ -52,7 +52,7 @@
             </template>
           </el-table-column>
           <el-table-column label="用户昵称" align="center" key="nickName" prop="nickName" v-if="columns.nickName.visible" :show-overflow-tooltip="true" />
-          <el-table-column label="部门" align="center" key="deptName" prop="dept.deptName" v-if="columns.deptName.visible" :show-overflow-tooltip="true" />
+          <el-table-column label="角色" align="center" key="roleNames" prop="roleNames" v-if="columns.roleNames.visible" :show-overflow-tooltip="true" />
           <el-table-column label="手机号码" align="center" key="phonenumber" prop="phonenumber" v-if="columns.phonenumber.visible" width="120" />
           <el-table-column label="状态" align="center" key="status" v-if="columns.status.visible">
             <template slot-scope="scope">
@@ -91,11 +91,6 @@
               <el-input v-model="form.nickName" placeholder="请输入用户昵称" maxlength="30" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="归属部门" prop="deptId">
-              <treeselect v-model="form.deptId" :options="enabledDeptOptions" :show-count="true" placeholder="请选择归属部门" />
-            </el-form-item>
-          </el-col>
         </el-row>
         <el-row>
           <el-col :span="12">
@@ -111,7 +106,7 @@
         </el-row>
         <el-row>
           <el-col :span="12">
-            <el-form-item v-if="form.userId == undefined" label="用户名称" prop="userName">
+            <el-form-item label="用户名称" prop="userName">
               <el-input v-model="form.userName" placeholder="请输入用户名称" maxlength="30" />
             </el-form-item>
           </el-col>
@@ -138,28 +133,20 @@
           </el-col>
         </el-row>
         <el-row>
-          <el-col :span="12">
-            <el-form-item label="岗位">
-              <el-select v-model="form.postIds" multiple placeholder="请选择岗位">
-                <el-option v-for="item in postOptions" :key="item.postId" :label="item.postName" :value="item.postId" :disabled="item.status == 1" ></el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
+          <el-col :span="24">
             <el-form-item label="角色">
-              <el-select v-model="form.roleIds" multiple placeholder="请选择角色">
+              <el-select v-model="form.roleIds" multiple placeholder="请选择角色" style="width:100%">
                 <el-option v-for="item in roleOptions" :key="item.roleId" :label="item.roleName" :value="item.roleId" :disabled="item.status == 1"></el-option>
               </el-select>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row>
-          <el-col :span="24">
-            <el-form-item label="备注">
-              <el-input v-model="form.remark" type="textarea" placeholder="请输入内容"></el-input>
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <div v-if="form.userId && roleOptions.some(role => role.roleKey === 'teacher' && (form.roleIds || []).includes(role.roleId))" v-loading="teacherProfileLoading">
+          <el-divider>教师授课配置</el-divider>
+          <el-form-item label="授课学科"><el-select v-model="teacherProfile.teacherSubject" filterable placeholder="请选择授课学科"><el-option v-for="subject in dict.type.edu_subject" :key="subject.value" :label="subject.label" :value="subject.label" /></el-select></el-form-item>
+          <el-form-item label="教师等级"><el-select v-model="teacherProfile.teacherLevel"><el-option label="精英教师" value="elite" /><el-option label="资深教师" value="senior" /></el-select></el-form-item>
+          <el-button size="small" :disabled="teacherProfileLoading" @click="saveTeacherProfile">保存授课配置</el-button>
+        </div>
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button type="primary" @click="submitForm">确 定</el-button>
@@ -175,19 +162,18 @@
 </template>
 
 <script>
-import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus, deptTreeSelect } from "@/api/system/user"
-import Treeselect from "@riophae/vue-treeselect"
-import "@riophae/vue-treeselect/dist/vue-treeselect.css"
+import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus } from "@/api/system/user"
 import TreePanel from "@/components/TreePanel"
 import ExcelImportDialog from "@/components/ExcelImportDialog"
 import UserViewDrawer from "./view"
+import request from "@/utils/request"
 import passwordRule from "@/utils/passwordRule"
 
 export default {
   name: "User",
   mixins: [passwordRule],
-  dicts: ['sys_normal_disable', 'sys_user_sex'],
-  components: { Treeselect, TreePanel, ExcelImportDialog, UserViewDrawer },
+  dicts: ['sys_normal_disable', 'sys_user_sex', 'edu_subject'],
+  components: { TreePanel, ExcelImportDialog, UserViewDrawer },
   data() {
     return {
       // 遮罩层
@@ -206,10 +192,7 @@ export default {
       userList: null,
       // 弹出层标题
       title: "",
-      // 所有部门树选项
-      deptOptions: undefined,
-      // 过滤掉已禁用部门树选项
-      enabledDeptOptions: undefined,
+      roleTreeOptions: [{ id: 'all', label: '全部角色' }],
       // 是否显示弹出层
       open: false,
       // 默认密码
@@ -217,11 +200,11 @@ export default {
       // 日期范围
       dateRange: [],
       // 岗位选项
-      postOptions: [],
       // 角色选项
       roleOptions: [],
       // 表单参数
       form: {},
+      teacherProfile: {}, teacherProfileLoading: false,
       // 查询参数
       queryParams: {
         pageNum: 1,
@@ -229,14 +212,14 @@ export default {
         userName: undefined,
         phonenumber: undefined,
         status: undefined,
-        deptId: undefined
+        roleId: undefined
       },
       // 列信息
       columns: {
         userId: { label: '用户编号', visible: true },
         userName: { label: '用户名称', visible: true },
         nickName: { label: '用户昵称', visible: true },
-        deptName: { label: '部门', visible: true },
+        roleNames: { label: '角色', visible: true },
         phonenumber: { label: '手机号码', visible: true },
         status: { label: '状态', visible: true },
         createTime: { label: '创建时间', visible: true }
@@ -245,7 +228,7 @@ export default {
       rules: {
         userName: [
           { required: true, message: "用户名称不能为空", trigger: "blur" },
-          { min: 2, max: 20, message: '用户名称长度必须介于 2 和 20 之间', trigger: 'blur' }
+          { min: 2, max: 30, message: '用户名称长度必须介于 2 和 30 之间', trigger: 'blur' }
         ],
         nickName: [
           { required: true, message: "用户昵称不能为空", trigger: "blur" }
@@ -269,7 +252,7 @@ export default {
   },
   created() {
     this.getList()
-    this.getDeptTree()
+    this.getRoleTree()
     this.getConfigKey("sys.user.initPassword").then(response => {
       this.initPassword = response.msg
     })
@@ -284,28 +267,16 @@ export default {
         this.loading = false
       })
     },
-    /** 查询部门下拉树结构 */
-    getDeptTree() {
-      deptTreeSelect().then(response => {
-        this.deptOptions = response.data
-        this.enabledDeptOptions = this.filterDisabledDept(JSON.parse(JSON.stringify(response.data)))
-      })
-    },
-    // 过滤禁用的部门
-    filterDisabledDept(deptList) {
-      return deptList.filter(dept => {
-        if (dept.disabled) {
-          return false
-        }
-        if (dept.children && dept.children.length) {
-          dept.children = this.filterDisabledDept(dept.children)
-        }
-        return true
+    /** 复用用户编辑接口提供的可见角色，不扩大角色管理权限。 */
+    getRoleTree() {
+      const ownId = this.$store.getters.id
+      return getUser(Number(ownId) === 1 ? ownId : undefined).then(response => {
+        this.roleTreeOptions = [{ id: 'all', label: '全部角色' }, ...(response.roles || []).map(role => ({ id: role.roleId, label: role.roleName }))]
       })
     },
     // 节点单击事件
     handleNodeClick(data) {
-      this.queryParams.deptId = data.id
+      this.queryParams.roleId = data.id === 'all' ? undefined : data.id
       this.handleQuery()
     },
     // 用户状态修改
@@ -328,7 +299,6 @@ export default {
     reset() {
       this.form = {
         userId: undefined,
-        deptId: undefined,
         userName: undefined,
         nickName: undefined,
         password: undefined,
@@ -351,8 +321,8 @@ export default {
     resetQuery() {
       this.dateRange = []
       this.resetForm("queryForm")
-      this.queryParams.deptId = undefined
-      this.$refs.deptTreeRef.setCurrentKey(null)
+      this.queryParams.roleId = undefined
+      this.$refs.roleTreeRef.setCurrentKey('all')
       this.handleQuery()
     },
     // 多选框选中数据
@@ -378,7 +348,6 @@ export default {
     handleAdd() {
       this.reset()
       getUser().then(response => {
-        this.postOptions = response.posts
         this.roleOptions = response.roles
         this.open = true
         this.title = "添加用户"
@@ -391,13 +360,15 @@ export default {
       const userId = row.userId || this.ids
       getUser(userId).then(response => {
         this.form = response.data
-        this.postOptions = response.posts
         this.roleOptions = response.roles
         this.$set(this.form, "postIds", response.postIds)
         this.$set(this.form, "roleIds", response.roleIds)
         this.open = true
         this.title = "修改用户"
         this.form.password = ""
+        this.teacherProfile = {}
+        this.teacherProfileLoading = true
+        request({ url: `/system/teacherProfile/${this.form.userId}` }).then(res => { this.teacherProfile = res.data || {} }).finally(() => { this.teacherProfileLoading = false })
       })
     },
     /** 重置密码按钮操作 */
@@ -417,6 +388,11 @@ export default {
     handleAuthRole(row) {
       const userId = row.userId
       this.$router.push("/system/user-auth/role/" + userId)
+    },
+    saveTeacherProfile() {
+      if (this.teacherProfileLoading) return
+      this.teacherProfileLoading = true
+      request({ url: `/system/teacherProfile/${this.form.userId}`, method: "put", data: this.teacherProfile }).then(() => this.$modal.msgSuccess("授课配置已保存")).finally(() => { this.teacherProfileLoading = false })
     },
     /** 提交按钮 */
     submitForm() {
