@@ -9,8 +9,10 @@ App({
 
   onLaunch() {
     const platform = wx.getDeviceInfo ? wx.getDeviceInfo().platform : ''
+    let allowOverride = platform === 'devtools'
+    try { allowOverride = allowOverride || wx.getAccountInfoSync().miniProgram.envVersion === 'develop' } catch (_) {}
     // 真机调试时可通过登录页长按 logo 写入 backendOverride，指向本机后端。
-    const override = wx.getStorageSync('backendOverride')
+    const override = allowOverride && wx.getStorageSync('backendOverride')
     if (override) this.globalData.baseUrl = String(override).replace(/\/+$/, '')
     else if (platform === 'devtools') this.globalData.baseUrl = 'http://127.0.0.1:8080'
     const previousBackend = wx.getStorageSync('backendBaseUrl')

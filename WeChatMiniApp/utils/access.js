@@ -38,4 +38,8 @@ function developmentTool() {
     return wx.getSystemInfoSync().platform === 'devtools'
   } catch (_) { return false }
 }
-module.exports = { roles, has, staff, can, options, selected, select, allowed, actions, developmentTool }
+function developmentBuild() {
+  if (developmentTool()) return true
+  try { return wx.getAccountInfoSync().miniProgram.envVersion === 'develop' } catch (_) { return false }
+}
+module.exports = { roles, has, staff, can, options, selected, select, allowed, actions, developmentTool, developmentBuild }

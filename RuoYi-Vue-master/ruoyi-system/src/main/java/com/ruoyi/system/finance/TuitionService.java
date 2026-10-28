@@ -720,8 +720,8 @@ public class TuitionService {
   public Map<String, Object> createPayment(
       long enrollment, long actor, boolean admin, Map<String, Object> b) {
     require(admin, "FORBIDDEN: 课程费用请联系教务线下缴纳");
-    // 收款登记与确认只归管理员本人；教务与业务管理员都不行。
-    coupons.strictAdmin(actor);
+    // 收款登记与确认允许原始管理员及业务管理员，教务不参与。
+    coupons.admin(actor);
     String key = key(b),
         hash =
             fingerprint(
@@ -1075,8 +1075,8 @@ public class TuitionService {
   public Map<String, Object> confirmPayment(
       long payment, long actor, boolean admin, Map<String, Object> b) {
     require(admin, "FORBIDDEN: 家长不能确认课程收款");
-    // 确认收款即生成收据，只归管理员本人；教务与业务管理员都不行。
-    coupons.strictAdmin(actor);
+    // 确认收款即生成收据，允许原始管理员及业务管理员。
+    coupons.admin(actor);
     long[] receipt = {0};
     var result =
         tx(
@@ -1126,7 +1126,7 @@ public class TuitionService {
   }
 
   public Map<String, Object> closePayment(long payment, long actor, Map<String, Object> b) {
-    coupons.strictAdmin(actor);
+    coupons.admin(actor);
     String reason = reason(b, "reason", 255);
     return tx(
         () -> {
@@ -1844,7 +1844,7 @@ public class TuitionService {
   }
 
   public Map<String, Object> historyVerify(long enrollment, long actor, Map<String, Object> b) {
-    coupons.strictAdmin(actor);
+    coupons.admin(actor);
     BigDecimal original = money(b.get("originalAmount")),
         paid = money(b.get("historyPaidAmount")),
         returned = money(b.get("historyRefundedAmount"));
