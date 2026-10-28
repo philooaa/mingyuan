@@ -39,7 +39,7 @@ public class ScheduleAvailabilityService {
     public void validateSingle(EduCourseSchedule s) {
         LocalDate date = ScheduleCalendar.date(s.getStartDate());
         require(date != null && date.equals(ScheduleCalendar.date(s.getEndDate())),"新建一对一仅支持指定日期的一节课");
-        require(s.getClassroomId() != null,"一对一必须选择机构空闲教室");
+        require(s.getClassroomId() != null || (s.getCampusName()!=null && !s.getCampusName().isBlank()),"请选择一对一上课校区");
         Slot slot = slot(s.getTimeSlot());
         require(slot.start().equals(s.getStartTime()) && slot.end().equals(s.getEndTime()),"上课时间必须与固定班课时段一致");
         require("WEEKLY".equals(s.getClassPattern()) && ScheduleCalendar.weekday(s.getPeriodName()) == date.getDayOfWeek().getValue(),"上课日期与星期不一致");

@@ -34,7 +34,7 @@
                 bindtap="selectCourse">
             <view class="u-slot">{{u.timeSlot}}</view>
             <view class="u-name">{{u.gradeName}}{{u.subjectName}}</view>
-            <view class="u-teacher">{{u.teacherName || '教师未填'}}</view>
+            <view class="u-teacher">{{u.campusName}} · {{u.teacherName || '教师未填'}}</view>
           </view>
         </view>
       </scroll-view>

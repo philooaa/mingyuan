@@ -4,6 +4,24 @@ const path = require('node:path')
 const vm = require('node:vm')
 const test = require('node:test')
 
+test('开发者工具连接本地，手机保留服务器地址，切换环境清除旧会话', () => {
+  for (const platform of ['devtools', 'ios', 'android']) {
+    let app
+    const store = new Map([['token', 'server-token'], ['roles', ['admin']]])
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8'), {
+      App(value) { app = value }, wx: {
+        getDeviceInfo: () => ({ platform }), getStorageSync: key => store.get(key),
+        setStorageSync: (key, value) => store.set(key, value), removeStorageSync: key => store.delete(key)
+      }
+    })
+    app.onLaunch()
+    assert.equal(app.globalData.baseUrl, platform === 'devtools' ? 'http://127.0.0.1:8080' : 'https://test-admin.mingyuantostars.online/prod-api')
+    assert.equal(app.globalData.token, platform === 'devtools' ? '' : 'server-token')
+    store.set('token', 'same-backend-token'); app.onLaunch()
+    assert.equal(app.globalData.token, 'same-backend-token')
+  }
+})
+
 test('体验版请求走远程HTTPS测试后端，而不是体验者手机的本地地址', async () => {
   let app
   const root = path.resolve(__dirname, '..')

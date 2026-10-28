@@ -20,13 +20,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.teacher_id as teacherId,
             s.class_type as classType,
             s.course_class_name as courseClassName,
-            c.campus_name as campusName,
+            COALESCE(NULLIF(s.campus_name,''),c.campus_name) as campusName,
             c.classroom_name as classroomName,
             ifnull(s.enrolled_count, 0) as enrolledCount,
             case when e.enrollment_id is null then 0 else 1 end as enrolled
         from edu_course_schedule s
         left join sys_user teacher on teacher.user_id = s.teacher_id
-        inner join edu_classroom c on c.classroom_id = s.classroom_id
+        left join edu_classroom c on c.classroom_id = s.classroom_id
         left join edu_enrollment e
           on e.schedule_id = s.schedule_id
          and e.parent_id = #{parentId}
@@ -37,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             and s.status = '0'
             and s.recruit_status = '0'
             and s.class_mode != '2'
-            and c.status = '0'
+            and ((s.classroom_id IS NULL AND NULLIF(TRIM(s.campus_name),'') IS NOT NULL) OR c.status = '0')
             <if test="gradeName != null and gradeName != ''">
                 and s.grade_name = #{gradeName}
             </if>
@@ -74,7 +74,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.grade_name as gradeName,
             s.subject_name as subjectName,
             coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacherName,
-            c.campus_name as campusName,
+            COALESCE(NULLIF(s.campus_name,''),c.campus_name) as campusName,
             c.classroom_name as classroomName
         from edu_enrollment e
         inner join edu_course_schedule s on s.schedule_id = e.schedule_id
@@ -109,7 +109,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.subject_name as subjectName,
             coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacherName,
             s.class_type as classType,
-            c.campus_name as campusName,
+            COALESCE(NULLIF(s.campus_name,''),c.campus_name) as campusName,
             c.classroom_name as classroomName
         from edu_enrollment e
         inner join edu_course_schedule s on s.schedule_id = e.schedule_id
@@ -186,14 +186,14 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.grade_name as gradeName,
             s.subject_name as subjectName,
             s.teacher_name as teacherName,
-            c.campus_name as campusName,
+            COALESCE(NULLIF(s.campus_name,''),c.campus_name) as campusName,
             c.classroom_name as classroomName,
             ifnull(a.attendance_status, '0') as attendanceStatus,
             a.attended_time as attendedTime,
             a.confirm_name as confirmName
         from edu_enrollment e
         inner join edu_course_schedule s on s.schedule_id = e.schedule_id
-        inner join edu_classroom c on c.classroom_id = s.classroom_id
+        left join edu_classroom c on c.classroom_id = s.classroom_id
         left join edu_attendance a
           on a.enrollment_id = e.enrollment_id
          and a.del_flag = '0'
@@ -209,12 +209,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="countScheduleAvailable" resultType="int">
         select count(1)
         from edu_course_schedule s
-        inner join edu_classroom c on c.classroom_id = s.classroom_id
+        left join edu_classroom c on c.classroom_id = s.classroom_id
         where s.schedule_id = #{scheduleId}
           and s.del_flag = '0'
           and s.status = '0' and s.class_mode != '2'
           and s.recruit_status = '0'
-          and c.status = '0'
+          and ((s.classroom_id IS NULL AND NULLIF(TRIM(s.campus_name),'') IS NOT NULL) OR c.status = '0')
     </select>
 
     <select id="countActiveEnrollment" resultType="int">
@@ -233,7 +233,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     -->
     <update id="increaseScheduleEnrollment">
         update edu_course_schedule s
-        inner join edu_classroom c on c.classroom_id = s.classroom_id
+        left join edu_classroom c on c.classroom_id = s.classroom_id
         set s.enrolled_count = ifnull(s.enrolled_count, 0) + 1,
             s.update_by = 'miniapp',
             s.update_time = now()
@@ -241,7 +241,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and s.del_flag = '0'
           and s.status = '0'
           and s.recruit_status = '0'
-          and c.status = '0'
+          and ((s.classroom_id IS NULL AND NULLIF(TRIM(s.campus_name),'') IS NOT NULL) OR c.status = '0')
           and (s.class_mode = '2'
                or s.enroll_limit is null
                or s.enroll_limit &lt;= 0

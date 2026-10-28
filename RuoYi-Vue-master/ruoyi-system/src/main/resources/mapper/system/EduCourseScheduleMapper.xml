@@ -7,6 +7,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="EduCourseSchedule" id="EduCourseScheduleResult">
         <result property="scheduleId"    column="schedule_id"    />
         <result property="scheduleCode"    column="schedule_code"    />
+        <result property="campusName" column="campus_name" />
         <result property="classroomId"    column="classroom_id"    />
         <result property="lessonLocation" column="lesson_location" />
         <result property="courseYear"    column="course_year"    />
@@ -42,7 +43,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectEduCourseScheduleVo">
-        select schedule_id, schedule_code, classroom_id, lesson_location, course_year, term_name, period_name, time_slot, start_time, end_time, start_date, end_date, class_pattern, grade_name, subject_name, teacher_name, teacher_id, class_type, class_mode, enrolled_count, enroll_limit, unit_price, recruit_status, course_class_name, source_sheet, source_row, source_col, status, del_flag, create_by, create_time, update_by, update_time, remark from edu_course_schedule
+        select schedule_id, schedule_code, campus_name, classroom_id, lesson_location, course_year, term_name, period_name, time_slot, start_time, end_time, start_date, end_date, class_pattern, grade_name, subject_name, teacher_name, teacher_id, class_type, class_mode, enrolled_count, enroll_limit, unit_price, recruit_status, course_class_name, source_sheet, source_row, source_col, status, del_flag, create_by, create_time, update_by, update_time, remark from edu_course_schedule
     </sql>
 
     <select id="selectEduCourseScheduleList" parameterType="EduCourseSchedule" resultMap="EduCourseScheduleResult">
@@ -88,6 +89,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="scheduleCode != null and scheduleCode != ''">schedule_code,</if>
             <if test="classroomId != null">classroom_id,</if>
+            <if test="campusName != null">campus_name,</if>
             <if test="lessonLocation != null">lesson_location,</if>
             <if test="courseYear != null">course_year,</if>
             <if test="termName != null and termName != ''">term_name,</if>
@@ -123,6 +125,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="scheduleCode != null and scheduleCode != ''">#{scheduleCode},</if>
             <if test="classroomId != null">#{classroomId},</if>
+            <if test="campusName != null">#{campusName},</if>
             <if test="lessonLocation != null">#{lessonLocation},</if>
             <if test="courseYear != null">#{courseYear},</if>
             <if test="termName != null and termName != ''">#{termName},</if>
@@ -161,8 +164,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update edu_course_schedule
         <trim prefix="SET" suffixOverrides=",">
             <if test="scheduleCode != null and scheduleCode != ''">schedule_code = #{scheduleCode},</if>
-            <if test="classMode == '2' and lessonLocation != null">classroom_id = null,</if>
-            <if test="classroomId != null and !(classMode == '2' and lessonLocation != null)">classroom_id = #{classroomId},</if>
+            <if test="classroomId != null">classroom_id = #{classroomId},</if>
+            <if test="campusName != null">campus_name = #{campusName},</if>
             <if test="lessonLocation != null">lesson_location = #{lessonLocation},</if>
             <if test="courseYear != null">course_year = #{courseYear},</if>
             <if test="termName != null and termName != ''">term_name = #{termName},</if>
@@ -211,7 +214,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <!-- 可视化课表：按 年+学期+期次 查询所有排课，可联教室表按校区过滤 -->
     <select id="selectTimetableGrid" parameterType="EduCourseSchedule" resultMap="EduCourseScheduleResult">
-        SELECT s.schedule_id, s.schedule_code, s.classroom_id, s.lesson_location, s.course_year, s.term_name, s.period_name,
+        SELECT s.schedule_id, s.schedule_code, COALESCE(NULLIF(s.campus_name,''),c.campus_name) AS campus_name, s.classroom_id, s.lesson_location, s.course_year, s.term_name, s.period_name,
                s.time_slot, s.start_time, s.end_time, s.start_date, s.end_date, s.class_pattern,
                s.grade_name, s.subject_name, s.teacher_name, s.teacher_id,
                s.class_type, s.class_mode, s.enrolled_count, s.enroll_limit, s.recruit_status, s.course_class_name,
@@ -233,7 +236,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="params.teacherUserId != null">and s.teacher_id = #{params.teacherUserId}</if>
             <if test="classType   != null and classType   != ''"> and s.class_type   = #{classType}</if>
             <!-- 用 classroom 表按校区过滤 -->
-            <if test="remark != null and remark != ''"> and c.campus_name = #{remark}</if>
+            <if test="remark != null and remark != ''"> and COALESCE(NULLIF(s.campus_name,''),c.campus_name) = #{remark}</if>
         </where>
         ORDER BY s.course_year, s.term_name, s.period_name, c.campus_name, c.classroom_id, s.time_slot
     </select>
@@ -252,17 +255,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
       因此是原子操作，不需要临时占位值，也不存在中间态。
     -->
     <update id="swapClassroom">
-        UPDATE edu_course_schedule
-        SET classroom_id = CASE classroom_id
+        UPDATE edu_course_schedule s
+        JOIN edu_classroom target ON target.classroom_id = CASE s.classroom_id
+            WHEN #{classroomIdA} THEN #{classroomIdB} WHEN #{classroomIdB} THEN #{classroomIdA} END
+        SET s.campus_name = target.campus_name,
+            s.classroom_id = CASE s.classroom_id
                 WHEN #{classroomIdA} THEN #{classroomIdB}
                 WHEN #{classroomIdB} THEN #{classroomIdA}
             END,
-            update_time = NOW()
-            <if test="updateBy != null and updateBy != ''">, update_by = #{updateBy}</if>
-        WHERE del_flag = '0'
-          AND classroom_id IN (#{classroomIdA}, #{classroomIdB})
-          <if test="courseYear != null">AND course_year = #{courseYear}</if>
-          <if test="termName != null and termName != ''">AND term_name = #{termName}</if>
-          <if test="periodName != null and periodName != ''">AND period_name = #{periodName}</if>
+            s.update_time = NOW()
+            <if test="updateBy != null and updateBy != ''">, s.update_by = #{updateBy}</if>
+        WHERE s.del_flag = '0'
+          AND s.classroom_id IN (#{classroomIdA}, #{classroomIdB})
+          <if test="courseYear != null">AND s.course_year = #{courseYear}</if>
+          <if test="termName != null and termName != ''">AND s.term_name = #{termName}</if>
+          <if test="periodName != null and periodName != ''">AND s.period_name = #{periodName}</if>
     </update>
 </mapper>

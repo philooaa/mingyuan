@@ -109,7 +109,7 @@ public class RoomAssignService
 
         return db.transactions().execute(status ->
         {
-            Map<String, Object> schedule = db.one("SELECT schedule_id,classroom_id,time_slot,teacher_name,course_class_name "
+            Map<String, Object> schedule = db.one("SELECT schedule_id,classroom_id,campus_name,time_slot,teacher_name,course_class_name "
                     + "FROM edu_course_schedule WHERE schedule_id=? AND del_flag='0' AND status='0' FOR UPDATE", scheduleId);
 
             // 该日期必须真的上课（停课/调走的课次不能调教室）
@@ -126,13 +126,11 @@ public class RoomAssignService
                 throw new ServiceException("这门课已经在「" + targetName + "」了");
 
             // 跨校区必须拦住：学生和老师跑错校区代价太大
+            String currentCampus = str(schedule.get("campusName"));
             if (currentRoomId != null)
-            {
-                Map<String, Object> current = db.one("SELECT campus_name FROM edu_classroom WHERE classroom_id=?", currentRoomId);
-                if (!str(current.get("campusName")).equals(targetCampus))
-                    throw new ServiceException("只能在同校区内调整教室：当前在" + str(current.get("campusName"))
-                            + "，目标教室属于" + targetCampus);
-            }
+                currentCampus = str(db.one("SELECT campus_name FROM edu_classroom WHERE classroom_id=?", currentRoomId).get("campusName"));
+            if (currentCampus.isEmpty() || !currentCampus.equals(targetCampus))
+                throw new ServiceException("只能在课程已选校区内分配教室；请先确认课程校区");
 
             String slot = str(schedule.get("timeSlot"));
             Map<String, Object> occupant = findOccupant(scheduleId, date, slot, targetRoomId);
@@ -140,7 +138,7 @@ public class RoomAssignService
             if (occupant == null)
             {
                 assign(scheduleId, date, targetRoomId, currentRoomId, "1", null, operator);
-                db.jdbc().update("UPDATE edu_course_schedule SET classroom_id=? WHERE schedule_id=?", targetRoomId, scheduleId);
+                db.jdbc().update("UPDATE edu_course_schedule SET classroom_id=?,campus_name=? WHERE schedule_id=?", targetRoomId, targetCampus, scheduleId);
 
                 Map<String, Object> out = new LinkedHashMap<>();
                 out.put("moved", 1);
@@ -155,8 +153,8 @@ public class RoomAssignService
             Long occupantId = id(occupant.get("scheduleId"));
             assign(scheduleId, date, targetRoomId, currentRoomId, "2", occupantId, operator);
             assign(occupantId, date, currentRoomId, targetRoomId, "2", scheduleId, operator);
-            db.jdbc().update("UPDATE edu_course_schedule SET classroom_id=? WHERE schedule_id=?", targetRoomId, scheduleId);
-            db.jdbc().update("UPDATE edu_course_schedule SET classroom_id=? WHERE schedule_id=?", currentRoomId, occupantId);
+            db.jdbc().update("UPDATE edu_course_schedule SET classroom_id=?,campus_name=? WHERE schedule_id=?", targetRoomId, targetCampus, scheduleId);
+            db.jdbc().update("UPDATE edu_course_schedule SET classroom_id=?,campus_name=? WHERE schedule_id=?", currentRoomId, targetCampus, occupantId);
 
             Map<String, Object> current = db.one("SELECT classroom_name FROM edu_classroom WHERE classroom_id=?", currentRoomId);
             Map<String, Object> out = new LinkedHashMap<>();
@@ -188,7 +186,7 @@ public class RoomAssignService
      */
     private List<Map<String, Object>> occurringCourses(LocalDate date)
     {
-        List<Map<String, Object>> rows = db.rows("SELECT schedule_id,classroom_id,time_slot,start_time,end_time,"
+        List<Map<String, Object>> rows = db.rows("SELECT schedule_id,classroom_id,campus_name,time_slot,start_time,end_time,"
                 + "start_date,end_date,class_pattern,period_name,grade_name,subject_name,teacher_name,teacher_id,"
                 + "course_class_name,class_mode,enrolled_count,term_name "
                 + "FROM edu_course_schedule WHERE del_flag='0' AND status='0' "
@@ -217,6 +215,7 @@ public class RoomAssignService
             item.put("scheduleId", String.valueOf(scheduleId));
             item.put("roomId", roomId == null ? null : String.valueOf(roomId));
             item.put("templateRoomId", templateRoom == null ? null : String.valueOf(templateRoom));
+            item.put("campusName", str(row.get("campusName")));
             item.put("timeSlot", str(row.get("timeSlot")));
             item.put("termName", str(row.get("termName")));
             item.put("periodName", str(row.get("periodName")));
@@ -254,8 +253,8 @@ public class RoomAssignService
         }
         if (latest != null) return latest;
         // 所有记录都晚于该日期：用最早一条的「变更前教室」还原历史
-        Long from = id(list.get(0).get("fromClassroomId"));
-        return from == null ? templateRoom : from;
+        // null 表示首次分配前确实没有教室，不能回落到已被更新的模板教室。
+        return id(list.get(0).get("fromClassroomId"));
     }
 
     /**
@@ -334,7 +333,7 @@ public class RoomAssignService
     private List<Map<String, Object>> activeRooms()
     {
         // 按教室名里的数字自然排序（W6 的 classroom_id 比 W11 大，按 id 排会插到 11 和 12 中间）
-        return db.rows("SELECT classroom_id,campus_name,classroom_name,sheet_code FROM edu_classroom "
+        return db.rows("SELECT classroom_id,campus_name,classroom_name FROM edu_classroom "
                 + "WHERE status='0' "
                 + "ORDER BY campus_name, CAST(REGEXP_SUBSTR(classroom_name, '[0-9]+') AS UNSIGNED), classroom_name");
     }

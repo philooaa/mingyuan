@@ -7,7 +7,7 @@ const { createRequire } = require('node:module')
 
 function page(name, roles) {
   const file = path.join(__dirname, '../pages', name, `${name}.js`)
-  const localRequire = createRequire(file), storage = { token: 'teacher-session', roles }, requests = []
+  const localRequire = createRequire(file), storage = { token: 'teacher-session', roles }, requests = [], redirects = []
   let definition
   const request = async options => {
     requests.push(options)
@@ -20,15 +20,15 @@ function page(name, roles) {
   vm.runInNewContext(fs.readFileSync(file, 'utf8'), {
     Page: value => { definition = value },
     require: id => id.endsWith('/request') ? { request } : localRequire(id),
-    wx: { getStorageSync: key => storage[key], getSystemInfoSync: () => ({ windowWidth: 375 }), stopPullDownRefresh() {} },
+    wx: { getStorageSync: key => storage[key], getSystemInfoSync: () => ({ windowWidth: 375 }), stopPullDownRefresh() {}, redirectTo: o => redirects.push(o.url) },
     setInterval: () => 0, clearInterval() {}, console
   })
   const p = { ...definition, data: structuredClone(definition.data) }
   p.setData = updates => Object.assign(p.data, updates)
-  return { p, storage, requests }
+  return { p, storage, requests, redirects }
 }
 
-for (const name of ['teacher-single-transactions', 'teacher-schedule-create', 'teacher-schedule-edit']) {
+for (const name of ['teacher-single-transactions']) {
   test(`${name}: an administrator who is also a teacher loads the teacher-scoped page`, async () => {
     const { p, requests, storage } = page(name, ['admin', 'business_admin', 'teacher', 'parent'])
     p.onLoad(name === 'teacher-schedule-edit' ? { id: '9' } : {}); await new Promise(resolve => setImmediate(resolve))
@@ -46,5 +46,12 @@ for (const name of ['teacher-single-transactions', 'teacher-schedule-create', 't
     p.onLoad({ id: '9' }); await new Promise(resolve => setImmediate(resolve))
     assert.equal(p.current(), false); assert.equal(requests.length, 0)
     p.onUnload()
+  })
+}
+
+for(const name of ['teacher-schedule-create','teacher-schedule-edit']) {
+  test(`${name}: retired teacher publisher performs no requests and redirects staff`,()=>{
+    const teacher=page(name,['teacher']);teacher.p.onLoad({id:'9'});assert.equal(teacher.redirects.length,0);assert.equal(teacher.requests.length,0)
+    const staff=page(name,['education','teacher']);staff.p.onLoad({id:'9'});assert.deepEqual(staff.redirects,['/pages/admin-schedule/admin-schedule?id=9']);assert.equal(staff.requests.length,0)
   })
 }

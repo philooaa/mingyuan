@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="card"><view class="heading">课程排课</view><view class="muted">教务、管理员统一安排课程。先选校区，教室稍后分配。</view>
+    <view class="search"><input value="{{keyword}}" bindinput="inputSearch" bindconfirm="search" placeholder="搜索课程名称" confirm-type="search"/><button size="mini" bindtap="search" disabled="{{loading || saving}}">搜索</button></view>
+    <button class="primary" bindtap="add" disabled="{{!ready || loading || saving}}">新增课程排课</button>
+  </view>
+  <view class="error" wx:if="{{error}}">{{error}}<button size="mini" bindtap="load">重新加载</button></view>
+  <view class="card" wx:for="{{list}}" wx:key="scheduleId">
+    <view class="title">{{item.courseClassName}}</view><view class="muted">{{item.gradeName}} · {{item.subjectName}} · {{item.teacherName}}</view>
+    <view>{{item.campusName || '校区待核对'}} · {{item.classroomId ? '已分配教室' : '待分配教室'}}</view>
+    <view>{{item.termName}} · {{item.periodName}} · {{item.timeSlot}}</view>
+    <view class="muted">{{item.startDate || '日期待排'}}{{item.endDate ? ' 至 ' + item.endDate : ''}}</view>
+    <view class="muted">{{item.classMode === '2' ? '一对一' : '班课'}} · {{item.status === '1' ? '已停用' : '正常'}} · {{item.recruitStatus === '0' ? '开放报名' : '停止招生'}}</view>
+    <view class="actions"><button size="mini" data-id="{{item.scheduleId}}" bindtap="edit" disabled="{{!ready || loading || saving}}">修改排课</button></view>
+  </view>
+  <view class="muted empty" wx:if="{{!loading && !error && !list.length}}">暂无排课</view>
+  <view class="pager"><button size="mini" bindtap="previous" disabled="{{pageNum <= 1 || loading || saving}}">上一页</button><text>第 {{pageNum}} 页 · 共 {{total}} 条</text><button size="mini" bindtap="next" disabled="{{pageNum * pageSize >= total || loading || saving}}">下一页</button></view>
+  <view class="shade" wx:if="{{formOpen}}">
+    <view class="sheet">
+      <view class="title">{{form.scheduleId ? '修改课程排课' : '新增课程排课'}}</view>
+      <scroll-view class="body" scroll-y><view class="form">
+        <view class="label">校区 *</view><picker range="{{campusOptions}}" bindchange="chooseCampus" disabled="{{saving || form.classroomId}}"><view class="field">{{form.campusName || '请选择校区'}} ▾</view></picker>
+        <view class="muted">本页不分配教室。{{form.classroomId ? '此课程已有教室，校区由教室分配功能调整。' : '保存后家长即可按招生状态报名。'}}</view>
+        <view class="label">课程名称 *</view><input value="{{form.courseClassName}}" data-key="courseClassName" bindinput="input" maxlength="100" disabled="{{saving}}" placeholder="请输入课程名称"/>
+        <view class="label">课程年份 *</view><input type="number" value="{{form.courseYear}}" data-key="courseYear" bindinput="input" maxlength="4" disabled="{{saving}}"/>
+        <view class="label">授课形式 *</view><picker range="{{modes}}" range-key="label" data-key="classMode" bindchange="choose" disabled="{{saving}}"><view class="field">{{form.classMode === '2' ? '一对一' : '班课'}} ▾</view></picker>
+        <block wx:for="{{fields}}" wx:key="key" wx:for-item="field"><view class="label">{{field.label}}{{field.key !== 'classType' ? ' *' : ''}}</view><picker range="{{field.options}}" range-key="label" data-key="{{field.key}}" bindchange="choose" disabled="{{saving}}"><view class="field">{{form[field.key] || '请选择'}} ▾</view></picker></block>
+        <view class="label">教师 *</view><picker range="{{teachers}}" range-key="label" bindchange="chooseTeacher" disabled="{{saving}}"><view class="field">{{form.teacherLabel || '请选择授课教师'}} ▾</view></picker>
+        <view class="label">上课模式</view><picker range="{{patterns}}" range-key="label" data-key="classPattern" bindchange="choose" disabled="{{saving || form.classMode === '2'}}"><view class="field">{{form.classPattern === 'DAILY_5_1' ? '上五休一' : '每周一次'}} ▾</view></picker>
+        <view class="label">{{form.classMode === '2' ? '一对一上课日期 *' : '开课日期（可与结课日期一起留空待排）'}}</view><picker mode="date" value="{{form.startDate}}" data-key="startDate" bindchange="date" disabled="{{saving}}"><view class="field">{{form.startDate || '选择日期'}} ▾</view></picker>
+        <block wx:if="{{form.classMode !== '2'}}"><view class="label">结课日期</view><picker mode="date" value="{{form.endDate}}" data-key="endDate" bindchange="date" disabled="{{saving}}"><view class="field">{{form.endDate || '选择日期'}} ▾</view></picker></block>
+        <view class="label">课时单价（元）</view><input type="digit" value="{{form.unitPrice}}" data-key="unitPrice" bindinput="input" disabled="{{saving}}" placeholder="可留空"/>
+        <view class="label">报名上限</view><input type="number" value="{{form.enrollLimit}}" data-key="enrollLimit" bindinput="input" disabled="{{saving}}" placeholder="0 或留空表示不限"/>
+        <view class="label">招生状态</view><picker range="{{recruitOptions}}" range-key="label" data-key="recruitStatus" bindchange="choose" disabled="{{saving}}"><view class="field">{{form.recruitStatus === '0' ? '开放报名' : form.recruitStatus === '2' ? '已满' : '停止招生'}} ▾</view></picker>
+        <view class="label">课程状态</view><picker range="{{statusOptions}}" range-key="label" data-key="status" bindchange="choose" disabled="{{saving}}"><view class="field">{{form.status === '1' ? '停用' : '正常'}} ▾</view></picker>
+        <view class="label">备注</view><textarea value="{{form.remark}}" data-key="remark" bindinput="input" maxlength="500" disabled="{{saving}}"/>
+        <view class="error" wx:if="{{formError}}">{{formError}}</view>
+      </view></scroll-view>
+      <view class="footer"><button bindtap="close" disabled="{{saving}}">取消</button><button class="primary" bindtap="save" loading="{{saving}}" disabled="{{saving}}">保存排课</button></view>
+    </view>
+  </view>
+</view>

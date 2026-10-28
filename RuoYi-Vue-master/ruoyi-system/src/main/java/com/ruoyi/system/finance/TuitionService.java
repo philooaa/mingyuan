@@ -102,7 +102,7 @@ public class TuitionService {
                 "parentName",
                 FinanceRules.parentSearchSql("u"),
                 "campusName",
-                "c.campus_name",
+                "COALESCE(NULLIF(s.campus_name,''),c.campus_name)",
                 "courseClassName",
                 "s.course_class_name",
                 "enrollmentCode",
@@ -272,7 +272,7 @@ public class TuitionService {
       "SELECT e.*,"
           + FinanceRules.parentNameSql("u")
           + " parent_name,COALESCE(e.fee_title_snapshot,s.course_class_name)"
-          + " course_class_name,COALESCE(e.campus_name_snapshot,c.campus_name) campus_name,(SELECT"
+          + " course_class_name,COALESCE(e.campus_name_snapshot,NULLIF(s.campus_name,''),c.campus_name) campus_name,(SELECT"
           + " COALESCE(SUM(p.amount),0) FROM edu_tuition_payment p WHERE"
           + " p.enrollment_id=e.enrollment_id AND p.payment_status='SUCCESS')"
           + " received_amount,(SELECT COALESCE(SUM(r.approved_amount),0) FROM edu_tuition_refund r"
@@ -390,7 +390,7 @@ public class TuitionService {
                 "courseClassName",
                 "COALESCE(e.fee_title_snapshot,s.course_class_name)",
                 "campusName",
-                "c.campus_name")
+                "COALESCE(NULLIF(s.campus_name,''),c.campus_name)")
             .entrySet())
       if (!str(q, f.getKey()).isEmpty()) {
         where += " AND " + f.getValue() + " LIKE ?";
@@ -463,7 +463,7 @@ public class TuitionService {
           require("PENDING_PRICE".equals(e.get("billingStatus")), "新报名初始化状态不正确");
           var s =
               db.one(
-                  "SELECT s.*,c.campus_name FROM edu_course_schedule s JOIN edu_classroom c ON"
+                  "SELECT s.*,COALESCE(NULLIF(s.campus_name,''),c.campus_name) campus_name FROM edu_course_schedule s LEFT JOIN edu_classroom c ON"
                       + " c.classroom_id=s.classroom_id WHERE s.schedule_id=?",
                   e.get("scheduleId"));
           Map<String, Object> v =
@@ -527,7 +527,7 @@ public class TuitionService {
               "存在缴费历史后不能切换真实／模拟模式");
           var s =
               db.one(
-                  "SELECT s.course_class_name,c.campus_name FROM edu_course_schedule s JOIN"
+                  "SELECT s.course_class_name,COALESCE(NULLIF(s.campus_name,''),c.campus_name) campus_name FROM edu_course_schedule s LEFT JOIN"
                       + " edu_classroom c ON c.classroom_id=s.classroom_id WHERE s.schedule_id=?",
                   e.get("scheduleId"));
           updateBill(
@@ -1781,7 +1781,7 @@ public class TuitionService {
                       e.get("enrollmentStatus"));
               var s =
                   db.one(
-                      "SELECT s.course_class_name,c.campus_name FROM edu_course_schedule s JOIN"
+                      "SELECT s.course_class_name,COALESCE(NULLIF(s.campus_name,''),c.campus_name) campus_name FROM edu_course_schedule s LEFT JOIN"
                           + " edu_classroom c ON c.classroom_id=s.classroom_id WHERE"
                           + " s.schedule_id=?",
                       e.get("scheduleId"));
