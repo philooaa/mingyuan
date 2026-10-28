@@ -29,6 +29,7 @@ public class MiniAppParentController extends BaseController
     @Autowired private com.ruoyi.system.service.OneToOneEnrollmentService singleService;
     @Autowired private com.ruoyi.system.service.LessonCreditService lessonCredits;
     @Autowired private com.ruoyi.system.service.ParentAccountService personal;
+    @Autowired private com.ruoyi.system.finance.CourseOrderService orders;
 
     @PreAuthorize("@ss.hasRole('parent')") @GetMapping("/account")
     public AjaxResult account() { return success(personal.detail(com.ruoyi.common.utils.SecurityUtils.getUserId(),false)); }
@@ -102,6 +103,42 @@ public class MiniAppParentController extends BaseController
     @PreAuthorize("@ss.hasRole('parent')")
     @GetMapping("/single/lessons")
     public AjaxResult singleLessons() { return success(singleService.available()); }
+
+    /** 购物车结算：一个购物车生成一个订单，一次收款。 */
+    @PreAuthorize("@ss.hasAnyRoles('parent')")
+    @PostMapping("/cart/order")
+    public AjaxResult createCartOrder(@RequestBody com.ruoyi.common.core.domain.model.MiniAppCartOrderBody body)
+    {
+        if(body.getAccountId()!=null){personal.ownedChild(body.getAccountId());if(!body.getAccountId().equals(body.getLessonAccountId()))throw new com.ruoyi.common.exception.ServiceException("报名孩子与当前孩子不一致");}
+        return success(orders.createOrder(com.ruoyi.common.utils.SecurityUtils.getUserId(), body));
+    }
+
+    /** 我的课程订单（含课程明细）。 */
+    @PreAuthorize("@ss.hasAnyRoles('parent')")
+    @GetMapping("/orders")
+    public AjaxResult myOrders(@RequestParam(required=false) Long accountId)
+    {
+        if(accountId!=null)personal.ownedChild(accountId);
+        return success(orders.myOrders(com.ruoyi.common.utils.SecurityUtils.getUserId(), accountId));
+    }
+
+    @PreAuthorize("@ss.hasAnyRoles('parent')")
+    @GetMapping("/order/{id}")
+    public AjaxResult orderDetail(@PathVariable Long id,@RequestParam(required=false) Long accountId)
+    {
+        if(accountId!=null)personal.ownedChild(accountId);
+        return success(orders.detail(id, com.ruoyi.common.utils.SecurityUtils.getUserId(), false));
+    }
+
+    @PreAuthorize("@ss.hasAnyRoles('parent')")
+    @Log(title="家长取消课程订单",businessType=BusinessType.UPDATE)
+    @DeleteMapping("/order/{id}")
+    public AjaxResult cancelOrder(@PathVariable Long id,@RequestParam(required=false) Long accountId)
+    {
+        if(accountId!=null)personal.ownedChild(accountId);
+        orders.cancelOrder(id, com.ruoyi.common.utils.SecurityUtils.getUserId(), false, "家长取消订单");
+        return success("订单已取消");
+    }
 
     public static class CancelRequest { public String reason; public Long accountId; }
     @PreAuthorize("@ss.hasRole('parent')")
