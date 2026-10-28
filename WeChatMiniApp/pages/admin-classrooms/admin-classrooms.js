@@ -43,7 +43,7 @@ Page({
       })
       const groups = keys.map((k) => ({
         campus: k,
-        rooms: byCampus[k].sort((a, b) => a.classroomName.localeCompare(b.classroomName, 'zh')),
+        rooms: byCampus[k].sort((a, b) => a.classroomName.localeCompare(b.classroomName, 'zh', { numeric: true })),
         realCount: byCampus[k].filter((r) => r.classroomName.indexOf('待重排') !== 0 && r.classroomName !== '缺教室').length
       }))
       this.setData({ groups, total: rooms.length, loading: false })

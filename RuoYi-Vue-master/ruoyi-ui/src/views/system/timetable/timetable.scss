@@ -480,3 +480,138 @@
 ::v-deep .el-table .occ-row-cancelled:hover > td {
   background: #ebebeb !important;
 }
+
+/* ============ 课表日历 ============ */
+.cal-wrap {
+  display: flex;
+  gap: 16px;
+  min-height: 480px;
+}
+.cal-side {
+  width: 470px;
+  flex-shrink: 0;
+}
+.cal-main {
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid #ebeef5;
+  padding-left: 16px;
+}
+
+/* 日历单元格压扁一点，一屏能看到整月 */
+::v-deep .el-calendar__header { padding: 6px 10px; }
+::v-deep .el-calendar__body { padding: 8px 10px 10px; }
+::v-deep .el-calendar-table .el-calendar-day { height: 58px; padding: 2px; }
+::v-deep .el-calendar-table td.is-selected { background: transparent; }
+::v-deep .el-calendar-table td.is-today { background: #fdf6ec; }
+
+.cal-cell {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s;
+}
+/* 有课的日期：黄色高亮 */
+.cal-cell.cal-has {
+  background: #fff5cf;
+  box-shadow: inset 0 0 0 1px #f0d48a;
+}
+.cal-cell.cal-has:hover { background: #ffeeb0; }
+.cal-cell.cal-pick {
+  box-shadow: inset 0 0 0 2px #e6a23c;
+  background: #ffe9a8;
+}
+.cal-num { font-size: 14px; line-height: 18px; color: #303133; }
+.cal-has .cal-num { color: #b8860b; font-weight: 700; }
+.cal-cnt {
+  margin-top: 2px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 15px;
+  border-radius: 8px;
+  background: #e6a23c;
+  color: #fff;
+}
+
+.cal-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.cal-date { font-size: 16px; font-weight: 700; color: #303133; }
+.cal-wk { font-size: 13px; color: #909399; }
+.cal-sum { margin-left: auto; font-size: 12px; color: #909399; }
+.cal-empty {
+  padding: 90px 0;
+  text-align: center;
+  font-size: 13px;
+  color: #909399;
+}
+.cal-list {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.cal-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: #fafcff;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+}
+.cal-item-time {
+  width: 84px;
+  flex-shrink: 0;
+  padding-top: 1px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #409eff;
+}
+.cal-item-body { flex: 1; min-width: 0; }
+.cal-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cal-item-sub { margin-top: 3px; font-size: 12px; color: #909399; }
+.cal-item-sub .dot { margin: 0 4px; color: #dcdfe6; }
+
+.cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 0;
+  font-size: 12px;
+  color: #909399;
+}
+.cal-legend .lg-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #fff5cf;
+  box-shadow: inset 0 0 0 1px #f0d48a;
+}
+
+.cal-item-term {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  color: #7a5c00;
+  background: #fff5cf;
+  border-radius: 3px;
+}

@@ -56,7 +56,13 @@ public class ScheduleAvailabilityService {
     }
     public List<Map<String,Object>> adjustments(Long id, boolean locked) {
         if (id == null) return List.of();
-        return db.rows("SELECT adjustment_id,original_date,adjusted_date FROM edu_schedule_adjustment WHERE schedule_id=? ORDER BY adjustment_id"+(locked ? " FOR UPDATE" : ""),id);
+        // 该排课自己的单条记录 + 同学期期次的日期级记录（schedule_id=0，一条管整天）
+        return db.rows("SELECT a.adjustment_id,a.original_date,a.adjusted_date FROM edu_schedule_adjustment a "
+                + "JOIN edu_course_schedule s ON s.schedule_id=? "
+                + "WHERE a.schedule_id=s.schedule_id OR (a.schedule_id=0 AND a.term_name=s.term_name "
+                + "AND a.period_name=s.period_name AND NOT EXISTS (SELECT 1 FROM edu_schedule_adjustment x "
+                + "WHERE x.schedule_id=s.schedule_id AND x.original_date=a.original_date)) "
+                + "ORDER BY a.adjustment_id"+(locked ? " FOR UPDATE" : ""),id);
     }
     public SortedSet<LocalDate> dates(EduCourseSchedule s, List<Map<String,Object>> changes) {
         return ScheduleCalendar.dates(ScheduleCalendar.date(s.getStartDate()),ScheduleCalendar.date(s.getEndDate()),s.getClassPattern(),s.getPeriodName(),changes);
@@ -89,7 +95,14 @@ public class ScheduleAvailabilityService {
         var rows = db.rows("SELECT schedule_id,teacher_id,classroom_id,start_time,end_time,start_date,end_date,class_pattern,period_name FROM edu_course_schedule WHERE status='0' AND del_flag='0' AND schedule_id<>?",excludeId == null ? -1 : excludeId);
         Map<String,SortedSet<LocalDate>> dates = new HashMap<>();
         Map<Long,List<Map<String,Object>>> changes = new HashMap<>();
-        for(var change : db.rows("SELECT schedule_id,original_date,adjusted_date FROM edu_schedule_adjustment ORDER BY adjustment_id"))
+        for(var change : db.rows("SELECT s.schedule_id AS schedule_id,a.original_date,a.adjusted_date "
+                + "FROM edu_schedule_adjustment a JOIN edu_course_schedule s "
+                + "ON s.term_name=a.term_name AND s.period_name=a.period_name "
+                + "WHERE a.schedule_id=0 AND s.del_flag='0' AND s.status='0' "
+                + "AND NOT EXISTS (SELECT 1 FROM edu_schedule_adjustment x WHERE x.schedule_id=s.schedule_id "
+                + "AND x.original_date=a.original_date) "
+                + "UNION ALL SELECT schedule_id,original_date,adjusted_date FROM edu_schedule_adjustment "
+                + "WHERE schedule_id<>0 ORDER BY 1"))
             changes.computeIfAbsent(id(change.get("scheduleId")),ignored -> new ArrayList<>()).add(change);
         int pending = 0;
         for (var row : rows) {

@@ -21,9 +21,16 @@ public class EduScheduleAdjustment extends BaseEntity
     @Excel(name = "调课ID")
     private Long adjustmentId;
 
-    /** 关联排课ID */
-    @Excel(name = "排课ID")
+    /** 关联排课ID；0 表示「整期次」日期级记录（一条记录作用于该学期期次当天全部课程） */
     private Long scheduleId;
+
+    /** 学期（日期级记录用） */
+    @Excel(name = "学期")
+    private String termName;
+
+    /** 期次/上课日（日期级记录用） */
+    @Excel(name = "期次")
+    private String periodName;
 
     /** 原上课日期 */
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -34,6 +41,10 @@ public class EduScheduleAdjustment extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd")
     @Excel(name = "调整后日期", width = 30, dateFormat = "yyyy-MM-dd")
     private Date adjustedDate;
+
+    /** 涉及课程数（日期级记录用） */
+    @Excel(name = "涉及课程数")
+    private Integer courseCount;
 
     /** 调课原因（国庆节/元旦等） */
     @Excel(name = "调课原因")
@@ -57,6 +68,36 @@ public class EduScheduleAdjustment extends BaseEntity
     public Long getScheduleId()
     {
         return scheduleId;
+    }
+
+    public void setTermName(String termName)
+    {
+        this.termName = termName;
+    }
+
+    public String getTermName()
+    {
+        return termName;
+    }
+
+    public void setPeriodName(String periodName)
+    {
+        this.periodName = periodName;
+    }
+
+    public String getPeriodName()
+    {
+        return periodName;
+    }
+
+    public void setCourseCount(Integer courseCount)
+    {
+        this.courseCount = courseCount;
+    }
+
+    public Integer getCourseCount()
+    {
+        return courseCount;
     }
 
     public void setOriginalDate(Date originalDate)
@@ -94,8 +135,11 @@ public class EduScheduleAdjustment extends BaseEntity
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
             .append("adjustmentId", getAdjustmentId())
             .append("scheduleId", getScheduleId())
+            .append("termName", getTermName())
+            .append("periodName", getPeriodName())
             .append("originalDate", getOriginalDate())
             .append("adjustedDate", getAdjustedDate())
+            .append("courseCount", getCourseCount())
             .append("reason", getReason())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())

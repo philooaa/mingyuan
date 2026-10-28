@@ -79,6 +79,10 @@ public class TimetableImportService
     /** 兜底教师匹配：姓+老师（取文本中最后一个「X老师」，教师名通常在课程文本末尾） */
     private static final Pattern TEACHER_FALLBACK = Pattern.compile("([\\u4e00-\\u9fa5])老师");
     private static final String TEACHER_STOP_CHARS = "的了是在有和与班级辅导主任讲";
+    /** 单元格里的括号补充说明，如「幼小衔接语文许叶子（15：00~16：30）」 */
+    private static final Pattern BRACKET_CONTENT = Pattern.compile("[（(][^）)]*[）)]");
+    /** 字典里没有、但原表实际出现过的班型写法（含错别字），摘姓名时要一并去掉 */
+    private static final Pattern CLASS_TYPE_LOOSE = Pattern.compile("(常规|尖子|培优|特长|校优|拓展|提高|基础|冲刺|衔接)[班版]");
 
     private static final List<String> EXTRA_CLASS_TYPES = Arrays.asList("常规班", "常规版", "培优班");
 
@@ -584,7 +588,7 @@ public class TimetableImportService
     {
         if (rows == null || rows.isEmpty()) throw new ServiceException("没有可导入的数据");
         Map<String, Object> syncStat = syncMasterData(rows, username);
-        int inserted = 0, updated = 0, skipped = 0, incomplete = 0, dated = 0, undated = 0;
+        int inserted = 0, updated = 0, skipped = 0, incomplete = 0, dated = 0, undated = 0, restored = 0;
         // 哪些学期没能写入日期（没设起止日期 / 学期·期次判定不出规则），导入后提示用户去补
         Set<String> undatedTerms = new LinkedHashSet<>();
         List<String> skipMsgs = new ArrayList<>();
@@ -663,6 +667,16 @@ public class TimetableImportService
             {
                 if (!updateSupport) { skipped++; if (skipMsgs.size() < 10) skipMsgs.add("已存在（未勾选覆盖）：" + s.getCourseClassName()); continue; }
                 s.setScheduleId(exist.getScheduleId());
+                // 教师补绑后自动解除停用：这类行当初就是因为「教师未绑定」才被置成停用，
+                // 现在本次导入已经能定位到教师，就该回到正常状态——否则课表页只查 status='0'，
+                // 会出现「预览识别成功、导完课表上还是看不到」的假象。
+                // 只放开备注明确写着「教师未绑定」的行：冲突、原表缺信息等其它原因的停用必须留给人处理。
+                if (teacherId != null && "1".equals(exist.getStatus()) && isUnboundTeacherStop(exist))
+                {
+                    s.setStatus("0");
+                    s.setRemark("");   // 清掉已经失效的「需补充教师资料」提示
+                    restored++;
+                }
                 s.setUpdateBy(username);
                 if (complete)
                 {
@@ -695,6 +709,7 @@ public class TimetableImportService
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("inserted", inserted);
         out.put("updated", updated);
+        out.put("restored", restored);
         out.put("skipped", skipped);
         out.put("incomplete", incomplete);
         out.put("dated", dated);
@@ -1271,7 +1286,7 @@ public class TimetableImportService
         }
         else
         {
-            // 取文本中最后一个「X老师」的姓，过滤虚词
+            // ① 旧课表：取文本中最后一个「X老师」的姓，过滤虚词
             Matcher m = TEACHER_FALLBACK.matcher(text);
             String surname = null;
             while (m.find()) surname = m.group(1);
@@ -1279,6 +1294,14 @@ public class TimetableImportService
             {
                 teacherGuess = surname + "老师";
                 teacher = teacherGuess;
+            }
+            // ② 现用课表：单元格是「初二英语常规班\n王文晶」，姓名在末尾、没有「老师」二字。
+            //    这种情况以前完全兜不住：既匹配不到账号、也不会自动建号，只能人工补，于是永久「未识别教师」。
+            //    这里把年级/科目/班型/括号补充说明都摘掉，剩下的纯姓名才作为建号候选。
+            if (teacherGuess == null)
+            {
+                String cand = teacherNameCandidate(text, grade, subject, classType);
+                if (cand != null) { teacherGuess = cand; teacher = cand; }
             }
         }
         item.put("gradeName", grade);
@@ -1288,6 +1311,37 @@ public class TimetableImportService
         item.put("teacherId", teacherId);
         item.put("teacherGuess", teacherGuess);
         item.put("courseClassName", text);
+    }
+
+    /**
+     * 从「年级 + 科目 + 班型 + 姓名」结构的单元格文本里摘出教师姓名，供自动建号使用。
+     * <p>只在「摘干净之后正好剩下 2~4 个汉字」时才认：摘不干净（例如「幼小衔接」这种字典里没有的前缀、
+     * 或原文带了备注）一律返回 null，宁可继续标红让人工补，也不能拿半截文字去建一个假教师账号。
+     */
+    private String teacherNameCandidate(String text, String grade, String subject, String classType)
+    {
+        String s = normalize(text);
+        if (StringUtils.isEmpty(s)) return null;
+        s = BRACKET_CONTENT.matcher(s).replaceAll("");
+        if (StringUtils.isNotEmpty(grade))     s = s.replace(grade, "");
+        if (StringUtils.isNotEmpty(subject))   s = s.replace(subject, "");
+        if (StringUtils.isNotEmpty(classType)) s = s.replace(classType, "");
+        // 字典里没有的班型写法（如原表错别字「常规版」）也要摘掉，否则会连着姓名一起留下来
+        s = CLASS_TYPE_LOOSE.matcher(s).replaceAll("");
+        s = s.replaceAll("[^\\u4e00-\\u9fa5]", "");
+        if (s.length() < 2 || s.length() > 4) return null;
+        if (TEACHER_STOP_CHARS.indexOf(s.charAt(0)) >= 0) return null;
+        if (s.matches(".*[班版级科课学老].*")) return null;
+        return s;
+    }
+
+    /**
+     * 该排课是不是「因为教师没绑定所以被停用」。
+     * <p>只有这一类停用能在补绑教师后自动恢复；冲突、原表缺信息等其它停用原因必须留给人处理。
+     */
+    private static boolean isUnboundTeacherStop(EduCourseSchedule exist)
+    {
+        return exist != null && StringUtils.trimToEmpty(exist.getRemark()).contains("教师未绑定");
     }
 
     // =================================================================

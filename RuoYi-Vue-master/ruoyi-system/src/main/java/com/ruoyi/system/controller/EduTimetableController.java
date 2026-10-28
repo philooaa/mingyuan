@@ -1,8 +1,11 @@
 package com.ruoyi.system.controller;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +34,8 @@ import com.ruoyi.system.service.ISysRoleService;
 import com.ruoyi.system.service.ISysUserService;
 import com.ruoyi.system.service.ScheduleAvailabilityService;
 import com.ruoyi.system.service.ScheduleCalendar;
+import com.ruoyi.system.timetable.TimetableCalendarService;
+import com.ruoyi.system.timetable.TimetableExportService;
 import com.ruoyi.system.timetable.TimetableImportService;
 
 /**
@@ -61,10 +66,16 @@ public class EduTimetableController extends BaseController
     private TimetableImportService timetableImportService;
 
     @Autowired
+    private TimetableExportService exportService;
+
+    @Autowired
     private ScheduleAvailabilityService availability;
 
     @Autowired
     private IEduScheduleAdjustmentService adjustmentService;
+
+    @Autowired
+    private TimetableCalendarService calendarService;
 
     /**
      * 维度数据：返回页面初始化需要的下拉框 + 固定时段 + 校区分组教室
@@ -198,8 +209,139 @@ public class EduTimetableController extends BaseController
             @RequestParam(value = "classType",   required = false) String classType,
             @RequestParam(value = "classroomId", required = false) Long classroomId)
     {
+        EduCourseSchedule q = buildGridQuery(courseYear, termName, periodName, campusName,
+                gradeName, subjectName, teacherId, teacherName, classType, classroomId);
+
+        List<EduCourseSchedule> rows = scheduleService.selectTimetableGrid(q);
+        Map<String, Object> data = new HashMap<>();
+        // 前端用 "classroomId@timeSlot" 做 key 快速索引；同一格允许多条排课（冲突由前端红色感叹号提示）
+        // 教室或时段缺失的排课也能取回：缺失部分用 "-" 占位（前端分别落在「未指定教室」列 / 「未指定时段」行）
+        Map<String, List<EduCourseSchedule>> map = new LinkedHashMap<>();
+        for (EduCourseSchedule s : rows) {
+            String cid = s.getClassroomId() == null ? "-" : String.valueOf(s.getClassroomId());
+            String slot = StringUtils.isEmpty(s.getTimeSlot()) ? "-" : s.getTimeSlot();
+            map.computeIfAbsent(cid + "@" + slot, k -> new ArrayList<>()).add(s);
+        }
+        data.put("rows", rows);
+        data.put("cellMap", map);
+        return success(data);
+    }
+
+    /**
+     * 课表日历：把排课展开成具体日期，供页面日历高亮「有课的日期」。
+     *
+     * <p>和 {@link #grid} 不同，这里 <b>不按学年 / 学期 / 期次过滤</b>：一个日历看全部课，
+     * 只要那天有课就标出来，日期清单里用学期标签区分是哪一期。
+     * 校区 / 年级 / 科目 / 教师 / 教室这些筛选照旧生效。
+     */
+    @PreAuthorize("@ss.hasPermi('system:courseschedule:list') or @ss.hasAnyRoles('admin,teacher')")
+    @GetMapping("/calendar")
+    public AjaxResult calendar(
+            @RequestParam(value = "courseYear",  required = false) Integer courseYear,
+            @RequestParam(value = "termName",    required = false) String termName,
+            @RequestParam(value = "periodName",  required = false) String periodName,
+            @RequestParam(value = "campusName",  required = false) String campusName,
+            @RequestParam(value = "gradeName",   required = false) String gradeName,
+            @RequestParam(value = "subjectName", required = false) String subjectName,
+            @RequestParam(value = "teacherId",   required = false) Long teacherId,
+            @RequestParam(value = "teacherName", required = false) String teacherName,
+            @RequestParam(value = "classType",   required = false) String classType,
+            @RequestParam(value = "classroomId", required = false) Long classroomId)
+    {
+        EduCourseSchedule q = buildGridQuery(courseYear, termName, periodName, campusName,
+                gradeName, subjectName, teacherId, teacherName, classType, classroomId);
+        return success(calendarService.build(scheduleService.selectTimetableGrid(q)));
+    }
+
+    /**
+     * 课表导出：把当前筛选条件下的课表导出为 xlsx。
+     * <p>第一张表「课表」与页面版式一致（纵轴时段、横轴教室、表头按校区合并），
+     * 第二张表「排课明细」是同一批数据的平表，便于筛选与统计。
+     * <p>筛选口径与 {@link #grid} 完全一致，导出的就是页面上看到的那些课。
+     */
+    @PreAuthorize("@ss.hasPermi('system:courseschedule:list') or @ss.hasAnyRoles('admin,teacher')")
+    @Log(title = "可视化课表-导出", businessType = BusinessType.EXPORT)
+    @PostMapping("/export")
+    public void export(HttpServletResponse response,
+            @RequestParam(value = "courseYear") Integer courseYear,
+            @RequestParam(value = "termName")   String termName,
+            @RequestParam(value = "periodName") String periodName,
+            @RequestParam(value = "campusName",  required = false) String campusName,
+            @RequestParam(value = "gradeName",   required = false) String gradeName,
+            @RequestParam(value = "subjectName", required = false) String subjectName,
+            @RequestParam(value = "teacherId",   required = false) Long teacherId,
+            @RequestParam(value = "teacherName", required = false) String teacherName,
+            @RequestParam(value = "classType",   required = false) String classType,
+            @RequestParam(value = "classroomId", required = false) Long classroomId) throws IOException
+    {
+        EduCourseSchedule q = buildGridQuery(courseYear, termName, periodName, campusName,
+                gradeName, subjectName, teacherId, teacherName, classType, classroomId);
+        List<EduCourseSchedule> rows = scheduleService.selectTimetableGrid(q);
+
+        // 横轴教室：与页面同一份数据（只含启用教室）；按校区筛选时只导出该校区
+        EduClassroom cq = new EduClassroom();
+        cq.setStatus("0");
+        List<EduClassroom> rooms = classroomService.selectEduClassroomList(cq).stream()
+                .filter(c -> StringUtils.isEmpty(campusName) || campusName.equals(c.getCampusName()))
+                .collect(Collectors.toList());
+
+        // 纵轴时段：字典固定时段 ∪ 数据里实际出现的时段（与页面 rowSlots 一致，
+        // 否则非标准时段（如 8:00-9:30）的课会在导出里整行消失）
+        List<String> slots = new ArrayList<>();
+        for (Map<String, String> m : dictLabelValueList("edu_time_slot"))
+        {
+            String v = m.get("value");
+            if (StringUtils.isNotEmpty(v) && !slots.contains(v)) slots.add(v);
+        }
+        List<String> extras = rows.stream().map(EduCourseSchedule::getTimeSlot)
+                .filter(StringUtils::isNotEmpty).distinct().filter(s -> !slots.contains(s))
+                .sorted().collect(Collectors.toList());
+        slots.addAll(extras);
+
+        String title = String.join(" ", Arrays.asList(
+                courseYear == null ? "" : courseYear + "年",
+                StringUtils.trimToEmpty(termName), StringUtils.trimToEmpty(periodName), "课表")).replaceAll("\\s+", " ").trim();
+
+        List<String> conds = new ArrayList<>();
+        if (StringUtils.isNotEmpty(campusName))  conds.add("校区=" + campusName);
+        if (StringUtils.isNotEmpty(gradeName))   conds.add("年级=" + gradeName);
+        if (StringUtils.isNotEmpty(subjectName)) conds.add("科目=" + subjectName);
+        if (teacherId != null)
+        {
+            String tn = dimsTeacherName(teacherId);
+            conds.add("教师=" + (StringUtils.isEmpty(tn) ? String.valueOf(teacherId) : tn));
+        }
+        else if (StringUtils.isNotEmpty(teacherName))
+        {
+            conds.add("教师=" + teacherName);
+        }
+        String subtitle = (conds.isEmpty() ? "筛选条件：全部" : "筛选条件：" + String.join("，", conds))
+                + "；共 " + rows.size() + " 门课；导出时间："
+                + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date());
+
+        String base = TimetableExportService.buildFileBaseName(courseYear, termName, periodName, campusName);
+        exportService.export(response, base, title, subtitle, rooms, slots, rows);
+    }
+
+    /** 按 teacher_id 取展示名，仅用于导出副标题里的「教师=xxx」。 */
+    private String dimsTeacherName(Long teacherId)
+    {
+        SysUser u = userService.selectUserById(teacherId);
+        if (u == null) return null;
+        return com.ruoyi.system.service.impl.EduCourseScheduleServiceImpl.realNameOf(
+                Map.of("userName", StringUtils.trimToEmpty(u.getUserName()),
+                       "nickName", StringUtils.trimToEmpty(u.getNickName())));
+    }
+
+    /**
+     * 组装课表网格查询条件，供 {@link #grid} 与 {@link #export} 共用，避免两处口径走偏。
+     */
+    private EduCourseSchedule buildGridQuery(Integer courseYear, String termName, String periodName, String campusName,
+                                             String gradeName, String subjectName, Long teacherId, String teacherName,
+                                             String classType, Long classroomId)
+    {
         EduCourseSchedule q = new EduCourseSchedule();
-        q.setCourseYear(courseYear.longValue());
+        q.setCourseYear(courseYear == null ? null : courseYear.longValue());
         q.setTermName(termName);
         q.setPeriodName(periodName);
         // remark 字段在 XML 里被借来当 campusName 条件（不入库，仅用在联表教室的 and c.campus_name = #{remark}）
@@ -220,20 +362,7 @@ public class EduTimetableController extends BaseController
         }
         q.setClassType(classType);
         q.setClassroomId(classroomId);
-
-        List<EduCourseSchedule> rows = scheduleService.selectTimetableGrid(q);
-        Map<String, Object> data = new HashMap<>();
-        // 前端用 "classroomId@timeSlot" 做 key 快速索引；同一格允许多条排课（冲突由前端红色感叹号提示）
-        // 教室或时段缺失的排课也能取回：缺失部分用 "-" 占位（前端分别落在「未指定教室」列 / 「未指定时段」行）
-        Map<String, List<EduCourseSchedule>> map = new LinkedHashMap<>();
-        for (EduCourseSchedule s : rows) {
-            String cid = s.getClassroomId() == null ? "-" : String.valueOf(s.getClassroomId());
-            String slot = StringUtils.isEmpty(s.getTimeSlot()) ? "-" : s.getTimeSlot();
-            map.computeIfAbsent(cid + "@" + slot, k -> new ArrayList<>()).add(s);
-        }
-        data.put("rows", rows);
-        data.put("cellMap", map);
-        return success(data);
+        return q;
     }
 
     /**
