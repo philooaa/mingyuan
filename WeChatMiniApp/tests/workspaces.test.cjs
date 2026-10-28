@@ -185,7 +185,7 @@ test('code rejection and an abandoned login never replace an active session', as
 })
 
 
-test('login screen is phone-only and the homepage uses the assigned-role action sheet', async () => {
+test('phone login keeps the assigned-role action sheet and hides preview on real devices', async () => {
   const registerMarkup = fs.readFileSync(path.join(root, 'pages/register/register.wxml'), 'utf8')
   const homeMarkup = fs.readFileSync(path.join(root, 'pages/index/index.wxml'), 'utf8')
   assert.match(registerMarkup, /open-type="getPhoneNumber"/)
@@ -193,9 +193,37 @@ test('login screen is phone-only and the homepage uses the assigned-role action 
   assert.match(homeMarkup, /bindtap="openRoleMenu"/)
   assert.doesNotMatch(homeMarkup, /workspace-tabs|switchTestAccount|切换测试账号/)
   const h = harness('register', [], [], o => o.url === '/miniapp/dev/session' ? { data: { version: 'local' } } : undefined)
+  h.wx.getDeviceInfo = () => ({ platform: 'ios' })
   h.store.delete('token'); h.p.onLoad()
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(h.p.data.developmentLoginEnabled, false)
   assert.equal(h.calls.some(o => o.url === '/miniapp/dev/session'), false)
   h.p.onUnload()
+})
+
+
+test('loopback preview automatically enters the existing account without a tap or WeChat authorization', async () => {
+  const assigned = ['parent', 'teacher', 'education', 'admin']
+  const h = harness('register', assigned, ['*:*:*'], o => {
+    if (o.url === '/miniapp/dev/session') return { data: { version: 'local' } }
+    if (o.url === '/miniapp/login') return { token: 'preview-token' }
+  })
+  h.wx.login = () => assert.fail('preview must not call WeChat login')
+  await h.p.handleLocalPreview(); assert.equal(h.calls.length, 0)
+  await h.p.loadLocalPreview(); assert.equal(h.p.data.localPreviewEnabled, true)
+  assert.equal(h.store.get('token'), 'preview-token')
+  assert.deepEqual(Array.from(h.store.get('roles')), assigned)
+  assert.ok(h.navigations.includes('/pages/index/index'))
+})
+test('preview is unavailable on phones, remote backends, and backends without explicit development confirmation', async () => {
+  for (const kind of ['phone', 'remote', 'disabled']) {
+    const h = harness('register')
+    if (kind === 'phone') h.wx.getDeviceInfo = () => ({ platform: 'ios' })
+    if (kind === 'remote') h.app.globalData.baseUrl = 'https://test-admin.mingyuantostars.online/prod-api'
+    await h.p.loadLocalPreview()
+    assert.equal(h.p.data.localPreviewEnabled, false)
+    await h.p.handleLocalPreview()
+    assert.equal(h.calls.some(o => o.method === 'POST'), false)
+    assert.equal(h.store.get('token'), 'original-token')
+  }
 })

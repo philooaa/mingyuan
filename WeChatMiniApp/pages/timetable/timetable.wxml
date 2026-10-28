@@ -56,4 +56,14 @@
       <view class="pay-tag" wx:if="{{!teacherMode}}">{{course.payText}}</view>
     </view>
   </view>
+  <view class="advisor-card" wx:if="{{!teacherMode}}">
+    <view class="advisor-title">报名及缴费提醒</view>
+    <view class="advisor-notice">提交报名后，课程顾问将在24小时内联系您，确认课程安排、缴费及相关事项。您也可以主动添加课程顾问咨询。</view>
+    <view class="advisor-wechat-row">
+      <text class="advisor-wechat" selectable="{{true}}">顾问微信：{{advisorWechat}}</text>
+      <button class="advisor-copy" bindtap="copyAdvisorWechat">复制微信号</button>
+    </view>
+    <image class="advisor-qr" src="{{advisorQrImage}}" mode="widthFix" show-menu-by-longpress="{{true}}" bindtap="previewAdvisorQr" />
+    <view class="advisor-hint">点击二维码查看大图，可保存后使用微信扫一扫添加；也可搜索上方微信号添加。</view>
+  </view>
 </view>

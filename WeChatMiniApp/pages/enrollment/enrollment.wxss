@@ -297,9 +297,9 @@ page {
 .teacher-options { max-height: 360rpx; }
 .teacher-option { display: flex; align-items: center; gap: 12rpx; padding: 18rpx 10rpx; font-size: 25rpx; }
 .teacher-option.selected { background: #eaf3ff; color: #0f58a8; }
-.teacher-group-title { margin: 24rpx 0 14rpx; font-size: 27rpx; font-weight: 700; color: #0b326a; }
+.course-group-title { margin: 24rpx 0 14rpx; font-size: 27rpx; font-weight: 700; color: #0b326a; }
 
-.teacher-tag, .teacher-option, .teacher-group-title { white-space: normal; word-break: break-all; }
+.teacher-tag, .teacher-option, .course-group-title { white-space: normal; word-break: break-all; }
 .single-course-card { margin-bottom:18rpx; border-radius:16rpx; background:white; overflow:hidden; border:1rpx solid rgba(18,41,72,.06); }
 .single-course-heading { padding:22rpx; }
 .date-toggle { margin-top:18rpx; color:#0f58a8; font-size:25rpx; font-weight:700; }
@@ -320,7 +320,7 @@ page {
 .teacher-filter { padding:20rpx; margin-bottom:20rpx; border:1rpx solid #e8edf4; border-radius:14rpx; }
 .teacher-filter-title { color:#52627a; font-size:25rpx; font-weight:500; }
 .teacher-tag { background:#edf2ff; color:#2459d9; border-radius:8rpx; }
-.teacher-group-title { display:flex; align-items:center; margin:24rpx 0 14rpx; font-size:26rpx; color:#52627a; }
+.course-group-title { display:flex; align-items:center; margin:24rpx 0 14rpx; font-size:26rpx; color:#52627a; }
 .section-title { font-size:30rpx; font-weight:700; }
 .schedule-card,.enroll-card,.single-course-card { border-color:#e8edf4; box-shadow:none; border-radius:18rpx; }
 .schedule-card,.enroll-card { padding:24rpx; }

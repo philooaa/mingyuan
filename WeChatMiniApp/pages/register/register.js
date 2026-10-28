@@ -11,6 +11,7 @@ const devRoles = [
 Page({
   data: {
     submitting: false,
+    localPreviewEnabled: false,
     phone: '', verificationCode: '', codeSending: false, cooldown: 0,
     configLoading: true, phoneLoginEnabled: false, developmentCodeMode: false, developmentCode: '', codePhone: '',
     developmentLoginEnabled: false, showDevelopment: false,
@@ -40,6 +41,35 @@ Page({
       return
     }
     this.loadPhoneConfig()
+    this.loadLocalPreview()
+  },
+
+  isLocalPreviewEnvironment() {
+    return access.developmentTool() && typeof getApp === 'function' && /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/?$/.test(getApp().globalData.baseUrl || '')
+  },
+  async loadLocalPreview() {
+    if (!this.isLocalPreviewEnvironment()) return
+    try {
+      const res = await request({ url: '/miniapp/dev/session', timeout: 10000 })
+      if (!this._unloaded) {
+        this.setData({ localPreviewEnabled: !!(res.data && res.data.version) })
+        if (this.data.localPreviewEnabled) await this.handleLocalPreview()
+      }
+    } catch (_) { /* 本地后端未启用预览时仍使用正常授权。 */ }
+  },
+  async handleLocalPreview() {
+    if (this._unloaded || this.data.submitting || !this.data.localPreviewEnabled || !this.isLocalPreviewEnvironment()) return
+    const previousToken = wx.getStorageSync('token')
+    this.setData({ submitting: true, loginError: '' })
+    try {
+      const login = await request({ url: '/miniapp/login', method: 'POST', data: { loginCode: 'mock', phoneCode: 'mock', devRole: 'admin' } })
+      if (this._unloaded || wx.getStorageSync('token') !== previousToken) return
+      const info = await request({ url: '/getInfo', header: { Authorization: 'Bearer ' + login.token } })
+      if (this._unloaded || wx.getStorageSync('token') !== previousToken) return
+      this.activateAccount(login.token, info)
+      wx.reLaunch({ url: '/pages/index/index' })
+    } catch (e) { if (!this._unloaded) this.setData({ loginError: e.message || '本地预览登录失败' }) }
+    finally { if (!this._unloaded) this.setData({ submitting: false }) }
   },
 
   async loadPhoneConfig() {
