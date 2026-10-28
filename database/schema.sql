@@ -108,7 +108,7 @@ CREATE TABLE `edu_course_schedule` (
   `end_time` time DEFAULT NULL COMMENT '结束时间',
   `start_date` date DEFAULT NULL COMMENT '本期开课日期（第一次上课日）',
   `end_date` date DEFAULT NULL COMMENT '本期结课日期（最后一次上课日）',
-  `class_pattern` varchar(32) DEFAULT NULL COMMENT '上课模式（WEEKLY每周/DAILY_5_1上5休1）',
+  `class_pattern` varchar(32) DEFAULT NULL COMMENT '上课模式（WEEKLY每周/DAILY连上无假期/DAILY_5_1上5休1/DAILY_6_1上6休1/DAILY_5_2上5休2）',
   `grade_name` varchar(20) NOT NULL COMMENT '年级',
   `subject_name` varchar(20) NOT NULL COMMENT '科目',
   `teacher_name` varchar(30) DEFAULT '' COMMENT '教师姓名',

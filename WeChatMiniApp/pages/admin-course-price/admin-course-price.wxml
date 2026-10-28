@@ -1,0 +1,77 @@
+<view class="page">
+  <view class="section">
+    <view class="section-head">
+      <text class="section-title">年级定价规则</text>
+      <text class="section-sub">单价 × 课次数 = 课程总价</text>
+    </view>
+    <view wx:if="{{loading}}" class="tip">加载中…</view>
+    <view wx:else class="rule-list">
+      <view class="rule" wx:for="{{rules}}" wx:key="gradeName" data-grade="{{item.gradeName}}" bindtap="openEdit">
+        <view class="rule-main">
+          <text class="rule-grade">{{item.gradeName}}</text>
+          <text class="rule-meta">{{item.courseCount}} 门课程<text wx:if="{{item.pendingCount > 0}}" class="rule-warn"> · {{item.pendingCount}} 门与规则不一致</text></text>
+        </view>
+        <view class="rule-right">
+          <text class="rule-price">{{item.unitPriceText}}</text>
+          <text class="rule-unit">元/节</text>
+        </view>
+      </view>
+      <view wx:if="{{rules.length === 0}}" class="tip">暂无定价规则</view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-head">
+      <text class="section-title">按年级 + 学科批量改价</text>
+    </view>
+    <view class="form-item">
+      <text class="form-label">年级</text>
+      <picker mode="selector" range="{{grades}}" value="{{batchGradeIndex}}" bindchange="onBatchGrade">
+        <view class="picker-value">{{grades[batchGradeIndex] || '请选择'}}<text class="picker-arrow">▾</text></view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">学科</text>
+      <picker mode="selector" range="{{subjects}}" value="{{batchSubjectIndex}}" bindchange="onBatchSubject">
+        <view class="picker-value">{{subjects[batchSubjectIndex] || '请选择'}}<text class="picker-arrow">▾</text></view>
+      </picker>
+    </view>
+    <view class="form-item">
+      <text class="form-label">单价（元/节）</text>
+      <input class="form-input" type="digit" value="{{batchPrice}}" placeholder="如 150" bindinput="onBatchPrice" />
+    </view>
+
+    <view class="batch-ops">
+      <button class="btn ghost" size="mini" bindtap="previewBatch" loading="{{batchPreviewing}}">预览影响范围</button>
+      <button class="btn primary" size="mini" bindtap="submitBatch" loading="{{saving}}">应用到课程</button>
+    </view>
+
+    <view wx:if="{{batchPreview}}" class="preview">
+      <view class="preview-head">共 {{batchPreview.total}} 门课程将被改价</view>
+      <view class="preview-row" wx:for="{{batchPreview.rows}}" wx:key="scheduleId">
+        <view class="preview-name">{{item.courseClassName}}</view>
+        <view class="preview-meta">{{item.lessonCount}} 课次 · 当前 {{item.unitPrice}} 元/节 · 总价 {{item.tuitionPrice}} 元</view>
+      </view>
+      <view wx:if="{{batchPreview.total > batchPreview.rows.length}}" class="preview-more">仅显示前 {{batchPreview.rows.length}} 门</view>
+    </view>
+  </view>
+
+  <view wx:if="{{editVisible}}" class="mask" bindtap="closeEdit">
+    <view class="sheet" catchtap="noop">
+      <view class="sheet-head">
+        <text class="sheet-title">{{editForm.gradeName}} 定价</text>
+        <text class="sheet-close" bindtap="closeEdit">取消</text>
+      </view>
+      <view class="form-item">
+        <text class="form-label">单价（元/节）</text>
+        <input class="form-input" type="digit" data-field="unitPrice" value="{{editForm.unitPrice}}" bindinput="onEditField" />
+      </view>
+      <view class="form-item switch-row">
+        <text class="form-label">同时套用到该年级课程</text>
+        <switch checked="{{editForm.applyCourses}}" bindchange="onEditToggle" />
+      </view>
+      <view class="sheet-hint">该年级共 {{editForm.courseCount}} 门课程；套用后课程总价按课次数自动重算。</view>
+      <button class="btn primary block" bindtap="submitEdit" loading="{{saving}}">保存</button>
+    </view>
+  </view>
+</view>

@@ -31,6 +31,24 @@ public class CouponService {
         "FORBIDDEN: 管理员权限不足");
   }
 
+  /**
+   * 仅管理员本人：登记收款、确认收款、开具收据只允许 role_key=admin，教务与业务管理员一律不行。
+   * 与 {@link #admin(long)} 的区别是不把 business_admin 视为管理员。
+   */
+  public void strictAdmin(long actor) {
+    require(
+        db.jdbc()
+                .queryForObject(
+                    "SELECT COUNT(*) FROM sys_user u JOIN sys_user_role ur ON ur.user_id=u.user_id"
+                        + " JOIN sys_role r ON r.role_id=ur.role_id WHERE u.user_id=? AND"
+                        + " u.status='0' AND u.del_flag='0' AND r.role_key='admin' AND r.status='0'"
+                        + " AND r.del_flag='0'",
+                    Integer.class,
+                    actor)
+            > 0,
+        "FORBIDDEN: 登记收款、确认收款与开具收据只允许管理员操作，教务只能核价");
+  }
+
   public String username(long actor) {
     return str(db.one("SELECT user_name FROM sys_user WHERE user_id=?", actor), "userName");
   }

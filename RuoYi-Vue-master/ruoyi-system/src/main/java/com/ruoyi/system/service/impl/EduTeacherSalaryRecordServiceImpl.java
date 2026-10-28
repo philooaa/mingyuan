@@ -338,18 +338,24 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
             }
             return n;
         }
-        if ("DAILY_5_1".equals(pattern))
+        if (com.ruoyi.system.service.ScheduleCalendar.isDaily(pattern))
         {
             LocalDate from = toLocalDate(s.get("startDate"));
             if (from == null)
             {
                 return 0;
             }
+            // 日循环按 ScheduleCalendar 统一口径：连上无假期(1/1) / 上5休1(5/6) / 上6休1(6/7) / 上5休2(5/7)
+            int cycle = com.ruoyi.system.service.ScheduleCalendar.cycle(pattern);
+            int study = com.ruoyi.system.service.ScheduleCalendar.studyDays(pattern);
+            if (cycle <= 0 || study <= 0)
+            {
+                return 0;
+            }
             int n = 0;
             for (LocalDate d = begin; !d.isAfter(finish); d = d.plusDays(1))
             {
-                // 每 6 天为一轮：第 1~5 天上课，第 6 天休息
-                if (ChronoUnit.DAYS.between(from, d) % 6 != 5)
+                if (ChronoUnit.DAYS.between(from, d) % cycle < study)
                 {
                     n++;
                 }

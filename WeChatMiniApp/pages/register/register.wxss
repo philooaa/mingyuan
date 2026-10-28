@@ -87,3 +87,5 @@ page {
 .auth-footer { margin: 36rpx 12rpx 0; text-align: center; color: #98a5b7; font-size: 22rpx; line-height: 1.9; }
 
 .wechat-btn + .wechat-btn { margin-top: 20rpx; }
+.dev-backend { margin-top: 18rpx; text-align: center; color: #94a0b1; font-size: 22rpx; line-height: 1.6; word-break: break-all; }
+.dev-tip { color: #1767ba; }

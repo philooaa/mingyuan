@@ -8,6 +8,7 @@
     </view>
 
     <view class="account-toolbar">
+      <button wx:if="{{developmentLoginEnabled}}" class="logout-button" size="mini" bindtap="switchPreviewIdentity">切换预览身份</button>
       <button wx:if="{{currentRole === 'parent' && roles.length}}" class="logout-button" size="mini" bindtap="openChildren">管理孩子信息 ›</button>
       <button class="logout-button" size="mini" bindtap="logout">退出登录</button>
     </view>

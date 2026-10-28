@@ -77,6 +77,7 @@ const roleProfiles = {
       { key:'personalAccount', title: '交易管理', icon: '交', tone: 'gold', route: '/pages/admin-transactions/admin-transactions' },
       { key:'referral', title: '优惠券管理', icon: '券', tone: 'violet', route: '/pages/admin-referral/admin-referral' },
       { title: '教师管理', icon: '师', tone: 'indigo', route: '/pages/admin-teachers/admin-teachers' },
+      { title: '课程定价', icon: '价', tone: 'gold', route: '/pages/admin-course-price/admin-course-price' },
       { title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' },
       { title: '退费管理', icon: '退', tone: 'orange', route: '/pages/admin-tuition-refunds/admin-tuition-refunds' },
       { title: '薪资核算', icon: '薪', tone: 'red' },
@@ -96,7 +97,7 @@ const roleProfiles = {
 // 工作台只展示后端实际授予的身份。
 roleProfiles.education = {
   name: '教务', tag: '全校区教务管理', eyebrow: '教务端', title: '课程出勤、收费与退费初审',
-  stats: [], actions: roleProfiles.admin.actions.filter(a => ['排课管理', '教室管理', '教室分配', '学生档案', '收费财务', '退费管理', '学生出勤'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
+  stats: [], actions: roleProfiles.admin.actions.filter(a => ['排课管理', '教室管理', '教室分配', '学生档案', '收费财务', '退费管理', '学生出勤', '课程定价'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
 }
 
 function normalizeRole(roleKey) {
@@ -248,6 +249,32 @@ Page({
   onLoad() {
     this._unloaded = false
     this._visible = false
+    this.detectDevelopment()
+  },
+
+  // 探测本机后端的开发会话，用于显示「切换预览身份」入口。真机 baseUrl 是线上地址，不会触发。
+  async detectDevelopment() {
+    const base = getApp().globalData.baseUrl || ''
+    if (!/^http:\/\/(127\.0\.0\.1|localhost|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(base)) return
+    try {
+      const res = await request({ url: '/miniapp/dev/session', timeout: 5000 })
+      if (!this._unloaded && res.data && res.data.version) this.setData({ developmentLoginEnabled: true })
+    } catch (_) { /* 非本地后端时不提供预览切换。 */ }
+  },
+
+  switchPreviewIdentity() {
+    if (!this.data.developmentLoginEnabled || this.data.roleSwitching) return
+    wx.showModal({
+      title: '切换预览身份',
+      content: '将退出当前登录，回到登录页重新选择身份。',
+      confirmText: '继续',
+      success: res => {
+        if (!res.confirm) return
+        ;['token', 'roles', 'userInfo', 'devSessionVersion'].forEach(k => wx.removeStorageSync(k))
+        Object.assign(getApp().globalData, { token: '', roles: [], permissions: [], userInfo: null })
+        wx.reLaunch({ url: '/pages/register/register?pickRole=1' })
+      }
+    })
   },
 
   onShow() {
@@ -319,7 +346,7 @@ Page({
     const role = getRoleFromStorage(info.roles || [])
     const financeAllowed = access.staff() && access.can('system:tuition:list')
     this._teacherLoadVersion = (this._teacherLoadVersion || 0) + 1
-    this.setData({ teacherDataMessage: '',currentChild:null,parentChildren:[],childLoading:false,childError:'',showChildPicker:false,parentScheduleError:'', roleLocked: workspaces.length < 2, developmentLoginEnabled: false, ...buildRoleState(role, workspaces) })
+    this.setData({ teacherDataMessage: '',currentChild:null,parentChildren:[],childLoading:false,childError:'',showChildPicker:false,parentScheduleError:'', roleLocked: workspaces.length < 2, developmentLoginEnabled: this.data.developmentLoginEnabled, ...buildRoleState(role, workspaces) })
     if(role==='education')this.loadSignReviewPending()
     if(role==='parent' || role==='admin') { this.loadAccountPending();if(role==='admin'){this.loadReferralPending();this.loadSignReviewPending()};this._accountTimer=setInterval(()=>{this.loadAccountPending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending()}},30000) }
 
