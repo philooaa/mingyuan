@@ -20,7 +20,7 @@ function setup({single=true,pending=false,confirm=true,requestError=null,holdMod
   p.data.loadSucceeded=true;p.data.timetable=[row]
   let refreshes=0
   p.loadTimetable=async()=>{refreshes++;if(single)row.cancelRequestStatus='1';p.data.timetable=p.decorateTimetable([row])}
-  return {p,storage,calls,modals,toasts,otherPage,row,confirmModal:()=>modalCallback(),refreshes:()=>refreshes,
+  return {p,wx,storage,calls,modals,toasts,otherPage,row,confirmModal:()=>modalCallback(),refreshes:()=>refreshes,
     event:{currentTarget:{dataset:{enrollmentId:42}}}}
 }
 
@@ -73,4 +73,19 @@ test('teacher, unloaded data and unlisted enrollment cannot send cancellation',a
     if(condition==='missing')s.p.data.timetable=[]
     await s.p.handleCancel(s.event);assert.equal(s.calls.length,0);assert.equal(s.modals.length,0)
   }
+})
+
+
+test('parent timetable contact card copies the supplied WeChat ID and previews the packaged QR', () => {
+  const s=setup(), copied=[], previews=[]
+  s.wx.setClipboardData=o=>{copied.push(o.data);o.success()};s.wx.previewImage=o=>previews.push(o)
+  s.p.copyAdvisorWechat();s.p.previewAdvisorQr()
+  assert.deepEqual(copied,['myedu666888'])
+  assert.equal(previews[0].current,s.p.data.advisorQrImage)
+  assert.deepEqual(Array.from(previews[0].urls),[s.p.data.advisorQrImage])
+  assert.ok(fs.existsSync(path.join(__dirname,'..',s.p.data.advisorQrImage)))
+  const markup=fs.readFileSync(path.join(__dirname,'../pages/timetable/timetable.wxml'),'utf8')
+  assert.match(markup,/24小时内/);assert.match(markup,/class="advisor-card" wx:if="{{!teacherMode}}"/)
+  s.p.data.teacherMode=true;s.p.copyAdvisorWechat();s.p.previewAdvisorQr()
+  assert.equal(copied.length,1);assert.equal(previews.length,1)
 })

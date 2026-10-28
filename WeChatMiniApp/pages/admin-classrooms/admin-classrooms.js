@@ -62,7 +62,7 @@ Page({
   openEdit(e) {
     const id = e.currentTarget.dataset.id
     let room = null
-    this.data.groups.forEach((g) => { g.rooms.forEach((r) => { if (r.classroomId === id) room = r }) })
+    this.data.groups.forEach((g) => { g.rooms.forEach((r) => { if (String(r.classroomId) === String(id)) room = r }) })
     if (!room) return
     const idx = this.data.campusOptions.indexOf(room.campusName)
     this.setData({

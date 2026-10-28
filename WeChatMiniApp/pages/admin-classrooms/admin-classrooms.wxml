@@ -31,8 +31,8 @@
         <text class="sheet-title">{{editForm.classroomId ? '编辑教室' : '新增教室'}}</text>
         <text class="sheet-close" bindtap="closeEdit">取消</text>
       </view>
-      <view class="form-item"><text class="form-label">教室名称</text><input class="form-input" data-field="classroomName" value="{{editForm.classroomName}}" placeholder="如 万达24-7"/></view>
-      <view class="form-item"><text class="form-label">教室编号</text><input class="form-input" data-field="classroomCode" value="{{editForm.classroomCode}}" placeholder="如 ROOM024"/></view>
+      <view class="form-item"><text class="form-label">教室名称</text><input class="form-input" data-field="classroomName" bindinput="onField" value="{{editForm.classroomName}}" placeholder="如 万达24-7"/></view>
+      <view class="form-item"><text class="form-label">教室编号</text><input class="form-input" data-field="classroomCode" bindinput="onField" value="{{editForm.classroomCode}}" placeholder="如 ROOM024"/></view>
       <view class="form-item">
         <text class="form-label">所属校区</text>
         <picker class="form-picker" range="{{campusOptions}}" value="{{editForm.campusIndex}}" bindchange="onCampus">

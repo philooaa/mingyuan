@@ -3,6 +3,8 @@ const { request } = require('../../utils/request')
 
 Page(childContext.page({
   data: {
+    advisorWechat: 'myedu666888',
+    advisorQrImage: '/images/course-advisor-wechat.png',
     loading: false,
     loadError: '',
     loadSucceeded: false,
@@ -43,6 +45,18 @@ Page(childContext.page({
         fail:()=>{if (!this._unloaded) this._redirecting=false}})
     }
     return true
+  },
+
+  copyAdvisorWechat() {
+    if (this._unloaded || this.data.teacherMode) return
+    wx.setClipboardData({ data: this.data.advisorWechat,
+      success: () => wx.showToast({ title: '微信号已复制', icon: 'success' }),
+      fail: () => wx.showToast({ title: '复制失败，请长按微信号复制', icon: 'none' }) })
+  },
+
+  previewAdvisorQr() {
+    if (this._unloaded || this.data.teacherMode) return
+    wx.previewImage({ current: this.data.advisorQrImage, urls: [this.data.advisorQrImage] })
   },
 
   onUnload() { this._unloaded = true; this._loadVersion = (this._loadVersion || 0) + 1 },

@@ -42,7 +42,7 @@ test('native checkbox changes select multiple teachers and show the union of the
   const { p, calls } = harness(); await p.loadSchedules()
   p.chooseTeachers(change(['teacher:11', 'teacher:12']))
   assert.deepEqual(Array.from(p.data.selectedTeacherKeys).sort(), ['teacher:11', 'teacher:12'])
-  assert.deepEqual(Array.from(p.data.teacherGroups, g => g.key).sort(), ['teacher:11', 'teacher:12'])
+  assert.deepEqual(Array.from(p.data.schedules, c => c.teacherId).sort(), ['11', '12'])
   assert.equal(calls.length, 2, 'teacher selection must not send booking requests')
 })
 test('search-based multi-select preserves hidden selected teachers and select-all adds only visible candidates', async () => {
@@ -61,7 +61,7 @@ test('explicit select-all checks every eligible teacher while clear restores an 
   p.selectAllTeachers(); p.selectAllTeachers()
   assert.deepEqual(Array.from(p.data.selectedTeacherKeys).sort(), ['teacher:11', 'teacher:12'])
   assert.equal(p.data.teacherOptions.every(t => t.selected), true); assert.equal(p.data.allVisibleTeachersSelected, true)
-  p.clearTeachers(); assert.equal(p.data.selectedTeacherKeys.length, 0); assert.equal(p.data.teacherGroups.length, 2)
+  p.clearTeachers(); assert.equal(p.data.selectedTeacherKeys.length, 0); assert.equal(p.data.courseGroups.length, 1)
   assert.equal(p.data.allVisibleTeachersSelected, false)
 })
 test('changing dimensions removes unavailable teachers, and stale sessions cannot change filters', async () => {
@@ -70,4 +70,37 @@ test('changing dimensions removes unavailable teachers, and stale sessions canno
   assert.equal(p.data.selectedTeacherKeys.length, 0); assert.deepEqual(Array.from(p.data.teacherOptions, t => t.key), ['teacher:13'])
   storage.token = 'different-parent'; p.selectAllTeachers(); p.chooseTeachers(change(['teacher:13']))
   assert.equal(p.data.selectedTeacherKeys.length, 0)
+})
+
+
+test('a fixed grade groups by subject in dictionary order instead of teacher names', async () => {
+  const { p } = harness(); await p.loadSchedules(); p.onGradeChange(change(1))
+  assert.deepEqual(Array.from(p.data.courseGroups, g => g.label), ['数学', '英语'])
+  assert.equal(p.data.sortHint, '按学科排列')
+  assert.deepEqual(Array.from(p.data.courseGroups[0].courses, c => c.teacherId), ['11', '12'])
+})
+test('a fixed subject groups by grade and both filters still narrow to one grade', async () => {
+  const { p } = harness(); await p.loadSchedules(); p.onSubjectChange(change(1))
+  assert.deepEqual(Array.from(p.data.courseGroups, g => g.label), ['五年级', '高一'])
+  assert.equal(p.data.sortHint, '按年级排列')
+  p.onGradeChange(change(1))
+  assert.deepEqual(Array.from(p.data.courseGroups, g => g.label), ['五年级'])
+  assert.deepEqual(Array.from(p.data.schedules, c => c.scheduleId), ['1', '2'])
+})
+test('unfiltered courses are ordered by grade then subject and class enrollment uses the same grouping', async () => {
+  const { p } = harness(); await p.loadSchedules()
+  assert.deepEqual(Array.from(p.data.courseGroups, g => g.label), ['五年级', '高一'])
+  assert.deepEqual(Array.from(p.data.courseGroups[0].courses, c => c.subjectName), ['数学', '数学', '英语'])
+  p.onCourseTypeChange(change(0)); p.onGradeChange(change(1))
+  assert.deepEqual(Array.from(p.data.courseGroups, g => g.label), ['数学'])
+  assert.deepEqual(Array.from(p.data.schedules, c => c.scheduleId), ['4'])
+})
+test('subject grouping preserves one-to-one course dates and expansion', async () => {
+  const { p } = harness(o => ({ data: o.url.endsWith('/single/lessons') ? [{ ...lesson(1, teachers[0]), lessons: [{ classDate: '2030-10-09', canEnroll: true }, { classDate: '2030-10-07', canEnroll: true }] }] : [] }))
+  await p.loadSchedules(); p.onGradeChange(change(1))
+  const course = p.data.courseGroups[0].courses[0]
+  assert.equal(p.data.courseGroups[0].label, '数学'); assert.equal(course.lessonCount, 2)
+  assert.deepEqual(Array.from(course.lessons, c => c.classDate), ['2030-10-07', '2030-10-09'])
+  p.toggleCourseDates({ currentTarget: { dataset: { id: '1' } } })
+  assert.equal(p.data.courseGroups[0].courses[0].expanded, true)
 })
