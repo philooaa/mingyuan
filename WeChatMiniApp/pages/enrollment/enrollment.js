@@ -8,7 +8,7 @@ Page(childContext.page({
     scopeAccountId:'',
     submitting: false,
     schedules: [],
-    teacherGroups: [], teacherOptions: [], selectedTeacherKeys: [], selectedTeachers: [],
+    courseGroups: [], sortHint: '按年级排列', teacherOptions: [], selectedTeacherKeys: [], selectedTeachers: [],
     teacherKeyword: '', showTeacherPicker: false, allVisibleTeachersSelected: false,
     enrollments: [],
     showScheduleEmpty: false,
@@ -157,10 +157,25 @@ Page(childContext.page({
     const keys = this.data.selectedTeacherKeys.filter(key => eligibleKeys.has(key))
     this.setData({ selectedTeacherKeys: keys })
     const schedules = eligible.filter(course => !keys.length || keys.includes(course.teacherKey))
+    const bySubject = !!grade && !subject
+    const field = bySubject ? 'subjectName' : 'gradeName'
+    const secondaryField = bySubject ? 'gradeName' : 'subjectName'
+    const primaryDict = bySubject ? this.data.subjects : this.data.grades
+    const secondaryDict = bySubject ? this.data.grades : this.data.subjects
+    const compare = (a, b, dict) => {
+      const rank = value => { const i = dict.findIndex(item => item.dictLabel === value || item.dictValue === value); return i < 0 ? dict.length : i }
+      return rank(a) - rank(b) || String(a || '').localeCompare(String(b || ''), 'zh-CN', { numeric: true })
+    }
+    schedules.sort((a, b) => compare(a[field], b[field], primaryDict) || compare(a[secondaryField], b[secondaryField], secondaryDict)
+      || String(a.classDate || a.startDate || '').localeCompare(String(b.classDate || b.startDate || ''))
+      || String(a.startTime || a.timeSlot || '').localeCompare(String(b.startTime || b.timeSlot || ''), 'zh-CN', { numeric: true })
+      || String(a.scheduleId).localeCompare(String(b.scheduleId), 'en', { numeric: true }))
     const groups = new Map()
     schedules.forEach(course => {
-      if (!groups.has(course.teacherKey)) groups.set(course.teacherKey, { key: course.teacherKey, label: (this._teachers || []).find(t => t.key === course.teacherKey).label, courses: [] })
-      groups.get(course.teacherKey).courses.push(course)
+      const label = course[field] || (bySubject ? '未设置学科' : '未设置年级')
+      const key = `${field}:${label}`
+      if (!groups.has(key)) groups.set(key, { key, label, courses: [] })
+      groups.get(key).courses.push(course)
     })
     if (this.data.courseTypeIndex === 1) groups.forEach(group => {
       const courses = new Map()
@@ -173,7 +188,7 @@ Page(childContext.page({
       })
       group.courses = Array.from(courses.values()).map(course => ({ ...course, lessonCount: course.lessons.length, availableLessonCount: course.lessons.filter(lesson => lesson.canEnroll).length }))
     })
-    this.setData({ schedules, teacherGroups: Array.from(groups.values()).sort((a,b) => a.label.localeCompare(b.label, 'zh-CN')), showScheduleEmpty: schedules.length === 0 })
+    this.setData({ schedules, courseGroups: Array.from(groups.values()), sortHint: bySubject ? '按学科排列' : '按年级排列', showScheduleEmpty: schedules.length === 0 })
     this.updateTeacherOptions()
   },
 

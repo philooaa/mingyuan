@@ -296,3 +296,13 @@ page {
 .student { background:#f1f4f9; color:#52627a; font-weight:500; border-radius:8rpx; }
 .period-title { font-size:28rpx; font-weight:700; }
 .empty { box-shadow:none; border:1rpx solid #e8edf4; }
+
+.advisor-card { margin: 28rpx 24rpx 0; padding: 28rpx; border: 1rpx solid #e8edf4; border-radius: 18rpx; background: #fff; }
+.advisor-title { color: #173e70; font-size: 30rpx; font-weight: 700; }
+.advisor-notice { margin-top: 16rpx; color: #52627a; font-size: 26rpx; line-height: 1.8; }
+.advisor-wechat-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 24rpx; }
+.advisor-wechat { color: #173e70; font-size: 27rpx; line-height: 1.6; word-break: break-all; }
+.advisor-copy { flex-shrink: 0; margin: 0; padding: 0 20rpx; min-height: 64rpx; border-radius: 12rpx; background: #edf2ff; color: #2459d9; font-size: 24rpx; line-height: 64rpx; }
+.advisor-copy::after { border: none; }
+.advisor-qr { display: block; width: 100%; max-width: 560rpx; margin: 24rpx auto 0; }
+.advisor-hint { margin-top: 12rpx; color: #73839a; text-align: center; font-size: 23rpx; line-height: 1.7; }

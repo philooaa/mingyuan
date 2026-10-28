@@ -85,3 +85,5 @@ page {
 }
 .register-note { margin-top: 24rpx; text-align: center; color: #94a0b1; font-size: 23rpx; line-height: 1.6; }
 .auth-footer { margin: 36rpx 12rpx 0; text-align: center; color: #98a5b7; font-size: 22rpx; line-height: 1.9; }
+
+.wechat-btn + .wechat-btn { margin-top: 20rpx; }
