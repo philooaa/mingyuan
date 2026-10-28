@@ -27,6 +27,7 @@ public final class FinanceReceiptPdf {
         layout.line("报名编号：" + value(snapshot, "enrollmentCode", ""), 11);
         layout.line("学生姓名：" + value(snapshot, "studentName", ""), 12);
         layout.line("课程名称：" + value(snapshot, "courseClassName", ""), 12);
+        layout.items(snapshot.get("orderItems"));
         layout.line("校区：" + value(snapshot, "campusName", ""), 12);
         layout.line("课程原价：" + value(snapshot, "originalAmount", "0.00") + " 元", 12);
         layout.line("优惠减免：" + value(snapshot, "discountAmount", "0.00") + " 元", 12);
@@ -89,6 +90,40 @@ public final class FinanceReceiptPdf {
       stream.newLineAtOffset(x, at);
       stream.showText(s);
       stream.endText();
+    }
+
+    /** 购物车订单逐门列出课程，一张收据也能看清这一单收了哪几门课。 */
+    void items(Object raw) throws IOException {
+      if (!(raw instanceof java.util.List<?> list) || list.isEmpty()) return;
+      line("课程明细：", 12);
+      int index = 1;
+      for (Object entry : list) {
+        if (!(entry instanceof java.util.Map<?, ?> m)) continue;
+        StringBuilder text = new StringBuilder();
+        text.append("  ").append(index++).append(". ").append(field(m, "courseName"));
+        String meta = join(field(m, "gradeName"), field(m, "subjectName"));
+        if (!meta.isEmpty()) text.append("｜").append(meta);
+        String lessons = field(m, "lessonCount"), unit = field(m, "unitPrice");
+        if (!lessons.isEmpty()) {
+          text.append("（").append(lessons).append(" 课次");
+          if (!unit.isEmpty()) text.append(" × ").append(unit).append(" 元");
+          text.append("）");
+        }
+        String amount = field(m, "amount");
+        if (!amount.isEmpty()) text.append("   ").append(amount).append(" 元");
+        line(text.toString(), 11);
+      }
+    }
+
+    private static String field(java.util.Map<?, ?> m, String key) {
+      Object v = m.get(key);
+      return v == null ? "" : v.toString().trim();
+    }
+
+    private static String join(String a, String b) {
+      if (a.isEmpty()) return b;
+      if (b.isEmpty()) return a;
+      return a + " · " + b;
     }
 
     void line(String input, float size) throws IOException {

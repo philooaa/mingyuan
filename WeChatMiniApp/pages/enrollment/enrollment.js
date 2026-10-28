@@ -24,6 +24,7 @@ Page(childContext.page({
     subjectIndex: 0,
     gradeIndex: 0,
     selectedSchedule: null,
+    cart: [], cartCount: 0, cartTotal: '0.00', cartMode: false,
     lessonAccounts: [], creditAccount:null, lessonAccountOptions: [], lessonAccountIndex:0, selectedChildId:null, newChild:true, childMissing:false, settlementMethod:'C', accountsError:'', accountsLoading:false,
     form: {
       studentName: '',
@@ -36,6 +37,7 @@ Page(childContext.page({
     this._token = wx.getStorageSync('token')
     this._unloaded = false
     if (options.courseType === '2') this.setData({ courseTypeIndex: 1 })
+    this.loadCart()
     this.loadDict().then(() => this.loadPage())
   },
 
@@ -259,6 +261,8 @@ Page(childContext.page({
         timeText: this.buildTimeText(item),
         placeText: this.buildPlaceText(item),
         countText: `已报名 ${item.enrolledCount || 0} 人`,
+        priceText: this.buildPriceText(item),
+        inCart: (this.data.cart || []).some(c => String(c.scheduleId) === String(item.scheduleId)),
         canEnroll,
         statusClass: canEnroll ? 'ok' : 'disabled',
         statusText: item.classDate ? item.statusText : enrolled ? '已报名' : '报名'
@@ -321,8 +325,111 @@ Page(childContext.page({
     this.setData({ subjectIndex: 0, gradeIndex: 0, selectedTeacherKeys: [], teacherKeyword: '' }); this.applyFilters()
   },
 
-  openEnroll(e) {
-    const schedule = this.data.schedules.find((item) => item.viewKey === e.currentTarget.dataset.key)
+  // ---- 购物车：一个购物车 = 一个订单 ----
+  loadCart() {
+    const saved = wx.getStorageSync('enrollCart')
+    this.setData({ cart: Array.isArray(saved) ? saved : [] })
+    this.refreshCartSummary()
+  },
+
+  saveCart() { wx.setStorageSync('enrollCart', this.data.cart) },
+
+  refreshCartSummary() {
+    const cart = this.data.cart || []
+    const total = cart.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+    this.setData({ cartCount: cart.length, cartTotal: total.toFixed(2) })
+    const ids = new Set(cart.map(item => String(item.scheduleId)))
+    const mark = list => (list || []).map(course => ({ ...course, inCart: ids.has(String(course.scheduleId)) }))
+    this._allSchedules = mark(this._allSchedules)
+    this.setData({ schedules: mark(this.data.schedules) })
+  },
+
+  buildPriceText(item) {
+    const unit = Number(item.unitPrice || 0)
+    const total = Number(item.tuitionPrice || 0)
+    const count = Number(item.lessonCount || 0)
+    if (!(total > 0)) return '价格待教务核定'
+    return count > 0 ? `${unit.toFixed(2)} 元/节 × ${count} 节 = ${total.toFixed(2)} 元` : `${total.toFixed(2)} 元`
+  },
+
+  addToCart(e) {
+    if (!this.current() || this.data.submitting || this.data.showSheet) return
+    const key = e.currentTarget.dataset.key
+    const course = this.data.schedules.find(item => item.viewKey === key)
+    if (!course) return
+    if (!course.canEnroll) { wx.showToast({ title: course.statusText, icon: 'none' }); return }
+    if ((this.data.cart || []).some(item => String(item.scheduleId) === String(course.scheduleId))) {
+      wx.showToast({ title: '这门课已经在购物车里了', icon: 'none' }); return
+    }
+    if (!(Number(course.tuitionPrice || 0) > 0)) {
+      wx.showToast({ title: '该课程还没有定价，请联系教务', icon: 'none' }); return
+    }
+    if ((this.data.cart || []).length >= 10) {
+      wx.showToast({ title: '一个订单最多 10 门课程', icon: 'none' }); return
+    }
+    const cart = (this.data.cart || []).concat([{
+      scheduleId: course.scheduleId,
+      courseClassName: course.courseClassName,
+      gradeText: course.gradeText,
+      subjectText: course.subjectText,
+      teacherName: course.teacherName || '教师待配置',
+      timeText: course.timeText,
+      placeText: course.placeText,
+      unitPrice: Number(course.unitPrice || 0).toFixed(2),
+      lessonCount: Number(course.lessonCount || 0),
+      amount: Number(course.tuitionPrice || 0).toFixed(2)
+    }])
+    this.setData({ cart })
+    this.saveCart()
+    this.refreshCartSummary()
+    wx.showToast({ title: '已加入购物车', icon: 'success' })
+  },
+
+  removeFromCart(e) {
+    if (!this.current() || this.data.submitting) return
+    const id = String(e.currentTarget.dataset.id)
+    this.setData({ cart: (this.data.cart || []).filter(item => String(item.scheduleId) !== id) })
+    this.saveCart()
+    this.refreshCartSummary()
+  },
+
+  clearCart() {
+    if (!this.current() || this.data.submitting) return
+    this.setData({ cart: [] })
+    this.saveCart()
+    this.refreshCartSummary()
+  },
+
+  toggleCart() {
+    if (!this.current() || this.data.submitting) return
+    if (!(this.data.cart || []).length) { wx.showToast({ title: '购物车还是空的', icon: 'none' }); return }
+    this.openCart()
+  },
+
+  openCart() {
+    if (!this.current() || this.data.submitting || !(this.data.cart || []).length) return
+    const userInfo = wx.getStorageSync('userInfo') || {}
+    const selected = this.data.scopeAccountId
+      ? this.data.lessonAccounts.find(a => String(a.accountId) === this.data.scopeAccountId)
+      : this.data.lessonAccounts[0]
+    this.setData({
+      cartMode: true,
+      selectedSchedule: null,
+      showSheet: true,
+      settlementMethod: 'C',
+      lessonAccountIndex: selected ? this.data.lessonAccounts.indexOf(selected) : this.data.lessonAccounts.length,
+      selectedChildId: this.data.scopeAccountId || (selected ? selected.accountId : null),
+      newChild: !this.data.scopeAccountId && !selected,
+      childMissing: !!this.data.scopeAccountId && !selected,
+      form: {
+        studentName: selected ? selected.studentName : '',
+        studentRequestKey: requestKey(),
+        contactPhone: userInfo.phonenumber || ''
+      }
+    })
+  },
+
+  openEnroll(e) {    const schedule = this.data.schedules.find((item) => item.viewKey === e.currentTarget.dataset.key)
     if (!schedule) return
     if (!schedule.canEnroll) {
       wx.showToast({ title: schedule.statusText, icon: 'none' })
@@ -332,6 +439,7 @@ Page(childContext.page({
     const selected=this.data.scopeAccountId?this.data.lessonAccounts.find(a=>String(a.accountId)===this.data.scopeAccountId):this.data.lessonAccounts[0]
     this.setData({
       selectedSchedule: schedule,
+      cartMode: false,
       settlementMethod:'C',lessonAccountIndex:selected?this.data.lessonAccounts.indexOf(selected):this.data.lessonAccounts.length,selectedChildId:this.data.scopeAccountId||(selected?selected.accountId:null),newChild:!this.data.scopeAccountId&&!selected,childMissing:!!this.data.scopeAccountId&&!selected,
       showSheet: true,
       form: {
@@ -346,7 +454,8 @@ Page(childContext.page({
     if (this.data.submitting) return
     this.setData({
       selectedSchedule: null,
-      showSheet: false
+      showSheet: false,
+      cartMode: false
     })
   },
 
@@ -372,7 +481,8 @@ Page(childContext.page({
     catch(error) { if(this.current()) wx.showToast({title:error.message || '查询失败',icon:'none'}) }
   },
   async submitEnroll() {
-    if (!this.current() || this.data.submitting || !this.data.selectedSchedule) return
+    if (!this.current() || this.data.submitting) return
+    if (this.data.cartMode) return this.submitCart()
     const { selectedSchedule, form } = this.data
     if(this.data.accountsLoading || this.data.accountsError || this.data.childMissing){wx.showToast({title:'请重新加载并选择孩子',icon:'none'});return}
     if (!form.studentName.trim()) {
@@ -408,6 +518,46 @@ Page(childContext.page({
       if(this.current())wx.showToast({ title: error.message || '报名失败', icon: 'none' })
     } finally {
       if(this.current())this.setData({ submitting: false })
+    }
+  },
+
+  async submitCart() {
+    if (!this.current() || this.data.submitting) return
+    const cart = this.data.cart || [], form = this.data.form
+    if (!cart.length) { wx.showToast({ title: '购物车是空的', icon: 'none' }); return }
+    if (this.data.accountsLoading || this.data.accountsError || this.data.childMissing) {
+      wx.showToast({ title: '请重新加载并选择孩子', icon: 'none' }); return
+    }
+    if (!String(form.studentName || '').trim()) {
+      wx.showToast({ title: '请输入学生姓名', icon: 'none' }); return
+    }
+    const account = this.data.lessonAccounts.find(a => String(a.accountId) === String(this.data.selectedChildId))
+    if (!this.data.newChild && !account) { wx.showToast({ title: '请重新选择孩子', icon: 'none' }); return }
+    this.setData({ submitting: true })
+    try {
+      await request({
+        url: '/miniapp/parent/cart/order',
+        method: 'POST',
+        data: {
+          scheduleIds: cart.map(item => item.scheduleId),
+          studentName: String(form.studentName).trim(),
+          contactPhone: String(form.contactPhone || '').trim(),
+          lessonAccountId: account ? account.accountId : null,
+          studentRequestKey: this.data.newChild ? form.studentRequestKey : null,
+          idempotencyKey: `order_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+        }
+      })
+      if (!this.current()) return
+      if (typeof getCurrentPages === 'function') getCurrentPages().forEach(p => { p._scheduleDirty = true })
+      this.setData({ cart: [], cartMode: false, showSheet: false, selectedSchedule: null })
+      wx.setStorageSync('enrollCart', [])
+      this.refreshCartSummary()
+      wx.showToast({ title: '已生成订单，等待教务核价', icon: 'success' })
+      await this.loadPage()
+    } catch (error) {
+      if (this.current()) wx.showToast({ title: error.message || '下单失败', icon: 'none' })
+    } finally {
+      if (this.current()) this.setData({ submitting: false })
     }
   }
 }, {route:'/pages/enrollment/enrollment',detail:false}))
