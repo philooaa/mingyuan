@@ -7,8 +7,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <resultMap type="EduScheduleAdjustment" id="EduScheduleAdjustmentResult">
         <result property="adjustmentId"    column="adjustment_id"    />
         <result property="scheduleId"    column="schedule_id"    />
+        <result property="termName"    column="term_name"    />
+        <result property="periodName"    column="period_name"    />
         <result property="originalDate"    column="original_date"    />
         <result property="adjustedDate"    column="adjusted_date"    />
+        <result property="courseCount"    column="course_count"    />
         <result property="reason"    column="reason"    />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
@@ -18,17 +21,20 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectEduScheduleAdjustmentVo">
-        select adjustment_id, schedule_id, original_date, adjusted_date, reason, create_by, create_time, update_by, update_time, remark from edu_schedule_adjustment
+        select adjustment_id, schedule_id, term_name, period_name, original_date, adjusted_date, course_count, reason, create_by, create_time, update_by, update_time, remark from edu_schedule_adjustment
     </sql>
 
     <select id="selectEduScheduleAdjustmentList" parameterType="EduScheduleAdjustment" resultMap="EduScheduleAdjustmentResult">
         <include refid="selectEduScheduleAdjustmentVo"/>
         <where>
             <if test="scheduleId != null "> and schedule_id = #{scheduleId}</if>
+            <if test="termName != null  and termName != ''"> and term_name = #{termName}</if>
+            <if test="periodName != null  and periodName != ''"> and period_name = #{periodName}</if>
             <if test="originalDate != null "> and original_date = #{originalDate}</if>
             <if test="adjustedDate != null "> and adjusted_date = #{adjustedDate}</if>
             <if test="reason != null  and reason != ''"> and reason like concat('%', #{reason}, '%')</if>
         </where>
+        order by original_date desc, term_name, period_name, adjustment_id
     </select>
 
     <select id="selectEduScheduleAdjustmentByAdjustmentId" parameterType="Long" resultMap="EduScheduleAdjustmentResult">
@@ -40,8 +46,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         insert into edu_schedule_adjustment
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="scheduleId != null">schedule_id,</if>
+            <if test="termName != null">term_name,</if>
+            <if test="periodName != null">period_name,</if>
             <if test="originalDate != null">original_date,</if>
             <if test="adjustedDate != null">adjusted_date,</if>
+            <if test="courseCount != null">course_count,</if>
             <if test="reason != null">reason,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
@@ -51,8 +60,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="scheduleId != null">#{scheduleId},</if>
+            <if test="termName != null">#{termName},</if>
+            <if test="periodName != null">#{periodName},</if>
             <if test="originalDate != null">#{originalDate},</if>
             <if test="adjustedDate != null">#{adjustedDate},</if>
+            <if test="courseCount != null">#{courseCount},</if>
             <if test="reason != null">#{reason},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
@@ -66,8 +78,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         update edu_schedule_adjustment
         <trim prefix="SET" suffixOverrides=",">
             <if test="scheduleId != null">schedule_id = #{scheduleId},</if>
+            <if test="termName != null">term_name = #{termName},</if>
+            <if test="periodName != null">period_name = #{periodName},</if>
             <if test="originalDate != null">original_date = #{originalDate},</if>
             <if test="adjustedDate != null">adjusted_date = #{adjustedDate},</if>
+            <if test="courseCount != null">course_count = #{courseCount},</if>
             <if test="reason != null">reason = #{reason},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
             <if test="createTime != null">create_time = #{createTime},</if>
@@ -91,10 +106,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSchedulesForBatch" resultType="java.util.HashMap">
         select schedule_id   as scheduleId,
+               term_name     as termName,
+               period_name   as periodName,
                start_date    as startDate,
                end_date      as endDate,
-               class_pattern as classPattern,
-               period_name   as periodName
+               class_pattern as classPattern
         from edu_course_schedule
         where del_flag = '0'
           and status = '0'
@@ -106,10 +122,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="subjectName != null and subjectName != ''">and subject_name = #{subjectName}</if>
     </select>
 
+    <!-- 某个排课的有效调课记录：它自己的单条记录 + 同学期期次的日期级记录（schedule_id = 0） -->
     <select id="selectAdjustedOriginalDates" resultType="java.util.Date">
         select original_date from edu_schedule_adjustment
-        where schedule_id = #{scheduleId}
-          and original_date is not null
+        where original_date is not null
+          and (
+            schedule_id = #{scheduleId}
+            or (
+              schedule_id = 0
+              and exists (
+                select 1 from edu_course_schedule s
+                where s.schedule_id = #{scheduleId}
+                  and s.term_name = edu_schedule_adjustment.term_name
+                  and s.period_name = edu_schedule_adjustment.period_name
+              )
+            )
+          )
     </select>
 
 </mapper>

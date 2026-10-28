@@ -418,6 +418,9 @@ CREATE TABLE `edu_material_shipment` (
 CREATE TABLE `edu_schedule_adjustment` (
   `adjustment_id` bigint NOT NULL AUTO_INCREMENT COMMENT '调课ID',
   `schedule_id` bigint NOT NULL COMMENT '关联排课ID',
+  `term_name` varchar(50) DEFAULT NULL COMMENT '学期',
+  `period_name` varchar(50) DEFAULT NULL COMMENT '期次或上课日',
+  `course_count` int DEFAULT NULL COMMENT '日期级记录影响课程数',
   `original_date` date NOT NULL COMMENT '原上课日期',
   `adjusted_date` date DEFAULT NULL COMMENT '调整后日期（NULL=停课）',
   `reason` varchar(100) DEFAULT NULL COMMENT '调课原因（国庆节/元旦等）',
@@ -427,7 +430,7 @@ CREATE TABLE `edu_schedule_adjustment` (
   `update_time` datetime DEFAULT NULL COMMENT '更新时间',
   `remark` varchar(500) DEFAULT NULL COMMENT '备注',
   PRIMARY KEY (`adjustment_id`),
-  UNIQUE KEY `uk_schedule_date` (`schedule_id`,`original_date`),
+  UNIQUE KEY `uk_schedule_date` (`schedule_id`,`term_name`,`period_name`,`original_date`),
   KEY `idx_schedule` (`schedule_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COMMENT='排课调课记录';
 /*!40101 SET character_set_client = @saved_cs_client */;

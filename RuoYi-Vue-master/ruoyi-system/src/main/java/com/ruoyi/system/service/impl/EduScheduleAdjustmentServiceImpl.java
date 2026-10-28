@@ -5,11 +5,15 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.DateUtils;
@@ -51,7 +55,16 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         var schedule=singleSchedules.lockSchedule(change.getScheduleId());
         LocalDate original=com.ruoyi.system.service.ScheduleCalendar.date(change.getOriginalDate());
         if(original == null || !availability.dates(schedule,List.of()).contains(original)) throw new ServiceException("原日期不是该课程的有效课次");
-        if(!singleDb.rows("SELECT adjustment_id FROM edu_schedule_adjustment WHERE schedule_id=? AND original_date=? AND adjustment_id<>? FOR UPDATE",change.getScheduleId(),change.getOriginalDate(),excludeId == null ? -1 : excludeId).isEmpty()) throw new ServiceException("该课次已有调课记录，请修改已有记录");
+        // 同一课次只能有一条记录：该课自己的单条记录，或管整天的日期级记录都算
+        if(!singleDb.rows("SELECT adjustment_id FROM edu_schedule_adjustment WHERE original_date=? AND adjustment_id<>? "
+                        + "AND (schedule_id=? OR (schedule_id=0 AND term_name=? AND period_name=?)) FOR UPDATE",
+                change.getOriginalDate(), excludeId == null ? -1 : excludeId, change.getScheduleId(),
+                schedule == null ? null : schedule.getTermName(), schedule == null ? null : schedule.getPeriodName()).isEmpty())
+            throw new ServiceException("该课次已有调课记录，请修改已有记录");
+        // 结课日期之后不允许有课：调课只能在本课程的起止日期内换日期，停课（调整后日期为空）不受此限
+        LocalDate adjusted = change.getAdjustedDate() == null ? null : com.ruoyi.system.service.ScheduleCalendar.date(change.getAdjustedDate());
+        LocalDate endDate = schedule == null ? null : com.ruoyi.system.service.ScheduleCalendar.date(schedule.getEndDate());
+        if(adjusted != null && endDate != null && adjusted.isAfter(endDate)) throw new ServiceException("调课后的日期 "+adjusted+" 晚于结课日期 "+endDate+"，结课之后不能排课；如确实要上，请先改排课的结课日期");
     }
 
     /**
@@ -108,6 +121,10 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
     {
         var current = eduScheduleAdjustmentMapper.selectEduScheduleAdjustmentByAdjustmentId(eduScheduleAdjustment.getAdjustmentId());
         if (current == null) throw new ServiceException("调课记录不存在");
+        if (current.getScheduleId() != null && current.getScheduleId() == 0L)
+        {
+            throw new ServiceException("这条记录管该期次当天全部课程，请先删除再重新调课");
+        }
         protectSingle(current.getScheduleId());
         if (eduScheduleAdjustment.getScheduleId() != null && !eduScheduleAdjustment.getScheduleId().equals(current.getScheduleId())) throw new ServiceException("调课记录不能改绑其他排课");
         eduScheduleAdjustment.setScheduleId(current.getScheduleId());
@@ -130,7 +147,26 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
     public int deleteEduScheduleAdjustmentByIds(Long[] adjustmentIds)
     {
         Set<Long> schedules = new java.util.TreeSet<>();
-        for (Long id : java.util.Arrays.stream(adjustmentIds).distinct().sorted().toList()) { var record = eduScheduleAdjustmentMapper.selectEduScheduleAdjustmentByAdjustmentId(id); if(record != null) schedules.add(record.getScheduleId()); }
+        for (Long id : java.util.Arrays.stream(adjustmentIds).distinct().sorted().toList())
+        {
+            var record = eduScheduleAdjustmentMapper.selectEduScheduleAdjustmentByAdjustmentId(id);
+            if (record == null) continue;
+            if (record.getScheduleId() != null && record.getScheduleId() == 0L)
+            {
+                // 日期级记录：影响该学期期次下的全部排课，都要重新校验
+                for (var row : singleDb.rows("SELECT schedule_id FROM edu_course_schedule WHERE term_name=? AND period_name=? AND del_flag='0'",
+                        record.getTermName(), record.getPeriodName()))
+                {
+                    // ShopRepository 会把以 Id 结尾的列转成字符串，这里统一按字符串再转数字
+                    Object value = row.get("scheduleId");
+                    if (value != null) schedules.add(Long.valueOf(String.valueOf(value)));
+                }
+            }
+            else
+            {
+                schedules.add(record.getScheduleId());
+            }
+        }
         availability.lockResources(schedules.stream().map(singleSchedules::selectEduCourseScheduleByScheduleId).toList());
         schedules.forEach(this::protectSingle);
         int count = eduScheduleAdjustmentMapper.deleteEduScheduleAdjustmentByIds(adjustmentIds);
@@ -202,6 +238,13 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         int count = 0;
         availability.lockResources(schedules.stream().map(s -> singleSchedules.selectEduCourseScheduleByScheduleId(((Number)s.get("scheduleId")).longValue())).toList());
 
+        LocalDate target = "MOVE_TO".equals(mode) ? toLocalDate(batch.getTargetDate()) : null;
+        // 不带年级/科目筛选时，调课就是「整天整期次」的操作，可以按日期只记一条
+        boolean termLevel = StringUtils.isEmpty(batch.getGradeName()) && StringUtils.isEmpty(batch.getSubjectName());
+
+        // 第一遍：算出每个排课的「原上课日 → 调整后日期」计划，并做结课日期校验
+        Map<Long, Set<LocalDate>> classDatesMap = new LinkedHashMap<>();
+        Map<Long, TreeMap<LocalDate, Date>> plans = new LinkedHashMap<>();
         for (Map<String, Object> s : schedules)
         {
             Long scheduleId = ((Number) s.get("scheduleId")).longValue();
@@ -215,6 +258,7 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
             {
                 continue;
             }
+            classDatesMap.put(scheduleId, classDates);
             // 已被调过的原日期自动跳过，避免重复调课
             Set<LocalDate> alreadyAdjusted = eduScheduleAdjustmentMapper.selectAdjustedOriginalDates(scheduleId)
                     .stream().map(this::toLocalDate).collect(Collectors.toSet());
@@ -228,38 +272,91 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
                 continue;
             }
             LocalDate first = affected.get(0);
-            LocalDate target = "MOVE_TO".equals(mode) ? toLocalDate(batch.getTargetDate()) : null;
+            // 结课日期之后不允许有课：先算出这次调完的最后一天，超出结课日期就整批拒绝（事务会回滚）
+            LocalDate lastDay = affected.get(affected.size() - 1);
+            LocalDate lastAdjusted = "POSTPONE".equals(mode) ? lastDay.plusDays(batch.getOffsetDays())
+                    : ("CANCEL".equals(mode) ? null : target.plusDays(ChronoUnit.DAYS.between(first, lastDay)));
+            LocalDate endDate = s.get("endDate") == null ? null : toLocalDate((Date) s.get("endDate"));
+            if (lastAdjusted != null && endDate != null && lastAdjusted.isAfter(endDate))
+            {
+                throw new ServiceException("调课后的最后一天 " + lastAdjusted + " 晚于结课日期 " + endDate
+                        + "，结课之后不能排课；如确实要上，请先把这批排课的结课日期改到 " + lastAdjusted);
+            }
+            TreeMap<LocalDate, Date> plan = new TreeMap<>();
             for (LocalDate d : affected)
             {
-                EduScheduleAdjustment adj = new EduScheduleAdjustment();
-                adj.setScheduleId(scheduleId);
-                adj.setOriginalDate(toDate(d));
-                if ("CANCEL".equals(mode))
-                {
-                    // 停课：调整后日期留空
-                    adj.setAdjustedDate(null);
-                }
-                else if ("POSTPONE".equals(mode))
-                {
-                    adj.setAdjustedDate(toDate(d.plusDays(batch.getOffsetDays())));
-                }
-                else
-                {
-                    // MOVE_TO：范围内第一个上课日调到目标日期，其余保持原有间隔依次顺移
-                    adj.setAdjustedDate(toDate(target.plusDays(ChronoUnit.DAYS.between(first, d))));
-                }
-                adj.setReason(batch.getReason());
-                adj.setCreateBy(username);
-                adj.setCreateTime(now);
-                count += eduScheduleAdjustmentMapper.insertEduScheduleAdjustment(adj);
+                Date adjusted = "CANCEL".equals(mode) ? null
+                        : ("POSTPONE".equals(mode) ? toDate(d.plusDays(batch.getOffsetDays()))
+                                : toDate(target.plusDays(ChronoUnit.DAYS.between(first, d))));
+                plan.put(d, adjusted);
             }
+            plans.put(scheduleId, plan);
         }
-        if (count == 0)
+
+        if (plans.isEmpty())
         {
             throw new ServiceException("日期范围内没有需要调整的上课日（可能均已被调整过）");
         }
+
+        // 第二遍：落库。能整期次统一的日期合并成一条（schedule_id = 0），其余仍按排课单独记录
+        Set<LocalDate> dateLevel = new HashSet<>();
+        if (termLevel)
+        {
+            Map<LocalDate, Date> merged = new HashMap<>();
+            for (TreeMap<LocalDate, Date> plan : plans.values())
+            {
+                plan.forEach(merged::putIfAbsent);
+            }
+            for (Map.Entry<LocalDate, Date> e : merged.entrySet())
+            {
+                LocalDate d = e.getKey();
+                // 该日期必须对本期次所有排课都是上课日，且没有任何一门课单独调过这一天
+                boolean allCourses = classDatesMap.size() == schedules.size()
+                        && classDatesMap.values().stream().allMatch(set -> set.contains(d));
+                boolean noSingleRecord = singleDb.rows(
+                        "SELECT adjustment_id FROM edu_schedule_adjustment WHERE schedule_id<>0 AND term_name=? AND period_name=? AND original_date=? FOR UPDATE",
+                        batch.getTermName(), batch.getPeriodName(), java.sql.Date.valueOf(d)).isEmpty();
+                if (!allCourses || !noSingleRecord)
+                {
+                    continue;
+                }
+                count += insertRecord(0L, batch.getTermName(), batch.getPeriodName(), d, e.getValue(),
+                        schedules.size(), batch.getReason(), username, now);
+                dateLevel.add(d);
+            }
+        }
+        for (Map.Entry<Long, TreeMap<LocalDate, Date>> en : plans.entrySet())
+        {
+            for (Map.Entry<LocalDate, Date> e : en.getValue().entrySet())
+            {
+                if (dateLevel.contains(e.getKey()))
+                {
+                    continue;
+                }
+                count += insertRecord(en.getKey(), batch.getTermName(), batch.getPeriodName(), e.getKey(), e.getValue(),
+                        null, batch.getReason(), username, now);
+            }
+        }
+
         for (var s : schedules) checkResult(((Number)s.get("scheduleId")).longValue());
         return count;
+    }
+
+    /** 写一条调课记录；scheduleId=0 表示整期次的日期级记录，courseCount 记当天课程数 */
+    private int insertRecord(Long scheduleId, String termName, String periodName, LocalDate originalDate,
+                             Date adjustedDate, Integer courseCount, String reason, String username, Date now)
+    {
+        EduScheduleAdjustment adj = new EduScheduleAdjustment();
+        adj.setScheduleId(scheduleId);
+        adj.setTermName(termName);
+        adj.setPeriodName(periodName);
+        adj.setOriginalDate(toDate(originalDate));
+        adj.setAdjustedDate(adjustedDate);
+        adj.setCourseCount(courseCount);
+        adj.setReason(reason);
+        adj.setCreateBy(username);
+        adj.setCreateTime(now);
+        return eduScheduleAdjustmentMapper.insertEduScheduleAdjustment(adj);
     }
 
     /**

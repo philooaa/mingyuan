@@ -31,7 +31,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="sheetCode != null  and sheetCode != ''"> and sheet_code = #{sheetCode}</if>
             <if test="status != null  and status != ''"> and status = #{status}</if>
         </where>
-        order by campus_name, classroom_id
+        <!-- 按教室名里的数字自然排序：W6 的 classroom_id 比 W11 大，按 id 排会跑到 11 和 12 中间 -->
+        order by campus_name, CAST(REGEXP_SUBSTR(classroom_name, '[0-9]+') AS UNSIGNED), classroom_name
     </select>
     
     <select id="selectEduClassroomByClassroomId" parameterType="Long" resultMap="EduClassroomResult">

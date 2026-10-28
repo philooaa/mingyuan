@@ -123,16 +123,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by s.course_year, s.term_name, s.period_name, s.start_time, s.schedule_id
     </select>
 
+    <!-- 某个排课的有效调课：它自己的单条记录 + 同学期期次的日期级记录（schedule_id = 0，一条管整天） -->
     <select id="selectScheduleAdjustments" resultType="java.util.HashMap">
         select
-            adjustment_id as adjustmentId,
-            schedule_id as scheduleId,
-            original_date as originalDate,
-            adjusted_date as adjustedDate,
-            reason
-        from edu_schedule_adjustment
-        where schedule_id = #{scheduleId}
-        order by original_date
+            a.adjustment_id as adjustmentId,
+            a.schedule_id as scheduleId,
+            a.original_date as originalDate,
+            a.adjusted_date as adjustedDate,
+            a.reason
+        from edu_schedule_adjustment a
+        join edu_course_schedule s on s.schedule_id = #{scheduleId}
+        where a.schedule_id = s.schedule_id
+           or (
+             a.schedule_id = 0
+             and a.term_name = s.term_name
+             and a.period_name = s.period_name
+             and not exists (
+               select 1 from edu_schedule_adjustment x
+               where x.schedule_id = s.schedule_id and x.original_date = a.original_date
+             )
+           )
+        order by a.original_date
     </select>
 
     <select id="selectParentAttendanceSummary" resultType="java.util.HashMap">

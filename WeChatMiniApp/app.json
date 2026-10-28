@@ -16,6 +16,7 @@
     "pages/admin-teachers/admin-teachers",
     "pages/admin-students/admin-students",
     "pages/admin-classrooms/admin-classrooms",
+    "pages/admin-room-assign/admin-room-assign",
     "pages/enrollment/enrollment",
     "pages/admin-enrollment/admin-enrollment",
     "pages/admin-enrollment-list/admin-enrollment-list",

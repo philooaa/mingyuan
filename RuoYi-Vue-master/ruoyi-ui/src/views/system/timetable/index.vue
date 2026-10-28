@@ -42,6 +42,8 @@
         <el-button icon="el-icon-full-screen" size="mini" @click="toggleFullScreen">全屏</el-button>
         <el-button type="primary" plain icon="el-icon-date" size="mini" v-hasRole="['admin']" @click="openSingle()">一对一管理</el-button>
         <el-button type="success" icon="el-icon-upload2" size="mini" @click="openImport" v-hasPermi="['system:courseschedule:add']">课表导入</el-button>
+        <el-button type="info" plain icon="el-icon-download" size="mini" @click="handleExport">导出课表</el-button>
+        <el-button type="primary" plain icon="el-icon-notebook-2" size="mini" @click="openCalendar">课表日历</el-button>
         <el-button type="warning" icon="el-icon-sort" size="mini" @click="openSwap" v-hasPermi="['system:courseschedule:edit']">交换教室列</el-button>
       </el-form-item>
     </el-form>
@@ -398,6 +400,62 @@
       </div>
     </el-dialog>
 
+    <!-- 课表日历：有课的日期黄色高亮，点日期看当天安排 -->
+    <el-dialog title="课表日历" :visible.sync="cal.open" width="960px" top="6vh" append-to-body :close-on-click-modal="false">
+      <div class="cal-wrap" v-loading="cal.loading">
+        <div class="cal-side">
+          <el-calendar v-model="cal.cursor">
+            <template slot="dateCell" slot-scope="{ data }">
+              <!-- 自己接管点击：点有课的日期看当天安排，点相邻月份的空日期则翻到那个月 -->
+              <div class="cal-cell"
+                   :class="{ 'cal-has': data.type === 'current-month' && !!cal.days[data.day], 'cal-pick': cal.picked === data.day }"
+                   @click.stop="onCalCellClick(data)">
+                <span class="cal-num">{{ dayNum(data.day) }}</span>
+                <span v-if="data.type === 'current-month' && cal.days[data.day]" class="cal-cnt">{{ cal.days[data.day].count }}</span>
+              </div>
+            </template>
+          </el-calendar>
+          <div class="cal-legend"><i class="lg-dot"></i>黄色日期 = 当天有课（含所有学期期次），角标是当天的课程数</div>
+        </div>
+
+        <div class="cal-main">
+          <div class="cal-head">
+            <span class="cal-date">{{ cal.picked || '请选择日期' }}</span>
+            <span v-if="cal.picked" class="cal-wk">{{ cal.weekday }}</span>
+            <span v-if="cal.picked" class="cal-sum">共 {{ cal.list.length }} 门课</span>
+          </div>
+
+          <div v-if="!cal.picked" class="cal-empty">
+            <template v-if="!cal.total">当前没有任何已排定日期的课程</template>
+            <template v-else>点击左侧黄色高亮的日期，查看当天的课程安排</template>
+          </div>
+          <div v-else-if="!cal.list.length" class="cal-empty">这一天没有课</div>
+          <div v-else class="cal-list">
+            <div v-for="(it, i) in cal.list" :key="i" class="cal-item">
+              <div class="cal-item-time">{{ it.timeSlot || '未填时段' }}</div>
+              <div class="cal-item-body">
+                <div class="cal-item-name">
+                  <span v-if="it.termName || it.periodName" class="cal-item-term">{{ it.termName }}{{ it.periodName }}</span>
+                  {{ it.gradeName }}{{ it.subjectName }}{{ it.classType }}
+                </div>
+                <div class="cal-item-sub">
+                  <span>{{ it.teacherName || '教师未填' }}</span>
+                  <span class="dot">·</span>
+                  <span>{{ it.campusName }}{{ it.classroomName || '未指定教室' }}</span>
+                  <span class="dot">·</span>
+                  <span>报名 {{ it.enrolledCount || 0 }} 人</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div slot="footer" class="dialog-footer">
+        <el-button size="mini" @click="cal.open = false">关 闭</el-button>
+      </div>
+    </el-dialog>
+
     <!-- 课次（按日期展开）弹窗：停课 / 恢复 -->
     <el-dialog title="课次（按具体日期）" :visible.sync="occ.open" width="760px" top="8vh" append-to-body :close-on-click-modal="false">
       <div v-loading="occ.loading" style="min-height:140px">
@@ -459,6 +517,7 @@ import {
   importTimetableConfirm,
   importTimetableOneClick,
   getTimetableOccurrences,
+  getTimetableCalendar,
   cancelTimetableOccurrence,
   restoreTimetableOccurrence,
   swapTimetableClassrooms
@@ -537,6 +596,17 @@ export default {
         pending: false,
         message: '',
         items: []
+      },
+      // 课表日历：days 为 { 'yyyy-MM-dd': { date, weekday, count, items } }
+      cal: {
+        open: false,
+        loading: false,
+        cursor: new Date(),
+        days: {},
+        total: 0,
+        picked: '',
+        weekday: '',
+        list: []
       }
     }
   },
@@ -679,6 +749,97 @@ export default {
         if (!k.endsWith(suffix)) return false
         return (this.cellMap[k] || []).some(s => this.issueList(s).some(x => x.field === 'time'))
       })
+    },
+    // ============ 导出课表 ============
+    /**
+     * 导出当前筛选条件下的课表。
+     * 后端按与 /grid 完全相同的条件取数，导出的就是页面上看到的这些课：
+     * 第一张表是与页面版式一致的矩阵（纵轴时段 / 横轴教室 / 表头按校区合并），第二张是排课明细平表。
+     */
+    handleExport() {
+      const q = this.queryParams
+      if (!q.termName || !q.periodName) {
+        this.$message.warning('请先选择学期和期次，再导出课表')
+        return
+      }
+      const parts = ['课表', q.courseYear, q.termName, q.periodName]
+      if (q.campusName) parts.push(q.campusName)
+      this.download('system/courseTimetable/export', { ...q }, `${parts.join('_')}.xlsx`)
+    },
+    // ============ 课表日历 ============
+    /**
+     * 打开日历：一个日历看全部课，不区分学年/学期/期次 —— 只要那天有课就高亮。
+     * 校区/年级/科目/教师/班型/教室这些筛选仍然生效。
+     */
+    openCalendar() {
+      this.cal.open = true
+      this.cal.days = {}
+      this.cal.total = 0
+      this.cal.picked = ''
+      this.cal.weekday = ''
+      this.cal.list = []
+      this.loadCalendar()
+    },
+    loadCalendar() {
+      this.cal.loading = true
+      // 学年/学期/期次不参与日历筛选（要一个连续的日历），其余条件照传
+      const p = { ...this.queryParams }
+      delete p.courseYear
+      delete p.termName
+      delete p.periodName
+      getTimetableCalendar(p).then(res => {
+        const d = res.data || {}
+        const days = {}
+        ;(d.days || []).forEach(x => { days[x.date] = x })
+        this.cal.days = days
+        this.cal.total = (d.days || []).length
+        this.cal.loading = false
+        // 定位到「今天或之后最近的一个有课日」，都过去了就回到最早那天
+        const list = d.days || []
+        const today = this.ymdOf(new Date())
+        const first = list.find(x => x.date >= today) || list[0]
+        if (first) {
+          this.cal.cursor = this.parseYmd(first.date)
+          this.pickCalDay(first.date)
+        }
+      }).catch(() => {
+        this.cal.loading = false
+      })
+    },
+    parseYmd(s) {
+      const p = String(s || '').split('-')
+      return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]))
+    },
+    ymdOf(d) {
+      const p = n => (n < 10 ? '0' + n : String(n))
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+    },
+    /**
+     * 点日历格子。
+     * el-calendar 的默认点击只更新选中态、不抛事件，这里自己接管：
+     * 有课的日期（含相邻月份）→ 切到那个月并展示当天清单；当月空日期 → 只展示「这一天没有课」。
+     */
+    onCalCellClick(data) {
+      const day = data.day
+      if (this.cal.days[day]) {
+        this.cal.cursor = this.parseYmd(day)
+        this.pickCalDay(day)
+        return
+      }
+      if (data.type !== 'current-month') {
+        this.cal.cursor = this.parseYmd(day)
+        return
+      }
+      this.pickCalDay(day)
+    },
+    pickCalDay(day) {
+      const hit = this.cal.days[day]
+      this.cal.picked = day
+      this.cal.weekday = hit ? hit.weekday : ''
+      this.cal.list = hit ? (hit.items || []) : []
+    },
+    dayNum(day) {
+      return Number(String(day || '').slice(8, 10))
     },
     // ============ 课表导入 ============
     openImport() {
@@ -902,6 +1063,7 @@ export default {
       if (s.newRooms) syncParts.push(`新建教室 ${s.newRooms} 间`)
       if (s.newDicts) syncParts.push(`新增字典项 ${s.newDicts} 个`)
       let msg = `新增 ${d.inserted || 0} 条，覆盖更新 ${d.updated || 0} 条，跳过 ${d.skipped || 0} 条。`
+      if (d.restored) msg += `\n其中 ${d.restored} 条原先因「教师未绑定」被停用的排课，本次已匹配到教师并恢复为正常，课表上可以直接看到。`
       if (d.incomplete) msg += `\n其中 ${d.incomplete} 条为格式未识别：已按原文保留（学期/期次/时段/年级/科目用「未识别xx」占位），课表上用红色感叹号标出，请核对后修正。`
       if (d.dated) msg += `\n已为 ${d.dated} 条排课写入上课日期与递推模式（寒假/暑假=上5休1，春季/秋季=每周周六或周日）。`
       if (d.undated) {

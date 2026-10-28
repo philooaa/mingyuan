@@ -124,7 +124,7 @@ test('multi-role switching keeps the token, refuses an unassigned role and clear
 test('staff menu permissions are respected and a missing role never falls back to parent', async () => {
   const h = harness('index', ['education'], []); h.p.onLoad(); await h.p.applyLoginRole()
   // Attendance review is role-authorized, like the existing miniapp check-in review; finance still requires menu permissions.
-  assert.deepEqual(Array.from(h.p.data.quickActions, a => a.route), ['/pages/sign-review/sign-review', '/pages/admin-schedule/admin-schedule'])
+  assert.deepEqual(Array.from(h.p.data.quickActions, a => a.route), ['/pages/sign-review/sign-review', '/pages/admin-schedule/admin-schedule', '/pages/admin-room-assign/admin-room-assign'])
   h.state.roles = []; await h.p.applyLoginRole()
   assert.equal(h.p.data.currentRole, ''); assert.equal(h.p.data.roles.length, 0)
   assert.equal(h.calls.some(o => o.url.startsWith('/miniapp/parent')), false)
