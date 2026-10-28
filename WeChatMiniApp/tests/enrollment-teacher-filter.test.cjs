@@ -104,3 +104,15 @@ test('subject grouping preserves one-to-one course dates and expansion', async (
   p.toggleCourseDates({ currentTarget: { dataset: { id: '1' } } })
   assert.equal(p.data.courseGroups[0].courses[0].expanded, true)
 })
+
+test('cart changes refresh grouped course cards without losing grade and subject sorting', async () => {
+  const { p } = harness(); p.data.courseTypeIndex = 0
+  await p.loadSchedules(); p.onGradeChange(change(1))
+  p.setData({ cart: [{ scheduleId: '4', amount: '900.00' }] }); p.refreshCartSummary()
+  assert.equal(p.data.courseGroups[0].label, '数学')
+  assert.equal(p.data.courseGroups[0].courses[0].inCart, true)
+  assert.equal(p.data.cartTotal, '900.00')
+  p.setData({ cart: [] }); p.refreshCartSummary()
+  assert.equal(p.data.courseGroups[0].courses[0].inCart, false)
+  assert.equal(p.data.cartCount, 0)
+})

@@ -356,7 +356,7 @@ Page(childContext.page({
     const ids = new Set(cart.map(item => String(item.scheduleId)))
     const mark = list => (list || []).map(course => ({ ...course, inCart: ids.has(String(course.scheduleId)) }))
     this._allSchedules = mark(this._allSchedules)
-    this.setData({ schedules: mark(this.data.schedules) })
+    this.applyFilters()
   },
 
   buildPriceText(item) {
