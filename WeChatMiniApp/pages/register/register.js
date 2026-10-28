@@ -13,6 +13,7 @@ Page({
     submitting: false,
     localPreviewEnabled: false,
     autoPreview: true,
+    debugEnabled: false,
     backendLabel: '',
     phone: '', verificationCode: '', codeSending: false, cooldown: 0,
     configLoading: true, phoneLoginEnabled: false, developmentCodeMode: false, developmentCode: '', codePhone: '',
@@ -56,9 +57,10 @@ Page({
   // 真机调试时由长按 logo 写入的本机后端地址，需在页面加载时套用。
   applyBackendOverride() {
     if (typeof getApp !== 'function') return
-    const override = wx.getStorageSync('backendOverride')
+    const debugEnabled = access.developmentBuild()
+    const override = debugEnabled && wx.getStorageSync('backendOverride')
     if (override) getApp().globalData.baseUrl = String(override).replace(/\/+$/, '')
-    this.setData({ backendLabel: getApp().globalData.baseUrl })
+    this.setData({ debugEnabled, backendLabel: debugEnabled ? getApp().globalData.baseUrl : '' })
   },
 
   async probeBackend(url) {
@@ -75,6 +77,7 @@ Page({
 
   async resolveBackend() {
     if (typeof getApp !== 'function') return
+    if (!access.developmentBuild()) return
     // 仅在开发者工具或显式配置了本机后端时才探测，真机保持线上地址。
     if (!access.developmentTool() && !wx.getStorageSync('backendOverride')) return
     const app = getApp()
@@ -98,6 +101,7 @@ Page({
 
   isLocalPreviewEnvironment() {
     if (typeof getApp !== 'function') return false
+    if (!access.developmentBuild()) return false
     if (!access.developmentTool() && !wx.getStorageSync('backendOverride')) return false
     const base = getApp().globalData.baseUrl || ''
     return /^http:\/\/(127\.0\.0\.1|localhost|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(base)
@@ -105,6 +109,7 @@ Page({
 
   // 长按 logo：切换后端地址（仅用于本地/内网调试）。
   async openBackendSetting() {
+    if (!access.developmentBuild()) return
     const res = await new Promise(resolve => wx.showModal({
       title: '开发设置 · 后端地址',
       editable: true,

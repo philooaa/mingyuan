@@ -2,6 +2,7 @@ package com.ruoyi.system.finance;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.*;
 
 /** Uses a private disposable database, never the application database. */
@@ -31,6 +32,24 @@ class BusinessAdminFinanceMysqlTest {
   @Test void ordinaryParentCannotUseAdministratorGuards() {
     assertThrows(Exception.class, () -> coupons.admin(2));
     assertThrows(Exception.class, () -> FinanceRules.tuitionStaff(fixture.db,2));
+  }
+  @Test void collectionAndReceiptActionsAllowBusinessAdministratorsButDenyEducation() {
+    var service = new TuitionService(fixture.db, fixture.storage, fixture.receiptService, coupons, false);
+    List<java.util.function.LongConsumer> actions = List.of(
+        actor -> service.createPayment(-1, actor, true, Map.of()),
+        actor -> service.confirmPayment(-1, actor, true, Map.of()),
+        actor -> service.closePayment(-1, actor, Map.of()),
+        actor -> service.historyVerify(-1, actor, Map.of()),
+        actor -> fixture.receiptService.issue(-1, actor),
+        actor -> fixture.receiptService.retry(-1, actor),
+        actor -> fixture.receiptService.replace(-1, actor, ""));
+    for (var action : actions) {
+      // Deliberately invalid requests must reach validation, without writing financial data.
+      var businessError = assertThrows(RuntimeException.class, () -> action.accept(80));
+      assertFalse(String.valueOf(businessError.getMessage()).contains("FORBIDDEN"), businessError::getMessage);
+      var educationError = assertThrows(RuntimeException.class, () -> action.accept(5));
+      assertTrue(String.valueOf(educationError.getMessage()).contains("FORBIDDEN"));
+    }
   }
   @Test void disabledRoleOrAccountCannotUseAdministratorGuards() {
     try {

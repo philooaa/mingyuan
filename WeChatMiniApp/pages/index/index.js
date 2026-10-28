@@ -254,6 +254,7 @@ Page({
 
   // 探测本机后端的开发会话，用于显示「切换预览身份」入口。真机 baseUrl 是线上地址，不会触发。
   async detectDevelopment() {
+    if (!access.developmentBuild()) return
     const base = getApp().globalData.baseUrl || ''
     if (!/^http:\/\/(127\.0\.0\.1|localhost|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(base)) return
     try {

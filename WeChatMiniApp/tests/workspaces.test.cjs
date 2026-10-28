@@ -227,3 +227,18 @@ test('preview is unavailable on phones, remote backends, and backends without ex
     assert.equal(h.store.get('token'), 'original-token')
   }
 })
+
+test('published phone login ignores stored debugging overrides and cannot open backend settings', async () => {
+  const h = harness('register')
+  h.wx.getDeviceInfo = () => ({ platform: 'ios' })
+  h.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'trial' } })
+  h.app.globalData.baseUrl = 'https://test-admin.mingyuantostars.online/prod-api'
+  h.store.set('backendOverride', 'http://127.0.0.1:8080')
+  h.p.applyBackendOverride()
+  assert.equal(h.app.globalData.baseUrl, 'https://test-admin.mingyuantostars.online/prod-api')
+  assert.equal(h.p.isLocalPreviewEnvironment(), false)
+  h.wx.showModal = () => assert.fail('published login must not expose backend settings')
+  await h.p.openBackendSetting()
+  await h.p.resolveBackend()
+  assert.equal(h.calls.length, 0)
+})

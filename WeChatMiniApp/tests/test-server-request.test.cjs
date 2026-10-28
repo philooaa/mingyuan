@@ -37,3 +37,18 @@ test('体验版请求走远程HTTPS测试后端，而不是体验者手机的本
   await module.exports.request({ url: '/miniapp/auth/config' })
   assert.equal(requests[0].url, 'https://test-admin.mingyuantostars.online/prod-api/miniapp/auth/config')
 })
+
+test('体验版和正式版忽略历史调试后端地址，继续连接服务器', () => {
+  for (const envVersion of ['trial', 'release']) {
+    let app
+    const store = new Map([['backendOverride', 'http://192.168.1.8:8080']])
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8'), {
+      App(value) { app = value }, wx: {
+        getDeviceInfo: () => ({ platform: 'ios' }), getAccountInfoSync: () => ({ miniProgram: { envVersion } }),
+        getStorageSync: key => store.get(key), setStorageSync: (key, value) => store.set(key, value), removeStorageSync: key => store.delete(key)
+      }
+    })
+    app.onLaunch()
+    assert.equal(app.globalData.baseUrl, 'https://test-admin.mingyuantostars.online/prod-api')
+  }
+})
