@@ -56,7 +56,8 @@
     "pages/parent-leave/parent-leave",
     "pages/teacher-leave/teacher-leave",
     "pages/admin-coupon-section/admin-coupon-section",
-    "pages/admin-referral-grant/admin-referral-grant"
+    "pages/admin-referral-grant/admin-referral-grant",
+    "pages/admin-course-price/admin-course-price"
   ],
   "permission": {
     "scope.userLocation": {

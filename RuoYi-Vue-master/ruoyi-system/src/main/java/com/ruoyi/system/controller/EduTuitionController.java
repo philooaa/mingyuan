@@ -86,7 +86,7 @@ public class EduTuitionController {
     return EduTuitionController.ok(tuition.historyVerify(id, SecurityUtils.getUserId(), b));
   }
 
-  @PreAuthorize("@ss.hasPermi('system:tuition:collect')")
+  @PreAuthorize("@ss.hasPermi('system:tuition:collect') and @ss.hasRole('admin')")
   @Log(
       title = "学费收款登记",
       businessType = BusinessType.INSERT,
@@ -97,7 +97,7 @@ public class EduTuitionController {
     return EduTuitionController.ok(tuition.createPayment(id, SecurityUtils.getUserId(), true, b));
   }
 
-  @PreAuthorize("@ss.hasPermi('system:tuition:confirm')")
+  @PreAuthorize("@ss.hasPermi('system:tuition:confirm') and @ss.hasRole('admin')")
   @Log(
       title = "学费收款确认",
       businessType = BusinessType.UPDATE,
@@ -110,7 +110,7 @@ public class EduTuitionController {
         tuition.confirmPayment(id, SecurityUtils.getUserId(), true, b == null ? Map.of() : b));
   }
 
-  @PreAuthorize("@ss.hasPermi('system:tuition:collect')")
+  @PreAuthorize("@ss.hasPermi('system:tuition:collect') and @ss.hasRole('admin')")
   @Log(
       title = "关闭学费收款",
       businessType = BusinessType.UPDATE,

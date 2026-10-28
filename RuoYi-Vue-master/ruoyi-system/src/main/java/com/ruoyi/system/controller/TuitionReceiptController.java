@@ -41,7 +41,7 @@ public class TuitionReceiptController {
     return page(service.list(SecurityUtils.getUserId(), false, q));
   }
 
-  @PreAuthorize("@ss.hasPermi('system:tuitionReceipt:issue')")
+  @PreAuthorize("@ss.hasPermi('system:tuitionReceipt:issue') and @ss.hasRole('admin')")
   @Log(
       title = "课程收据开具",
       businessType = BusinessType.INSERT,
@@ -54,7 +54,7 @@ public class TuitionReceiptController {
             service.issue(paymentId, SecurityUtils.getUserId())));
   }
 
-  @PreAuthorize("@ss.hasPermi('system:tuitionReceipt:issue')")
+  @PreAuthorize("@ss.hasPermi('system:tuitionReceipt:issue') and @ss.hasRole('admin')")
   @Log(
       title = "课程收据生成重试",
       businessType = BusinessType.UPDATE,
@@ -66,7 +66,7 @@ public class TuitionReceiptController {
         com.ruoyi.system.finance.FinanceRules.dto(service.retry(id, SecurityUtils.getUserId())));
   }
 
-  @PreAuthorize("@ss.hasPermi('system:tuitionReceipt:replace')")
+  @PreAuthorize("@ss.hasPermi('system:tuitionReceipt:replace') and @ss.hasRole('admin')")
   @Log(
       title = "课程收据作废补开",
       businessType = BusinessType.UPDATE,

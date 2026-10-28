@@ -556,6 +556,14 @@ public class TuitionService {
           }
 
           BigDecimal original = money(b.get("originalAmount"));
+          // 教务核价时直接填优惠金额（不依赖优惠券），实收 = 原价 − 优惠。
+          BigDecimal discount = b.containsKey("discountAmount") ? money(b.get("discountAmount")) : money("0");
+          require(discount.signum() >= 0, "优惠金额不能为负数");
+          require(
+              discount.compareTo(original) <= 0,
+              "优惠金额不能超过课程原价 " + original.toPlainString() + " 元");
+          String discountReason = str(b, "discountReason");
+          require(discount.signum() == 0 || !discountReason.isBlank(), "请填写优惠原因");
           String fm = str(b, "financeMode");
           if (fm.isEmpty()) fm = str(e, "financeMode");
           require(
@@ -584,9 +592,9 @@ public class TuitionService {
                   "original_amount",
                   original,
                   "discount_amount",
-                  money("0"),
+                  discount,
                   "payable_amount",
-                  original,
+                  original.subtract(discount),
                   "user_coupon_id",
                   null,
                   "fee_title_snapshot",
@@ -596,7 +604,9 @@ public class TuitionService {
                   "price_confirmed_by",
                   actor,
                   "price_confirmed_time",
-                  now()),
+                  now(),
+                  "remark",
+                  discountReason.isBlank() ? e.get("remark") : discountReason),
               actor);
           return bill(enrollment, actor, true);
         });
@@ -621,7 +631,9 @@ public class TuitionService {
           "coupons", List.of());
     }
     Long coupon=selectedCoupon(e,b);
-    BigDecimal discount = CreditPackageService.bulkDiscount(e).add(
+    // 核价时教务填的优惠是账单基线，优惠券在其上叠加。
+    BigDecimal priced = e.get("discountAmount")==null ? money("0") : money(e.get("discountAmount"));
+    BigDecimal discount = CreditPackageService.bulkDiscount(e).add(priced).add(
         coupon==null
             ? money("0")
             : coupons.discount(coupon, e, false));
@@ -708,8 +720,8 @@ public class TuitionService {
   public Map<String, Object> createPayment(
       long enrollment, long actor, boolean admin, Map<String, Object> b) {
     require(admin, "FORBIDDEN: 课程费用请联系教务线下缴纳");
-    // 收款登记与确认只归管理员；教务只保留核价权限。
-    coupons.admin(actor);
+    // 收款登记与确认只归管理员本人；教务与业务管理员都不行。
+    coupons.strictAdmin(actor);
     String key = key(b),
         hash =
             fingerprint(
@@ -758,9 +770,11 @@ public class TuitionService {
               // 购物车订单的优惠是教务在核价时填的固定金额，不再叠加优惠券。
               boolean cartOrder = "CART_ORDER".equals(str(e, "billType"));
               Long coupon = cartOrder ? null : selectedCoupon(e,b);
+              // 核价时填的优惠是账单基线；优惠券在其上叠加（课包只走系统折扣）。
+              BigDecimal priced = e.get("discountAmount") == null ? money("0") : money(e.get("discountAmount"));
               BigDecimal discount = cartOrder
-                      ? (e.get("discountAmount") == null ? money("0") : money(e.get("discountAmount")))
-                      : CreditPackageService.bulkDiscount(e).add(coupon == null ? money("0") : coupons.discount(coupon, e, true)),
+                      ? priced
+                      : CreditPackageService.bulkDiscount(e).add(priced).add(coupon == null ? money("0") : coupons.discount(coupon, e, true)),
                   amount = money(e.get("originalAmount")).subtract(discount);
               require(
                   amount.compareTo(money(b.get("expectedPayableAmount"))) == 0,
@@ -1061,8 +1075,8 @@ public class TuitionService {
   public Map<String, Object> confirmPayment(
       long payment, long actor, boolean admin, Map<String, Object> b) {
     require(admin, "FORBIDDEN: 家长不能确认课程收款");
-    // 确认收款即生成收据，只归管理员；教务只保留核价权限。
-    coupons.admin(actor);
+    // 确认收款即生成收据，只归管理员本人；教务与业务管理员都不行。
+    coupons.strictAdmin(actor);
     long[] receipt = {0};
     var result =
         tx(
@@ -1112,7 +1126,7 @@ public class TuitionService {
   }
 
   public Map<String, Object> closePayment(long payment, long actor, Map<String, Object> b) {
-    coupons.admin(actor);
+    coupons.strictAdmin(actor);
     String reason = reason(b, "reason", 255);
     return tx(
         () -> {
@@ -1830,7 +1844,7 @@ public class TuitionService {
   }
 
   public Map<String, Object> historyVerify(long enrollment, long actor, Map<String, Object> b) {
-    coupons.admin(actor);
+    coupons.strictAdmin(actor);
     BigDecimal original = money(b.get("originalAmount")),
         paid = money(b.get("historyPaidAmount")),
         returned = money(b.get("historyRefundedAmount"));

@@ -12,6 +12,8 @@ Page({
   data: {
     submitting: false,
     localPreviewEnabled: false,
+    autoPreview: true,
+    backendLabel: '',
     phone: '', verificationCode: '', codeSending: false, cooldown: 0,
     configLoading: true, phoneLoginEnabled: false, developmentCodeMode: false, developmentCode: '', codePhone: '',
     developmentLoginEnabled: false, showDevelopment: false,
@@ -34,18 +36,91 @@ Page({
     devRoles
   },
 
-  onLoad(options = {}) {
+  async onLoad(options = {}) {
     this._unloaded = false
-    if (wx.getStorageSync('token') && options.selectTeacher !== '1' && options.selectParent !== '1') {
+    const pickRole = options.pickRole === '1'
+    if (pickRole) this.setData({ autoPreview: false })
+    this.applyBackendOverride()
+    if (!pickRole && wx.getStorageSync('token') && options.selectTeacher !== '1' && options.selectParent !== '1') {
       wx.reLaunch({ url: '/pages/index/index' })
       return
     }
+    // 环境判定不可靠时（如基础库缺 getDeviceInfo），主动探测本机后端并切过去。
+    await this.resolveBackend()
+    if (this._unloaded) return
     this.loadPhoneConfig()
-    this.loadLocalPreview()
+    await this.loadLocalPreview()
+    if (pickRole && !this._unloaded && this.data.localPreviewEnabled) this.choosePreviewRole()
+  },
+
+  // 真机调试时由长按 logo 写入的本机后端地址，需在页面加载时套用。
+  applyBackendOverride() {
+    if (typeof getApp !== 'function') return
+    const override = wx.getStorageSync('backendOverride')
+    if (override) getApp().globalData.baseUrl = String(override).replace(/\/+$/, '')
+    this.setData({ backendLabel: getApp().globalData.baseUrl })
+  },
+
+  async probeBackend(url) {
+    if (typeof getApp !== 'function') return false
+    const app = getApp(), previous = app.globalData.baseUrl
+    app.globalData.baseUrl = url
+    try {
+      const res = await request({ url: '/miniapp/dev/session', timeout: 3000 })
+      if (res && res.data && res.data.version) return true
+    } catch (_) { /* 该地址没有开发会话，继续尝试下一个。 */ }
+    app.globalData.baseUrl = previous
+    return false
+  },
+
+  async resolveBackend() {
+    if (typeof getApp !== 'function') return
+    // 仅在开发者工具或显式配置了本机后端时才探测，真机保持线上地址。
+    if (!access.developmentTool() && !wx.getStorageSync('backendOverride')) return
+    const app = getApp()
+    const candidates = []
+    const override = wx.getStorageSync('backendOverride')
+    if (override) candidates.push(override)
+    candidates.push(app.globalData.baseUrl, 'http://127.0.0.1:8080')
+    const seen = new Set()
+    for (const raw of candidates) {
+      const url = String(raw || '').replace(/\/+$/, '')
+      if (!url || seen.has(url)) continue
+      seen.add(url)
+      if (await this.probeBackend(url)) {
+        app.globalData.baseUrl = url
+        this.setData({ backendLabel: url })
+        return
+      }
+    }
+    this.setData({ backendLabel: app.globalData.baseUrl })
   },
 
   isLocalPreviewEnvironment() {
-    return access.developmentTool() && typeof getApp === 'function' && /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/?$/.test(getApp().globalData.baseUrl || '')
+    if (typeof getApp !== 'function') return false
+    if (!access.developmentTool() && !wx.getStorageSync('backendOverride')) return false
+    const base = getApp().globalData.baseUrl || ''
+    return /^http:\/\/(127\.0\.0\.1|localhost|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(base)
+  },
+
+  // 长按 logo：切换后端地址（仅用于本地/内网调试）。
+  async openBackendSetting() {
+    const res = await new Promise(resolve => wx.showModal({
+      title: '开发设置 · 后端地址',
+      editable: true,
+      placeholderText: 'http://10.201.27.23:8080',
+      content: getApp().globalData.baseUrl,
+      confirmText: '保存',
+      success: resolve,
+      fail: () => resolve({})
+    }))
+    if (!res.confirm) return
+    const url = String(res.content || '').trim().replace(/\/+$/, '')
+    if (!url) wx.removeStorageSync('backendOverride')
+    else wx.setStorageSync('backendOverride', url)
+    for (const key of ['token', 'userInfo', 'roles', 'devSessionVersion']) wx.removeStorageSync(key)
+    wx.showToast({ title: '已保存，正在重新加载', icon: 'none' })
+    setTimeout(() => wx.reLaunch({ url: '/pages/register/register' }), 500)
   },
   async loadLocalPreview() {
     if (!this.isLocalPreviewEnvironment()) return
@@ -53,23 +128,57 @@ Page({
       const res = await request({ url: '/miniapp/dev/session', timeout: 10000 })
       if (!this._unloaded) {
         this.setData({ localPreviewEnabled: !!(res.data && res.data.version) })
-        if (this.data.localPreviewEnabled) await this.handleLocalPreview()
+        if (this.data.localPreviewEnabled && this.data.autoPreview !== false) await this.handleLocalPreview()
       }
     } catch (_) { /* 本地后端未启用预览时仍使用正常授权。 */ }
   },
-  async handleLocalPreview() {
+  async handleLocalPreview(role, identityId) {
     if (this._unloaded || this.data.submitting || !this.data.localPreviewEnabled || !this.isLocalPreviewEnvironment()) return
+    const devRole = typeof role === 'string' ? role : 'admin'
     const previousToken = wx.getStorageSync('token')
     this.setData({ submitting: true, loginError: '' })
     try {
-      const login = await request({ url: '/miniapp/login', method: 'POST', data: { loginCode: 'mock', phoneCode: 'mock', devRole: 'admin' } })
+      const payload = { loginCode: 'mock', phoneCode: 'mock', devRole }
+      if (devRole === 'parent' && identityId) payload.devParentId = String(identityId)
+      if (devRole === 'teacher' && identityId) payload.devTeacherId = String(identityId)
+      const login = await request({ url: '/miniapp/login', method: 'POST', data: payload })
       if (this._unloaded || wx.getStorageSync('token') !== previousToken) return
       const info = await request({ url: '/getInfo', header: { Authorization: 'Bearer ' + login.token } })
       if (this._unloaded || wx.getStorageSync('token') !== previousToken) return
       this.activateAccount(login.token, info)
+      // 预览教务时强制切到教务工作台，避免多角色账号默认落回管理员视角。
+      if (devRole === 'education') access.select('education')
       wx.reLaunch({ url: '/pages/index/index' })
     } catch (e) { if (!this._unloaded) this.setData({ loginError: e.message || '本地预览登录失败' }) }
     finally { if (!this._unloaded) this.setData({ submitting: false }) }
+  },
+
+  // 预览时可切换身份，便于查看家长端 / 教务端 / 教师端功能。
+  choosePreviewRole() {
+    if (this.data.submitting || !this.data.localPreviewEnabled) return
+    wx.showActionSheet({
+      itemList: ['管理员', '教务', '家长', '教师'],
+      success: res => {
+        const role = ['admin', 'education', 'parent', 'teacher'][res.tapIndex]
+        if (!role) return
+        if (role === 'parent' || role === 'teacher') this.previewIdentity(role)
+        else this.handleLocalPreview(role)
+      }
+    })
+  },
+
+  async previewIdentity(role) {
+    const url = role === 'parent' ? '/miniapp/dev/parents' : '/miniapp/dev/teachers'
+    try {
+      const res = await request({ url, timeout: 15000 })
+      const list = res.data || []
+      if (!list.length) return this.handleLocalPreview(role)
+      const items = list.slice(0, 6).map(item => String(item.label || item.name || item.userId))
+      wx.showActionSheet({
+        itemList: items,
+        success: pick => this.handleLocalPreview(role, list[pick.tapIndex].userId)
+      })
+    } catch (e) { wx.showToast({ title: e.message || '身份列表加载失败', icon: 'none' }) }
   },
 
   async loadPhoneConfig() {
@@ -77,7 +186,7 @@ Page({
     try {
       const res = await request({ url: '/miniapp/auth/config', timeout: 10000 })
       if (!this._unloaded) this.setData({ phoneLoginEnabled: res.data.phoneLoginEnabled === true, developmentCodeMode: res.data.developmentCodeMode === true, loginError: '' })
-    } catch (e) { if (!this._unloaded) this.setData({ phoneLoginEnabled: false, loginError: '登录服务未就绪，请检查后端是否已更新并启动' }) }
+    } catch (e) { if (!this._unloaded) this.setData({ phoneLoginEnabled: false, loginError: `登录服务未就绪（${getApp().globalData.baseUrl}），请检查后端是否已启动` }) }
     finally { if (!this._unloaded) this.setData({ configLoading: false }) }
   },
   phoneInput(e) {

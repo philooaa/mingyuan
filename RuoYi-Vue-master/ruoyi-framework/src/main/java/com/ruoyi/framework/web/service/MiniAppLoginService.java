@@ -213,6 +213,10 @@ public class MiniAppLoginService
                     throw new ServiceException("该家长不存在、已停用或并非独立家长账号，请刷新列表");
             }
         }
+        else if (EduRoleConstants.EDUCATION.equals(role))
+        {
+            user = firstEducationUser();
+        }
         else
         {
             throw new ServiceException("Unsupported mock role: " + devRole);
@@ -224,6 +228,26 @@ public class MiniAppLoginService
         }
 
         return createLoginToken(user);
+    }
+
+    /** 开发态登录教务身份：取第一个启用中的教务账号。 */
+    private SysUser firstEducationUser()
+    {
+        SysRole educationRole = roleMapper.checkRoleKeyUnique(EduRoleConstants.EDUCATION);
+        if (educationRole == null || !"0".equals(educationRole.getStatus()) || !"0".equals(educationRole.getDelFlag()))
+        {
+            throw new ServiceException("系统未配置教务角色，无法以教务身份预览");
+        }
+        SysUser query = new SysUser();
+        query.setRoleId(educationRole.getRoleId());
+        List<SysUser> users = new ArrayList<>(userMapper.selectAllocatedList(query));
+        users.sort(Comparator.comparing(SysUser::getUserId, Comparator.nullsLast(Long::compareTo)));
+        for (SysUser candidate : users)
+        {
+            SysUser user = userService.selectUserById(candidate.getUserId());
+            if (user != null && !UserConstants.USER_DISABLE.equals(user.getStatus())) return user;
+        }
+        throw new ServiceException("没有可用的教务账号，请先在若依中为账号分配教务角色");
     }
 
     private void assertDevelopmentTeacherLogin()

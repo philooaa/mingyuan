@@ -128,7 +128,41 @@ public class TimetableImportService
         return rangeOf(ranges, termName, null);
     }
 
+    /**
+     * 取某条排课适用的递推模式，与 {@link #rangeOf} 同样按「越具体越优先」回退：
+     *   ① `学期|期次`（如 `寒假|一期`，正常都用这一级）
+     *   ② `学期`（同一学期各期次共用一个模式时的简写）
+     *   ③ 不指定 → 按学期默认（寒暑假=上5休1，春秋季=每周固定星期）
+     * <p>
+     * 寒暑假可指定 {@code DAILY}（连上无假期）、{@code DAILY_5_1}（上5休1）、
+     * {@code DAILY_6_1}（上6休1）、{@code DAILY_5_2}（上5休2）；春秋季固定每周，指定日循环无效。
+     */
+    public static String patternOf(Map<String, String> patterns, String termName, String periodName)
+    {
+        String override = null;
+        if (patterns != null && !patterns.isEmpty())
+        {
+            override = patterns.get(rangeKey(termName, periodName));
+            if (override == null && termName != null && !termName.trim().isEmpty()) override = patterns.get(termName.trim());
+        }
+        return ScheduleCalendar.patternFor(termName, periodName, override);
+    }
+
+    /** 兼容旧调用：不指定递推模式，全部按学期默认（寒暑假=上5休1，春秋季=每周固定星期） */
     public Map<String, Object> preview(MultipartFile file, long courseYear, Map<String, LocalDate[]> ranges)
+    {
+        return preview(file, courseYear, ranges, Map.of());
+    }
+
+    /**
+     * 解析预览。
+     * <p>
+     * patterns 是「学期|期次 → 递推模式」的覆盖表（键与 ranges 一致），寒暑假可指定
+     * {@code DAILY}（连上无假期）、{@code DAILY_5_1}（上5休1）、{@code DAILY_6_1}（上6休1）、
+     * {@code DAILY_5_2}（上5休2）；不指定则按学期默认上5休1。
+     */
+    public Map<String, Object> preview(MultipartFile file, long courseYear, Map<String, LocalDate[]> ranges,
+                                       Map<String, String> patterns)
     {
         if (file == null || file.isEmpty()) throw new ServiceException("请选择要导入的课表文件");
         String fname = StringUtils.trimToEmpty(file.getOriginalFilename()).toLowerCase();
@@ -283,7 +317,7 @@ public class TimetableImportService
 
         if (rows.isEmpty()) throw new ServiceException("未从文件中解析出任何课程。支持两种课表：①矩阵式（行=时段、列=教室 W1/B1）；②平铺表（含「排课编码/学期/期次或上课日」表头，即系统导出的课表）");
 
-        annotateDatePlan(rows, ranges);
+        annotateDatePlan(rows, ranges, patterns);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("courseYear", courseYear);
@@ -297,7 +331,7 @@ public class TimetableImportService
         out.put("undatedCount", rows.stream()
                 .filter(x -> x.get("plannedPattern") == null || !Boolean.TRUE.equals(x.get("hasDateRange"))).count());
         // 按「学期」聚合出待设置日期的工作表分组，前端据此逐行给起止日期
-        out.put("datePlans", datePlans(rows, ranges));
+        out.put("datePlans", datePlans(rows, ranges, patterns));
         out.put("rows", rows);
         return out;
     }
@@ -308,7 +342,8 @@ public class TimetableImportService
      * 同一学期里不同期次的上课周期往往不同（寒假一期/二期各自的开课结课日、春季周六/周日各自的起止周），
      * 所以分组键用 {@link #rangeKey}（`学期|期次`）而不是只按学期；来源工作表一并列出便于核对。
      */
-    private List<Map<String, Object>> datePlans(List<Map<String, Object>> rows, Map<String, LocalDate[]> ranges)
+    private List<Map<String, Object>> datePlans(List<Map<String, Object>> rows, Map<String, LocalDate[]> ranges,
+                                                Map<String, String> patterns)
     {
         Map<String, Map<String, Object>> grouped = new LinkedHashMap<>();
         Map<String, Set<String>> sheetsOf = new LinkedHashMap<>();
@@ -337,15 +372,21 @@ public class TimetableImportService
             String term = (String) plan.get("termName");
             String period = (String) plan.get("periodName");
             LocalDate[] range = rangeOf(ranges, term, period);
-            String pattern = ScheduleCalendar.patternFor(term, period);
+            String pattern = patternOf(patterns, term, period);
             plan.put("sheetNames", new ArrayList<>(sheetsOf.getOrDefault((String) plan.get("key"), new LinkedHashSet<>())));
             plan.put("startDate", range == null ? null : range[0].toString());
             plan.put("endDate", range == null ? null : range[1].toString());
             // pattern 为 null 表示该「学期+期次」判定不出上课模式（如「未识别学期」，或春秋季期次不是周一~周日），设了日期也仍是待排
             plan.put("pattern", pattern);
+            plan.put("patternLabel", pattern == null ? "" : ScheduleCalendar.label(pattern));
+            // 寒暑假可选「连上无假期 / 上5休1 / 上6休1 / 上5休2」；春秋季固定每周，不给选
+            plan.put("dailyPatterns", ScheduleCalendar.isDaily(pattern)
+                    ? List.of(ScheduleCalendar.DAILY, ScheduleCalendar.DAILY_5_1, ScheduleCalendar.DAILY_6_1, ScheduleCalendar.DAILY_5_2)
+                    : List.of());
             plan.put("schedulable", pattern != null);
-            plan.put("patternNote", pattern == null ? "该学期/期次无法判定上课规则（寒假/暑假=上5休1，春季/秋季=每周固定星期且期次需为周一~周日），这些课次将保持待排"
-                    : (ScheduleCalendar.DAILY_5_1.equals(pattern) ? "上5休1" : "每周" + period));
+            plan.put("patternNote", pattern == null
+                    ? "该学期/期次无法判定上课规则（寒假/暑假可选 连上无假期/上5休1/上6休1/上5休2，春季/秋季=每周固定星期且期次需为周一~周日），这些课次将保持待排"
+                    : (ScheduleCalendar.WEEKLY.equals(pattern) ? "每周" + period : ScheduleCalendar.label(pattern)));
             plans.add(plan);
         }
         return plans;
@@ -359,22 +400,24 @@ public class TimetableImportService
      * 预览时用户往往还没填日期，但递推规则本身已经可以确定，先展示出来才便于核对；
      * 真正能否写入日期由 hasDateRange 表示（该「学期+期次」是否已设置起止日期）。
      */
-    private void annotateDatePlan(List<Map<String, Object>> rows, Map<String, LocalDate[]> ranges)
+    private void annotateDatePlan(List<Map<String, Object>> rows, Map<String, LocalDate[]> ranges,
+                                  Map<String, String> patterns)
     {
         for (Map<String, Object> row : rows)
         {
             String term = str(row.get("termName"));
             String period = str(row.get("periodName"));
-            String pattern = ScheduleCalendar.patternFor(term, period);
+            String pattern = patternOf(patterns, term, period);
             LocalDate[] range = rangeOf(ranges, term, period);
             row.put("plannedPattern", pattern);
+            row.put("plannedPatternLabel", pattern == null ? "" : ScheduleCalendar.label(pattern));
             row.put("hasDateRange", range != null);
             row.put("plannedStartDate", range == null ? null : range[0].toString());
             row.put("plannedEndDate", range == null ? null : range[1].toString());
             if (pattern == null)
             {
                 row.put("datePlanNote", ScheduleCalendar.patternForTerm(term) == null
-                        ? "学期无法判定上课规则（寒假/暑假=上5休1，春季/秋季=每周固定星期），保持待排"
+                        ? "学期无法判定上课规则（寒假/暑假可选 连上无假期/上5休1/上6休1/上5休2，春季/秋季=每周固定星期），保持待排"
                         : "期次/上课日需为周一至周日才能按每周递推");
             }
             else if (range == null)
@@ -384,17 +427,24 @@ public class TimetableImportService
         }
     }
 
+    /** 兼容旧调用：不指定递推模式，全部按学期默认（寒暑假=上5休1，春秋季=每周固定星期） */
+    public Map<String, Object> oneClickImport(MultipartFile file, long courseYear, boolean updateSupport, String username,
+                                              Map<String, LocalDate[]> ranges)
+    {
+        return oneClickImport(file, courseYear, updateSupport, username, ranges, Map.of());
+    }
+
     /**
      * 一键导入：解析 + 同步主数据 + 落库（整体事务）
      */
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> oneClickImport(MultipartFile file, long courseYear, boolean updateSupport, String username,
-                                              Map<String, LocalDate[]> ranges)
+                                              Map<String, LocalDate[]> ranges, Map<String, String> patterns)
     {
-        Map<String, Object> pv = preview(file, courseYear, ranges);
+        Map<String, Object> pv = preview(file, courseYear, ranges, patterns);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> rows = (List<Map<String, Object>>) pv.get("rows");
-        Map<String, Object> res = confirm(rows, updateSupport, username, ranges);
+        Map<String, Object> res = confirm(rows, updateSupport, username, ranges, patterns);
         res.put("sheets", pv.get("sheets"));
         res.put("total", pv.get("total"));
         res.put("datePlans", pv.get("datePlans"));
@@ -582,9 +632,16 @@ public class TimetableImportService
     // =================================================================
     // 确认落库（整体事务：任一条失败则全部回滚）
     // =================================================================
-    @Transactional(rollbackFor = Exception.class)
+    /** 兼容旧调用：不指定递推模式，全部按学期默认 */
     public Map<String, Object> confirm(List<Map<String, Object>> rows, boolean updateSupport, String username,
                                        Map<String, LocalDate[]> ranges)
+    {
+        return confirm(rows, updateSupport, username, ranges, Map.of());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> confirm(List<Map<String, Object>> rows, boolean updateSupport, String username,
+                                       Map<String, LocalDate[]> ranges, Map<String, String> patterns)
     {
         if (rows == null || rows.isEmpty()) throw new ServiceException("没有可导入的数据");
         Map<String, Object> syncStat = syncMasterData(rows, username);
@@ -640,12 +697,12 @@ public class TimetableImportService
             if (StringUtils.isNotEmpty(st)) s.setStartTime(LocalTime.parse(st));
             if (StringUtils.isNotEmpty(et)) s.setEndTime(LocalTime.parse(et));
 
-            // 日期规则：寒暑假「上5休1」、春秋季「每周固定星期」（星期取期次/上课日）。
+            // 日期规则：寒暑假「连上无假期 / 上5休1 / 上6休1 / 上5休2」、春秋季「每周固定星期」（星期取期次/上课日）。
             // 起止日期按「该行所属的 学期+期次」各自取（寒假一期/二期、春季周六/周日 的上课周期都不同）；
             // 没设日期、或学期/期次判定不出规则时保持「待排」不猜日期，并记下是哪个「学期/期次」漏了。
             LocalDate[] range = rangeOf(ranges, s.getTermName(), s.getPeriodName());
             String datePattern = range == null ? null
-                    : ScheduleCalendar.patternFor(s.getTermName(), s.getPeriodName());
+                    : patternOf(patterns, s.getTermName(), s.getPeriodName());
             if (datePattern != null)
             {
                 s.setStartDate(java.sql.Date.valueOf(range[0]));
@@ -1505,12 +1562,24 @@ public class TimetableImportService
         return toLocalTime(slot.split("-")[1]);
     }
 
+    /**
+     * 统一成 HH:mm:ss。同时接受 H:mm、HH:mm 与 HH:mm:ss（系统导出文件就是带秒的格式，
+     * 导出后再导回来必须能解析），秒位忽略。
+     */
     private String toLocalTime(String hhmm)
     {
+        if (StringUtils.isEmpty(hhmm)) return null;
         String v = hhmm.replace("：", ":").trim();
         String[] p = v.split(":");
-        if (p.length != 2) return null;
-        return String.format("%02d:%02d:00", Integer.parseInt(p[0]), Integer.parseInt(p[1]));
+        if (p.length < 2) return null;
+        try
+        {
+            return String.format("%02d:%02d:00", Integer.parseInt(p[0].trim()), Integer.parseInt(p[1].trim()));
+        }
+        catch (NumberFormatException e)
+        {
+            return null;
+        }
     }
 
     private String str(Object o) { return o == null ? null : StringUtils.trimToNull(String.valueOf(o)); }

@@ -11,6 +11,9 @@ public interface EduRoleConstants
     /** 教师角色，对应小程序教师端。 */
     String TEACHER = "teacher";
 
+    /** 教务角色；只保留核价与课程定价权限，不参与收款。 */
+    String EDUCATION = "education";
+
     /** 管理员角色，沿用若依内置超级管理员 role_key。 */
     String ADMIN = "admin";
 
