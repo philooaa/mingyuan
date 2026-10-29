@@ -51,6 +51,12 @@ public interface IEduCourseScheduleService
      */
     public int updateEduCourseSchedule(EduCourseSchedule eduCourseSchedule);
 
+    /** 仅教务或管理员在明确确认后可跳过报名保护。 */
+    public int updateEduCourseSchedule(EduCourseSchedule input, boolean force);
+
+    /** 逻辑删除并保留报名、财务等历史关联。 */
+    public int removeConfirmedSchedule(Long id);
+
     /**
      * 批量删除课程排课
      * 

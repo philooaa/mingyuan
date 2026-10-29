@@ -255,7 +255,7 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="时段" prop="timeSlot">
-              <el-select v-model="form.timeSlot" filterable placeholder="请选择时段" style="width:100%" @change="onTimeSlotChange"><el-option v-for="item in timeSlotOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+              <el-select v-model="form.timeSlot" filterable placeholder="请选择时段" style="width:100%" @change="onTimeSlotChange"><el-option v-for="item in formTimeSlotOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -445,9 +445,19 @@ export default {
     }
   },
   computed: {
+    formTimeSlotOptions() {
+      return this.form.classMode === '2' ? (this.dims.singleTimeSlots || []) : this.timeSlotOptions
+    },
     timeSlotOptions() {
       const values = [...(this.dims.timeSlots || []).map(item => item.value), this.form.timeSlot].filter(Boolean)
       return [...new Set(values)].map(value => ({ label: value, value }))
+    }
+  },
+  watch: {
+    'form.classMode'(mode) {
+      if (mode === '2' && !(this.dims.singleTimeSlots || []).some(s => s.value === this.form.timeSlot)) {
+        this.form.timeSlot = ''; this.form.startTime = null; this.form.endTime = null
+      }
     }
   },
   created() {

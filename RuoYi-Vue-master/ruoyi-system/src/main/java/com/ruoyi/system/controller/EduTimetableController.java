@@ -115,8 +115,10 @@ public class EduTimetableController extends BaseController
         data.put("periodMap", periodMap);
         // 2. 期次字典
         data.put("periods",     dictLabelValueList("edu_term_period"));
-        // 3. 时段字典（Excel 对齐的 6 个固定时段）
+        // 3. 班课使用全部启用时段；一对一保留固定两小时选项。
         data.put("timeSlots",   dictLabelValueList("edu_time_slot"));
+        data.put("singleTimeSlots", availability.slots().stream()
+            .map(slot -> Map.of("label", slot.value(), "value", slot.value())).toList());
         // 4. 班型字典
         data.put("classTypes",  dictLabelValueList("edu_class_type"));
         // 5. 年级字典

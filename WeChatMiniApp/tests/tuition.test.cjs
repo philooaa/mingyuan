@@ -456,3 +456,32 @@ test('legacy completed refund explains history instead of claiming new two-stage
   }
   assert.equal(t.refund({ refundStatus: 'SUCCESS', refundWorkflow: 'OFFLINE_TWO_STAGE' }).progressText, '线下退款已登记完成。')
 })
+
+test('only administrator workspace can confirm or close payments, even with wildcard permissions',async()=>{
+  for(const scenario of [
+    {roles:['education'],workspace:'education',allowed:false},
+    {roles:['admin','education'],workspace:'education',allowed:false},
+    {roles:['admin','education'],workspace:'admin',allowed:true},
+    {roles:['business_admin'],workspace:'admin',allowed:true}
+  ]) {
+    storage=new Map()
+    const pending={...bill,payments:[{paymentId:'27',paymentStatus:'PENDING',amount:'900.00'}]}
+    env(o=>{
+      if(o.url.endsWith('/getInfo'))return o.success({statusCode:200,data:{code:200,roles:scenario.roles,permissions:['*:*:*']}})
+      ok(o,pending)
+    },scenario.roles[0])
+    app.globalData.roles=scenario.roles
+    storage.set('miniappWorkspace:9007199254740993',scenario.workspace)
+    const p=page('admin-tuition');p.onLoad({id:bill.enrollmentId});await p.onShow()
+    assert.equal(p.data.allowed.confirm,scenario.allowed)
+    assert.equal(p.data.allowed.close,scenario.allowed)
+    assert.equal(p.data.allowed.collect,true)
+    if(!scenario.allowed) {
+      for(const action of ['confirm','close'])await p.paymentAction({currentTarget:{dataset:{id:'27',action}}})
+      assert.equal(calls.some(c=>/payments\/27\/(confirm|close)$/.test(c.url)),false)
+    }
+  }
+  const markup=fs.readFileSync(path.join(root,'pages/admin-tuition/admin-tuition.wxml'),'utf8')
+  assert.match(markup,/allowed.close.*data-action="close"/)
+  assert.match(markup,/billingStep === 3 && allowed.close/)
+})

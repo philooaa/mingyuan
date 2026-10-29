@@ -87,6 +87,16 @@ public class ScheduleCrudTest {
         principal(21, "admin", "teacher"); input.setClassMode("1");
         assertEquals(1, service.insertEduCourseSchedule(input));
     }
+    @Test void ninetyMinuteSlotsAreAcceptedForClassesOnly() throws Exception {
+        var input=course();input.setClassMode("1");input.setTimeSlot("8:30-10:00");input.setStartTime(LocalTime.of(8,30));
+        assertEquals(1,service.insertEduCourseSchedule(input));
+        input=course();input.setTimeSlot("8:30-10:00");input.setStartTime(LocalTime.of(8,30));
+        final var single=input;
+        assertThrows(ServiceException.class,()->service.insertEduCourseSchedule(single));
+        var availability=new ScheduleAvailabilityService();inject(availability,"db",db);
+        assertTrue(availability.slots().stream().noneMatch(slot->slot.value().equals("8:30-10:00")));
+        assertEquals(2,availability.slots().size());
+    }
     @Test void newCourseBindsIdAndProtectsCounters() {
         EduCourseSchedule input = course(); input.setTeacherName("forged"); input.setCreateBy("forged"); input.setEnrolledCount(99L);
         assertEquals(1, service.insertEduCourseSchedule(input));
@@ -137,6 +147,30 @@ public class ScheduleCrudTest {
         EduCourseSchedule input = new EduCourseSchedule(); input.setScheduleId(10L); input.setRemark("changed"); input.setEnrolledCount(0L);
         ServiceException error = assertThrows(ServiceException.class, () -> service.updateEduCourseSchedule(input));
         assertTrue(error.getMessage().contains("报名")); assertNull(captured);
+    }
+    @Test void confirmedEditAllowsEnrolledCourseButKeepsAttendanceProtection() {
+        principal(23,"education"); db.activeEnrollments=1;
+        var input=new EduCourseSchedule();input.setScheduleId(10L);input.setCourseClassName("确认修改");
+        assertEquals(1,service.updateEduCourseSchedule(input,true));
+        assertEquals("确认修改",captured.getCourseClassName()); assertNull(captured.getEnrolledCount());
+        db.attendance=1;captured=null;
+        var changed=new EduCourseSchedule();changed.setScheduleId(10L);changed.setEndTime(LocalTime.of(11,0));
+        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(changed,true));
+        assertNull(captured);
+    }
+    @Test void confirmedDeletionRetainsEnrolledCourseAndHistoricalReferences() {
+        principal(23,"education");db.activeEnrollments=1;db.references=1;db.attendance=1;
+        assertEquals(1,service.removeConfirmedSchedule(10L));
+        assertEquals(10L,captured.getScheduleId());assertEquals("1",captured.getDelFlag());
+        assertEquals("1",captured.getStatus());assertEquals("1",captured.getRecruitStatus());
+        assertNull(deleted);assertNull(captured.getEnrolledCount());
+    }
+    @Test void teacherCannotUseConfirmedOperations() {
+        principal(21,"teacher");
+        var input=new EduCourseSchedule();input.setScheduleId(10L);
+        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(input,true));
+        assertThrows(ServiceException.class,()->service.removeConfirmedSchedule(10L));
+        assertNull(captured);assertNull(deleted);
     }
     @Test void activeEnrollmentBlocksAdminDeletionBeforeOtherHistoryChecks() {
         principal(1, "admin"); db.activeEnrollments = 1;
@@ -220,7 +254,7 @@ public class ScheduleCrudTest {
             if (sql.contains("information_schema")) return List.of(Map.of("tableName","edu_homework"));
             if (sql.contains("FROM edu_course_schedule") && sql.contains("start_time")) return conflicts;
             if (sql.contains("FROM edu_schedule_adjustment")) return List.of();
-            if (sql.contains("FROM sys_dict_data")) return List.of(Map.of("dictValue","8:00-10:00"),Map.of("dictValue","10:15-12:15"));
+            if (sql.contains("FROM sys_dict_data")) return List.of(Map.of("dictValue","8:00-10:00"),Map.of("dictValue","10:15-12:15"),Map.of("dictValue","8:30-10:00"));
             if (sql.contains("SELECT enrollment_id")) {
                 if (sql.contains("enrollment_status IN") || sql.contains("COALESCE(enrollment_status")) return activeEnrollment || activeEnrollments>0 ? List.of(Map.of("enrollmentId", 1)) : List.of();
                 if (sql.contains("class_date IS NOT NULL")) return canceledEnrollment || activeEnrollment ? List.of(Map.of("enrollmentId", 1)) : List.of();

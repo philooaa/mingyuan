@@ -192,10 +192,17 @@ export default {
   computed: {
     /** 时段下拉 = 字典时段 ∪ 当前值（兼容导入进来的非标准时段，如「周六 09:00-11:00」） */
     timeSlotOptions() {
-      const dict = (this.dims.timeSlots || []).map(t => t.value).filter(Boolean)
+      const dict = ((this.form.classMode === '2' ? this.dims.singleTimeSlots : this.dims.timeSlots) || []).map(t => t.value).filter(Boolean)
       const cur = this.form.timeSlot
-      if (cur && dict.indexOf(cur) === -1) return dict.concat([cur])
+      if (this.form.classMode !== '2' && cur && dict.indexOf(cur) === -1) return dict.concat([cur])
       return dict
+    }
+  },
+  watch: {
+    'form.classMode'(mode) {
+      if (mode === '2' && !this.timeSlotOptions.includes(this.form.timeSlot)) {
+        this.form.timeSlot = ''; this.form.startTime = null; this.form.endTime = null
+      }
     }
   },
   methods: {

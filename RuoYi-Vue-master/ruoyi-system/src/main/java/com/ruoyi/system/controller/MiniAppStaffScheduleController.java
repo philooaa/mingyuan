@@ -35,16 +35,18 @@ public class MiniAppStaffScheduleController extends BaseController {
     }
     @PutMapping
     @Log(title="教务管理员修改排课",businessType=BusinessType.UPDATE)
-    public AjaxResult edit(@RequestBody EduCourseSchedule input) {
+    public AjaxResult edit(@RequestBody EduCourseSchedule input, @RequestParam(defaultValue="false") boolean force) {
         EduCourseSchedule old=schedules.selectEduCourseScheduleByScheduleId(input.getScheduleId());
         if (input.getClassroomId()!=null && !Objects.equals(input.getClassroomId(),old.getClassroomId()))
             throw new ServiceException("请通过后续教室分配功能调整教室");
         if (old.getClassroomId()!=null && input.getCampusName()!=null && !Objects.equals(input.getCampusName(),old.getCampusName()))
             throw new ServiceException("已分配教室的课程需通过教室分配功能调整校区");
         input.setClassroomId(old.getClassroomId());
-        return toAjax(schedules.updateEduCourseSchedule(input));
+        return toAjax(schedules.updateEduCourseSchedule(input, force));
     }
     @DeleteMapping("/{id}")
     @Log(title="教务管理员删除排课",businessType=BusinessType.DELETE)
-    public AjaxResult remove(@PathVariable Long id) { return toAjax(schedules.deleteEduCourseScheduleByScheduleId(id)); }
+    public AjaxResult remove(@PathVariable Long id, @RequestParam(defaultValue="false") boolean force) {
+        return toAjax(force ? schedules.removeConfirmedSchedule(id) : schedules.deleteEduCourseScheduleByScheduleId(id));
+    }
 }
