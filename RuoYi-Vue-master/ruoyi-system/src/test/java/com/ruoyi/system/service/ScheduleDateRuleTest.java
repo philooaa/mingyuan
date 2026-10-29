@@ -193,11 +193,42 @@ public class ScheduleDateRuleTest {
         assertEquals(6, ScheduleCalendar.studyDays(ScheduleCalendar.DAILY_6_1));
         assertEquals(7, ScheduleCalendar.cycle(ScheduleCalendar.DAILY_5_2));
         assertEquals(5, ScheduleCalendar.studyDays(ScheduleCalendar.DAILY_5_2));
+        assertEquals(5, ScheduleCalendar.cycle(ScheduleCalendar.DAILY_4_1));
+        assertEquals(4, ScheduleCalendar.studyDays(ScheduleCalendar.DAILY_4_1));
         assertTrue(ScheduleCalendar.isDaily(ScheduleCalendar.DAILY));
         assertTrue(ScheduleCalendar.isDaily(ScheduleCalendar.DAILY_5_2));
+        assertTrue(ScheduleCalendar.isDaily(ScheduleCalendar.DAILY_4_1));
         assertFalse(ScheduleCalendar.isDaily(ScheduleCalendar.WEEKLY));
+        assertFalse(ScheduleCalendar.isDaily(ScheduleCalendar.OTHER));
         assertTrue(ScheduleCalendar.isValid(ScheduleCalendar.DAILY_6_1));
+        assertTrue(ScheduleCalendar.isValid(ScheduleCalendar.DAILY_4_1));
+        assertTrue(ScheduleCalendar.isValid(ScheduleCalendar.OTHER));
         assertFalse(ScheduleCalendar.isValid("DAILY_7_1"));
+    }
+
+    @Test
+    void fourOnOneOffRestsEveryFifthDay() {
+        // 2026-01-01 起 10 天：上 4 天（1/1~1/4）、休 1 天（1/5）、上 4 天（1/6~1/9）、休 1 天（1/10）
+        var dates = ScheduleCalendar.dates(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 10), ScheduleCalendar.DAILY_4_1, "一期", List.of());
+        assertEquals(8, dates.size());
+        assertFalse(dates.contains(LocalDate.of(2026, 1, 5)));
+        assertFalse(dates.contains(LocalDate.of(2026, 1, 10)));
+        assertTrue(dates.contains(LocalDate.of(2026, 1, 4)));
+        assertTrue(dates.contains(LocalDate.of(2026, 1, 9)));
+    }
+
+    @Test
+    void otherPatternIsNeverScheduled() {
+        // 「其他（暂不排课）」：即使给了起止日期也不展开任何上课日，课次保持 0
+        LocalDate start = LocalDate.of(2026, 1, 1);
+        LocalDate end = LocalDate.of(2026, 1, 31);
+        assertTrue(ScheduleCalendar.dates(start, end, ScheduleCalendar.OTHER, "一期", List.of()).isEmpty());
+        assertTrue(ScheduleCalendar.dates(start, end, ScheduleCalendar.OTHER, "周六", List.of()).isEmpty());
+        // 与学期、期次无关，指定即生效（不会被回退成学期默认模式）
+        assertEquals(ScheduleCalendar.OTHER, ScheduleCalendar.patternFor("寒假", "一期", ScheduleCalendar.OTHER));
+        assertEquals(ScheduleCalendar.OTHER, ScheduleCalendar.patternFor("秋季", "周六", ScheduleCalendar.OTHER));
+        assertEquals("其他（暂不排课）", ScheduleCalendar.label(ScheduleCalendar.OTHER));
+        assertEquals("上4休1", ScheduleCalendar.label(ScheduleCalendar.DAILY_4_1));
     }
 
     @Test
@@ -238,6 +269,7 @@ public class ScheduleDateRuleTest {
         assertEquals(ScheduleCalendar.DAILY_6_1, ScheduleCalendar.patternFor("寒假", "一期", ScheduleCalendar.DAILY_6_1));
         assertEquals(ScheduleCalendar.DAILY, ScheduleCalendar.patternFor("暑假", "二期", ScheduleCalendar.DAILY));
         assertEquals(ScheduleCalendar.DAILY_5_2, ScheduleCalendar.patternFor("暑假", "三期", ScheduleCalendar.DAILY_5_2));
+        assertEquals(ScheduleCalendar.DAILY_4_1, ScheduleCalendar.patternFor("寒假", "四期", ScheduleCalendar.DAILY_4_1));
         assertEquals(ScheduleCalendar.DAILY_5_1, ScheduleCalendar.patternFor("寒假", "一期", null));
         assertEquals(ScheduleCalendar.DAILY_5_1, ScheduleCalendar.patternFor("寒假", "一期", "  "));
         // 春秋季固定每周：日循环覆盖无效，仍按每周；期次不是星期则无法判定

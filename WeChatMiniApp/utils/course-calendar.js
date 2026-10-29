@@ -2,6 +2,9 @@
 const DAY_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const MINUTE_HEIGHT = 2.2 // rpx；两小时留足课程信息高度，时段间隔仍压缩显示。
 const DEFAULT_SLOTS = ['08:00-10:00','10:15-12:15','13:15-15:15','15:30-17:30','18:30-20:30','20:30-22:30']
+// 日循环模式的一轮天数与上课天数，与后端 ScheduleCalendar.cycle/studyDays 保持一致
+const DAILY_CYCLES = { DAILY: [1, 1], DAILY_5_1: [6, 5], DAILY_6_1: [7, 6], DAILY_5_2: [7, 5], DAILY_4_1: [5, 4] }
+const PATTERN_LABELS = { WEEKLY: '每周固定星期', DAILY: '连上无假期', DAILY_5_1: '上5休1', DAILY_6_1: '上6休1', DAILY_5_2: '上5休2', DAILY_4_1: '上4休1', OTHER: '其他（暂不排课）' }
 
 function parseDate(value) {
   const match = String(value || '').match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:$|[ T])/)
@@ -29,8 +32,11 @@ function expandCourse(course) {
   if (start > end) return { dates: [], reason: '排课起止日期顺序异常' }
   if ((end - start) / 86400000 > 3660) return { dates: [], reason: '排课日期跨度异常，请核对' }
   const pattern = course.classPattern || (['周六', '周日'].includes(course.periodName) ? 'WEEKLY' : '')
-  if (!['WEEKLY', 'DAILY_5_1'].includes(pattern)) return { dates: [], reason: '重复规则待确认' }
+  // 「其他（暂不排课）」不展开任何上课日
+  if (pattern === 'OTHER') return { dates: [], reason: PATTERN_LABELS.OTHER }
   if (pattern === 'WEEKLY' && !DAY_NAMES.includes(course.periodName)) return { dates: [], reason: '每周上课的星期待确认' }
+  const cycle = DAILY_CYCLES[pattern]
+  if (pattern !== 'WEEKLY' && !cycle) return { dates: [], reason: '重复规则待确认' }
   const adjustments = new Map()
   for (const adjustment of course.adjustments || []) {
     const original = parseDate(adjustment.originalDate)
@@ -42,7 +48,7 @@ function expandCourse(course) {
   }
   const dates = new Set()
   for (let date = start, index = 0; date <= end; date = addDays(date, 1), index++) {
-    const included = pattern === 'WEEKLY' ? date.getDay() === DAY_NAMES.indexOf(course.periodName) : index % 6 < 5
+    const included = pattern === 'WEEKLY' ? date.getDay() === DAY_NAMES.indexOf(course.periodName) : index % cycle[0] < cycle[1]
     if (!included) continue
     const key = formatDate(date)
     const actual = adjustments.has(key) ? adjustments.get(key) : date
@@ -175,4 +181,4 @@ function buildWeek(courses, selectedDate, slots) {
     stoppedCourses: stopped, weekLessonCount: lessonCount, plannedLessonCount: plannedCount,
     overlapCount: days.reduce((count, day) => count + day.blocks.filter(block => block.overlap).length, 0) }
 }
-module.exports = { parseDate, formatDate, addDays, weekStart, timeMinutes, expandCourse, positionBlocks, singleLessonState, buildWeek,rangeStyle }
+module.exports = { parseDate, formatDate, addDays, weekStart, timeMinutes, expandCourse, positionBlocks, singleLessonState, buildWeek,rangeStyle, DAILY_CYCLES, PATTERN_LABELS }

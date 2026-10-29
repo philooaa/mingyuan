@@ -567,7 +567,13 @@ Page(childContext.page({
       this.setData({ cart: [], cartMode: false, showSheet: false, selectedSchedule: null })
       wx.setStorageSync('enrollCart', [])
       this.refreshCartSummary()
-      wx.showToast({ title: '已生成订单，等待教务核价', icon: 'success' })
+      wx.showModal({
+        title: '订单已提交',
+        content: '报名信息已提交，正在等待教务核价。\n已报名课程可在「我的账户 - 已报课程」中查看。\n核价完成后教务会联系你确认应付金额，请按教务安排线下支付。',
+        confirmText: '查看账单',
+        cancelText: '关闭',
+        success: res => { if (res.confirm) wx.navigateTo({ url: '/pages/tuition-list/tuition-list' }) }
+      })
       await this.loadPage()
     } catch (error) {
       if (this.current()) wx.showToast({ title: error.message || '下单失败', icon: 'none' })
