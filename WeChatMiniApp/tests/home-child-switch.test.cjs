@@ -31,7 +31,7 @@ test('unlinked history survives child switches but is cleared when the parent ac
 })
 test('home shows real selected-child allowance and links child actions separately from parent services',async()=>{
  const calls=[];const e=home(o=>{calls.push(o);return Promise.resolve({data:o.url.endsWith('/account')?{children:[a,b]}:[]})});await e.p.loadParentTag();assert.equal(e.p.data.currentChild.studentName,'学生甲');assert.equal(e.p.data.stats[0].value,'5');assert.equal(e.p.data.schedule.length,0)
- e.p.chooseChild({currentTarget:{dataset:{id:'22'}}});assert.equal(e.p.data.currentChild.studentName,'学生乙');assert.equal(e.p.data.stats[0].value,'1');assert.equal(e.p.data.stats[2].value,'2')
+ e.p.chooseChild({currentTarget:{dataset:{id:'22'}}});assert.equal(e.p.data.currentChild.studentName,'学生乙');assert.equal(e.p.data.stats[0].value,'1');assert.equal(e.p.data.stats.length,2);assert.equal(e.p.data.stats.some(s=>s.label==='待办事项'),false)
  e.p.setData({quickActions:[{title:'我的作业',route:'/pages/homework/homework'},{title:'邀请好友',route:'/pages/parent-referral/parent-referral'}]})
  e.p.handleAction({currentTarget:{dataset:{title:'我的作业',route:'/pages/homework/homework'}}});e.p.handleAction({currentTarget:{dataset:{title:'邀请好友',route:'/pages/parent-referral/parent-referral'}}});assert.equal(e.routes[0],'/pages/homework/homework?accountId=22');assert.equal(e.routes[1],'/pages/parent-referral/parent-referral')
  e.p.addChild();assert.match(e.routes.at(-1),/create=1&returnHome=1/);assert.ok(calls.some(o=>o.data&&o.data.accountId==='22'))

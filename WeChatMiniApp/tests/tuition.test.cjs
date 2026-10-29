@@ -266,9 +266,9 @@ test('fee waived bill cannot produce a cash refund application', async () => {
   storage = new Map(); env(o => o.url.endsWith('/refunds') ? o.success({ statusCode: 200, data: { code: 200, rows: [], total: 0 } }) : ok(o, { ...bill, payableAmount: '0.00', refundableAmount: '0.00', payments: [{ paymentId: '9', channel: 'FREE', amount: '0.00', paymentStatus: 'SUCCESS' }] }))
   const p = page('tuition-refund'); p.onLoad({ id: bill.enrollmentId }); await p.onShow(); p.setData({ amount: '1.00', reason: '退课' }); await p.apply(); assert.equal(calls.some(c => c.method === 'POST'), false)
 })
-test('home exposes parent finance routes and admin finance route without changing shop routes', async () => {
+test('home hides parent payment entry while retaining coupons, shop and admin finance', async () => {
   env(o => o.url.endsWith('/getInfo') ? o.success({ statusCode: 200, data: { code: 200, roles: app.globalData.roles, permissions: ['system:tuition:list'] } }) : ok(o, {})); const p = page('index')
-  await p.applyLoginRole(); assert.ok(p.data.quickActions.some(a => a.route === '/pages/tuition-list/tuition-list')); assert.ok(p.data.quickActions.some(a => a.route === '/pages/my-coupons/my-coupons')); assert.ok(p.data.quickActions.some(a => a.route === '/pages/material/material'))
+  await p.applyLoginRole(); assert.equal(p.data.quickActions.some(a => a.route === '/pages/tuition-list/tuition-list'), false); assert.ok(p.data.quickActions.some(a => a.route === '/pages/my-coupons/my-coupons')); assert.ok(p.data.quickActions.some(a => a.route === '/pages/material/material'))
   app.globalData.roles = ['admin']
   await p.applyLoginRole(); assert.ok(p.data.quickActions.some(a => a.route === '/pages/admin-tuition/admin-tuition')); p.onUnload()
 })

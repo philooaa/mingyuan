@@ -1,0 +1,13 @@
+const test = require('node:test'), assert = require('node:assert/strict')
+const { matches } = require('../utils/course-term-filter')
+test('term matching uses configured fields without guessing dates or conflating vacation periods', () => {
+  assert.equal(matches({termName:' 暑期 ',periodName:'第２期'},6),true)
+  assert.equal(matches({termName:'寒假',periodName:'一期'},3),true)
+  assert.equal(matches({termName:'寒假',periodName:'二期'},3),false)
+  assert.equal(matches({termName:'一对一2026-11-15',periodName:'周日'},2),false)
+  assert.equal(matches({termName:'暑假',periodName:'三期'},5),false)
+  assert.equal(matches({},0),true)
+  assert.equal(matches({},1),false)
+  assert.equal(matches({termName:'春季',periodName:'周六'},1),true)
+  assert.equal(matches({termName:'春季',periodName:'周日'},1),true)
+})

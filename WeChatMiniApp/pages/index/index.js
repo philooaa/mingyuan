@@ -12,8 +12,7 @@ const roleProfiles = {
     title: '课程报名、课表与上课记录',
     stats: [
       { label: '可用额度', value: '—', suffix: '' },
-      { label: '已报课程', value: '—', suffix: '门' },
-      { label: '待办事项', value: '—', suffix: '项' }
+      { label: '已报课程', value: '—', suffix: '门' }
     ],
     actions: [
       { title: '课程报名', icon: '报', tone: 'blue', route: '/pages/enrollment/enrollment' },
@@ -23,12 +22,8 @@ const roleProfiles = {
       { title: '资料商城', icon: '资', tone: 'indigo', route: '/pages/material/material' },
       { title: '我的资料', icon: '料', tone: 'green', route: '/pages/material-orders/material-orders' },
       { title: '我的作业', icon: '作', tone: 'violet', route: '/pages/homework/homework' },
-      { title: '我的缴费', icon: '费', tone: 'blue', route: '/pages/tuition-list/tuition-list' },
-      { title: '我的收据', icon: '据', tone: 'cyan', route: '/pages/tuition-receipt/tuition-receipt' },
-      { title: '退费记录', icon: '退', tone: 'orange', route: '/pages/tuition-refund/tuition-refund' },
       { title: '我的优惠券', icon: '券', tone: 'indigo', route: '/pages/my-coupons/my-coupons' },
-      { title: '邀请好友', icon: '邀', tone: 'violet', route: '/pages/parent-referral/parent-referral' },
-      { key:'personalAccount', title:'我的账户', icon:'账', tone:'gold', route:'/pages/parent-account/parent-account' }
+      { title: '邀请好友', icon: '邀', tone: 'violet', route: '/pages/parent-referral/parent-referral' }
     ],
     agendaTitle: '我的课程',
     schedule: []
@@ -349,7 +344,7 @@ Page({
     this._teacherLoadVersion = (this._teacherLoadVersion || 0) + 1
     this.setData({ teacherDataMessage: '',currentChild:null,parentChildren:[],childLoading:false,childError:'',showChildPicker:false,parentScheduleError:'', roleLocked: workspaces.length < 2, developmentLoginEnabled: this.data.developmentLoginEnabled, ...buildRoleState(role, workspaces) })
     if(role==='education')this.loadSignReviewPending()
-    if(role==='parent' || role==='admin') { this.loadAccountPending();if(role==='admin'){this.loadReferralPending();this.loadSignReviewPending()};this._accountTimer=setInterval(()=>{this.loadAccountPending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending()}},30000) }
+    if(role==='admin') { this.loadAccountPending();if(role==='admin'){this.loadReferralPending();this.loadSignReviewPending()};this._accountTimer=setInterval(()=>{this.loadAccountPending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending()}},30000) }
 
     const actions = this.data.quickActions.filter(a => a.route !== '/pages/admin-tuition/admin-tuition')
     if (financeAllowed && ['admin', 'education'].includes(role)) actions.push({ title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' })
@@ -515,6 +510,7 @@ Page({
   openChildren() { if(this.data.currentRole==='parent' && getRoleFromStorage()==='parent') wx.navigateTo({url:'/pages/parent-children/parent-children'}) },
   stopAccountRefresh() {clearInterval(this._accountTimer);this._accountTimer=null;this._accountVersion=(this._accountVersion || 0)+1;this._accountBusy=false;if(!this._unloaded)this.setData({accountPendingError:'',quickActions:this.data.quickActions.map(a=>a.key==='personalAccount'?{...a,badgeText:''}:a)})},
   async loadAccountPending() {
+    if(!this.data.quickActions.some(a=>a.key==='personalAccount'))return
     const role=this.data.currentRole,token=wx.getStorageSync('token');if(this._accountBusy || !this._visible || this._unloaded || !['parent','admin'].includes(role) || getRoleFromStorage()!==role || !token)return
     const v=this._accountVersion=(this._accountVersion || 0)+1,current=()=>!this._unloaded && this._visible && v===this._accountVersion && this.data.currentRole===role && getRoleFromStorage()===role && wx.getStorageSync('token')===token
     this._accountBusy=true
@@ -528,7 +524,7 @@ Page({
     try {
       const r=await request({url:'/miniapp/parent/account'})
       if(this._unloaded||!this._visible||version!==this._parentChildrenVersion||roleVersion!==this._roleLoadVersion||this.data.currentRole!=='parent'||wx.getStorageSync('token')!==token)return
-      const children=((r.data||{}).children||[]).map(c=>({...c,accountId:String(c.accountId),badgeText:courseState.badgeText(c.actionPendingCount)}))
+      const children=((r.data||{}).children||[]).map(c=>({...c,accountId:String(c.accountId)}))
       const selected=childContext.reconcile(children)
       this.setData({parentChildren:children,tag:'管理孩子信息'})
       this.displayChild(selected);await this.loadParentSchedule()
@@ -537,7 +533,7 @@ Page({
     } finally {if(version===this._parentChildrenVersion&&!this._unloaded)this.setData({childLoading:false})}
   },
   displayChild(child) {
-    const stats=child?[{label:'可用额度',value:String(Number(child.remainingCredits)-Number(child.reservedCredits)),suffix:''},{label:'已报课程',value:String(child.courseCount||0),suffix:'门'},{label:'待办事项',value:String(child.actionPendingCount||0),suffix:'项'}]:roleProfiles.parent.stats
+    const stats=child?[{label:'可用额度',value:String(Number(child.remainingCredits)-Number(child.reservedCredits)),suffix:''},{label:'已报课程',value:String(child.courseCount||0),suffix:'门'}]:roleProfiles.parent.stats
     this.setData({currentChild:child,stats,schedule:[],showChildPicker:false,parentScheduleError:''})
     this._parentScheduleVersion=(this._parentScheduleVersion||0)+1
   },

@@ -9,7 +9,7 @@
   </view>
 
   <view class="booking-wallet" wx:if="{{courseTypeIndex === 1}}">
-    <view class="wallet-heading"><view><view class="wallet-eyebrow">我的一对一课包</view><view class="wallet-child">{{creditAccount ? creditAccount.studentName + ' · ' + creditAccount.gradeName : '孩子专属课次账户'}}</view></view><view class="wallet-mark">1 : 1</view></view>
+    <view class="wallet-heading"><view><view class="wallet-eyebrow">我的一对一课包</view><view class="wallet-child">{{creditAccount ? creditAccount.studentName + ' ' + creditAccount.gradeName : '孩子专属课次账户'}}</view></view><view class="wallet-mark">1 : 1</view></view>
     <view class="wallet-state" wx:if="{{accountsLoading}}">正在同步课次余额…</view>
     <view class="wallet-state wallet-error" wx:elif="{{accountsError}}" bindtap="loadLessonAccounts">{{accountsError}} · 点击重试</view>
     <block wx:elif="{{creditAccount}}">
@@ -26,6 +26,9 @@
     </picker>
     <picker class="filter-picker" bindchange="onGradeChange" value="{{gradeIndex}}" range="{{gradeOptions}}">
       <view class="filter-text">{{gradeOptions[gradeIndex]}}</view>
+    </picker>
+    <picker class="filter-picker term-picker" bindchange="onTermChange" value="{{termIndex}}" range="{{termOptions}}" disabled="{{submitting || showSheet}}">
+      <view class="filter-text">{{termOptions[termIndex]}} ▾</view>
     </picker>
     <view class="icon-btn reset" bindtap="resetFilters">重置</view>
   </view>

@@ -1,6 +1,7 @@
 const childContext = require('../../utils/child-context')
 const { request } = require('../../utils/request')
 const {requestKey}=require('../../utils/personal-account')
+const termFilter = require('../../utils/course-term-filter')
 
 Page(childContext.page({
   data: {
@@ -23,6 +24,8 @@ Page(childContext.page({
     expandedCourseIds: [],
     subjectIndex: 0,
     gradeIndex: 0,
+    termOptions: termFilter.options,
+    termIndex: 0,
     selectedSchedule: null,
     cart: [], cartCount: 0, cartTotal: '0.00', cartMode: false,
     lessonAccounts: [], creditAccount:null, lessonAccountOptions: [], lessonAccountIndex:0, selectedChildId:null, newChild:true, childMissing:false, settlementMethod:'C', accountsError:'', accountsLoading:false,
@@ -96,7 +99,7 @@ Page(childContext.page({
       const accounts=res.data || [],index=accounts.findIndex(a=>String(a.accountId)===String(this.data.selectedChildId))
       const selected=this.data.scopeAccountId || this.data.selectedChildId
       this.setData({creditAccount:selected?accounts.find(a=>String(a.accountId)===String(selected)) || null:accounts[0] || null})
-      this.setData({lessonAccounts:accounts,lessonAccountOptions:accounts.map(a=>`${a.studentName} · ${a.gradeName} · 可用额度 ${a.availableCredits} · #${a.accountId}`).concat('＋ 添加孩子信息'),lessonAccountIndex:index>=0?index:accounts.length,childMissing:!!this.data.selectedChildId && index<0})
+      this.setData({lessonAccounts:accounts,lessonAccountOptions:accounts.map(a=>[a.studentName,a.gradeName].filter(Boolean).join(' ')).concat('＋ 添加孩子信息'),lessonAccountIndex:index>=0?index:accounts.length,childMissing:!!this.data.selectedChildId && index<0})
       if(index>=0)this.setData({'form.studentName':accounts[index].studentName})
     } catch(error) { if(this.current() && version===this._accountVersion) this.setData({accountsError:'孩子资料暂时无法查询，请重试'}) }
     finally { if(this.current() && version===this._accountVersion) {this._hasLoadedAccounts=true;this.setData({accountsLoading:false})} }
@@ -152,6 +155,7 @@ Page(childContext.page({
     const grade = this.data.gradeIndex > 0 && this.data.grades[this.data.gradeIndex - 1]
     const eligible = (this._allSchedules || []).filter(course =>
       this.matchesCourseType(course) &&
+      termFilter.matches(course, this.data.termIndex) &&
       (!subject || course.subjectName === subject.dictLabel) &&
       (!grade || course.gradeName === grade.dictLabel))
     const eligibleKeys = new Set(eligible.map(course => course.teacherKey))
@@ -325,6 +329,11 @@ Page(childContext.page({
   onGradeChange(e) {
     this.setData({ gradeIndex: Number(e.detail.value) }); this.applyFilters()
   },
+  onTermChange(e) {
+    const index = Number(e.detail.value)
+    if (!this.current() || this.data.submitting || this.data.showSheet || !Number.isInteger(index) || index < 0 || index >= termFilter.options.length) return
+    this.setData({ termIndex: index, expandedCourseIds: [] }); this.applyFilters()
+  },
   chooseCourseType(e) {
     this.onCourseTypeChange({ detail: { value: e.currentTarget.dataset.index } })
   },
@@ -337,7 +346,7 @@ Page(childContext.page({
     this.applyEnrollmentFilter()
   },
   resetFilters() {
-    this.setData({ subjectIndex: 0, gradeIndex: 0, selectedTeacherKeys: [], teacherKeyword: '' }); this.applyFilters()
+    this.setData({ subjectIndex: 0, gradeIndex: 0, termIndex: 0, selectedTeacherKeys: [], teacherKeyword: '' }); this.applyFilters()
   },
 
   // ---- 购物车：一个购物车 = 一个订单 ----
