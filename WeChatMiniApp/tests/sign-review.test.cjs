@@ -15,7 +15,7 @@ function harness(name, roles = ['education'], custom) {
     return { data: currentSheet }
   }
   function load(file) {
-    if (file.endsWith('/utils/request.js')) return { request }
+    if (file === path.join(root, 'utils', 'request.js')) return { request }
     if (cache.has(file)) return cache.get(file)
     const module = { exports: {} }
     vm.runInNewContext(fs.readFileSync(file, 'utf8'), { module, Page: p => { definition = p }, require: id => load(path.resolve(path.dirname(file), id + '.js')), getApp: () => app, wx, console }, { filename: file })

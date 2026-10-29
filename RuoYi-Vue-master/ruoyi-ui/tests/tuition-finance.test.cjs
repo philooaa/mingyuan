@@ -657,7 +657,7 @@ test('pricing a real bill into MOCK requires explicit local pricing capability',
     payments: [],
   }
   instance.operation = 'price'
-  instance.form = { originalAmount: '100.00', financeMode: 'MOCK' }
+  instance.form = { originalAmount: '100.00', discountAmount: '0.00', financeMode: 'MOCK' }
   instance.getList = instance.handleDetail = async () => {}
   await instance.submitOperation()
   assert.equal(writes, 0)

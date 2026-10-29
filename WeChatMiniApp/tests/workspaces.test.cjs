@@ -242,3 +242,21 @@ test('published phone login ignores stored debugging overrides and cannot open b
   await h.p.resolveBackend()
   assert.equal(h.calls.length, 0)
 })
+
+
+test('parent hides account and payment shortcuts, rejects stale taps and retains child creation and administrator transactions', async () => {
+  const h = harness('index', ['parent']); h.p.onLoad(); h.p._visible = true; await h.p.applyLoginRole()
+  const hidden = [{ title: '我的账户', route: '/pages/parent-account/parent-account' }, { title: '我的缴费', route: '/pages/tuition-list/tuition-list' }, { title: '退费记录', route: '/pages/tuition-refund/tuition-refund' }, { title: '我的收据', route: '/pages/tuition-receipt/tuition-receipt' }]
+  for (const item of hidden) {
+    assert.equal(h.p.data.quickActions.some(a => a.route === item.route), false)
+    h.p.handleAction({ currentTarget: { dataset: item } })
+  }
+  assert.equal(h.navigations.length, 0)
+  await h.p.loadAccountPending()
+  assert.equal(h.calls.some(o => o.url === '/miniapp/parent/account/pending-count'), false)
+  h.p.addChild(); assert.equal(h.navigations.at(-1), '/pages/parent-account/parent-account?create=1&returnHome=1')
+  h.state.roles = ['admin']; await h.p.applyLoginRole()
+  assert.ok(h.p.data.quickActions.some(a => a.route === '/pages/admin-transactions/admin-transactions'))
+  assert.ok(h.p.data.quickActions.some(a => a.route === '/pages/admin-tuition/admin-tuition'))
+  h.p.onUnload()
+})

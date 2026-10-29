@@ -367,3 +367,5 @@ page {
 .cart-item-remove { margin-top:10rpx; font-size:23rpx; color:#8b98ab; }
 .cart-total-row { display:flex; align-items:center; justify-content:space-between; margin:22rpx 0 12rpx; padding-top:18rpx; border-top:1rpx solid #e8edf4; font-size:27rpx; color:#3a4a63; }
 .cart-total-value { font-size:34rpx; font-weight:800; color:#b4622a; }
+
+.filter-bar{flex-wrap:nowrap;gap:10rpx}.filter-picker{min-width:0;padding:0 12rpx}.term-picker{flex:1.2}.filter-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.filter-bar .reset{flex-shrink:0;width:76rpx}

@@ -10,7 +10,7 @@ function harness(respond) {
   const request = async o => { calls.push(o); if(respond)return respond(o);return { data: o.url.endsWith('/single/lessons') ? courses.filter(c => c.classMode === '2').map(c => ({ ...c, lessons: [{ classDate: c.classDate, canEnroll: true }] })) : courses.filter(c => c.classMode === '1') } }
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../pages/enrollment/enrollment.js'), 'utf8'), {
     Page: p => { definition = p }, wx, console,
-    require: id => id.includes('child-context') ? require('./helpers/child-context.cjs')(wx) : id.includes('personal-account') ? { requestKey: () => '' } : { request }
+    require: id => id.includes('course-term-filter') ? require('../utils/course-term-filter') : id.includes('child-context') ? require('./helpers/child-context.cjs')(wx) : id.includes('personal-account') ? { requestKey: () => '' } : { request }
   })
   const p = { ...definition, data: structuredClone(definition.data), _token: storage.token, _unloaded: false, setData(v) { Object.assign(this.data, v) } }
   p.data.courseTypeIndex = 1; p.data.subjects = [{ dictLabel: '数学' }, { dictLabel: '英语' }]; p.data.grades = [{ dictLabel: '五年级' }, { dictLabel: '高一' }]
@@ -115,4 +115,29 @@ test('cart changes refresh grouped course cards without losing grade and subject
   p.setData({ cart: [] }); p.refreshCartSummary()
   assert.equal(p.data.courseGroups[0].courses[0].inCart, false)
   assert.equal(p.data.cartCount, 0)
+})
+
+
+test('parent enrollment dictionary includes preschool first and can filter its courses',async()=>{
+ const preschool=lesson(91,teachers[0],'语文','幼小衔接','1'),primary=lesson(92,teachers[1],'数学','一年级','1')
+ const {p}=harness(async o=>o.url.endsWith('/dict')?{data:{grades:[{dictLabel:'幼小衔接',dictValue:'g0'},{dictLabel:'一年级',dictValue:'g1'}],subjects:[{dictLabel:'语文'},{dictLabel:'数学'}]}}:{data:[primary,preschool]})
+ p.data.courseTypeIndex=0;await p.loadDict();await p.loadSchedules()
+ assert.deepEqual(Array.from(p.data.gradeOptions),['全部年级','幼小衔接','一年级'])
+ assert.deepEqual(Array.from(p.data.courseGroups,g=>g.label),['幼小衔接','一年级'])
+ p.onGradeChange({detail:{value:1}})
+ assert.equal(p.data.schedules.length,1);assert.equal(p.data.schedules[0].scheduleId,'91')
+})
+
+test('parent term filter combines with teachers and dimensions, reset restores all periods for both course types',async()=>{
+ const periods=[['春季','周六'],['秋季','周日'],['寒假','一期'],['寒假','二期'],['暑假','一期'],['暑假','二期']]
+ const rows=periods.map(([termName,periodName],i)=>({...lesson(i+20,teachers[i%2]),termName,periodName}))
+ rows.push({...rows[2],scheduleId:'different-grade',gradeName:'高一'})
+ const {p}=harness(()=>Promise.resolve({data:rows}));await p.loadSchedules()
+ p.onGradeChange(change(1));p.onSubjectChange(change(1))
+ for(let index=1;index<=6;index++){p.onTermChange(change(index));assert.equal(p.data.schedules.length,1);assert.equal(p.data.schedules[0].scheduleId,String(index+19))}
+ p.onTermChange(change(3));p.chooseTeachers(change(['teacher:11']));assert.equal(p.data.selectedTeachers[0].key,'teacher:11')
+ p.onTermChange(change(4));assert.equal(p.data.selectedTeacherKeys.length,0);assert.equal(p.data.teacherOptions.length,1)
+ p.resetFilters();assert.equal(p.data.termIndex,0);assert.equal(p.data.schedules.length,7)
+ const actualTerm=p.data.termIndex;p.onTermChange(change(7));assert.equal(p.data.termIndex,actualTerm)
+ p._allSchedules=rows.map(c=>({...c,classMode:'1'}));p.data.courseTypeIndex=0;p.onTermChange(change(5));assert.equal(p.data.schedules.length,1);assert.equal(p.data.schedules[0].termName,'暑假')
 })

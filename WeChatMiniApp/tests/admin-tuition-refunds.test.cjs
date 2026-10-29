@@ -16,7 +16,7 @@ function setup(roles = ['education'], permissions = ['*:*:*'], custom) {
     return o.url.endsWith('/list') ? { rows: [current], total: 1 } : { data: current }
   }
   function load(file) {
-    if (file.endsWith('/utils/request.js')) return { request }
+    if (file === path.join(root, 'utils', 'request.js')) return { request }
     if (cache.has(file)) return cache.get(file)
     const module = { exports: {} }
     assert.ok(fs.existsSync(file), 'staff refund handling page is implemented')
