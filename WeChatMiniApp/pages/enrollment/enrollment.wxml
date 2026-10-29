@@ -132,7 +132,7 @@
         </view>
       </view>
       <view class="cart-total-row"><text>课程总价</text><text class="cart-total-value">{{cartTotal}} 元</text></view>
-      <view class="meta">一个购物车生成一个订单。提交后由教务核定优惠，管理员确认收款并开具收据。</view>
+      <view class="meta">一个购物车生成一个订单。提交后由教务核价，核价完成后请按教务安排线下支付。</view>
     </block>
     <block wx:else>
       <view class="sheet-course">{{selectedSchedule.courseClassName}}</view>
