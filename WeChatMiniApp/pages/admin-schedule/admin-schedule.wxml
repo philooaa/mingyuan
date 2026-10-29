@@ -10,7 +10,7 @@
     <view>{{item.termName}} · {{item.periodName}} · {{item.timeSlot}}</view>
     <view class="muted">{{item.startDate || '日期待排'}}{{item.endDate ? ' 至 ' + item.endDate : ''}}</view>
     <view class="muted">{{item.classMode === '2' ? '一对一' : '班课'}} · {{item.status === '1' ? '已停用' : '正常'}} · {{item.recruitStatus === '0' ? '开放报名' : '停止招生'}}</view>
-    <view class="actions"><button size="mini" data-id="{{item.scheduleId}}" bindtap="edit" disabled="{{!ready || loading || saving}}">修改排课</button></view>
+    <view class="actions"><button size="mini" data-id="{{item.scheduleId}}" bindtap="edit" disabled="{{!ready || loading || saving}}">修改排课</button><button size="mini" data-id="{{item.scheduleId}}" bindtap="remove" disabled="{{!ready || loading || saving}}">删除课程</button></view>
   </view>
   <view class="muted empty" wx:if="{{!loading && !error && !list.length}}">暂无排课</view>
   <view class="pager"><button size="mini" bindtap="previous" disabled="{{pageNum <= 1 || loading || saving}}">上一页</button><text>第 {{pageNum}} 页 · 共 {{total}} 条</text><button size="mini" bindtap="next" disabled="{{pageNum * pageSize >= total || loading || saving}}">下一页</button></view>

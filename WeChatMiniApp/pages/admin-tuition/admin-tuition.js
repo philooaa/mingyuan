@@ -1,3 +1,4 @@
+const access = require('../../utils/access')
 const t = require('../../utils/tuition')
 const pad = value => String(value).padStart(2, '0')
 const timeRanges = [24, 60, 60].map(count => Array.from({ length: count }, (_, i) => pad(i)))
@@ -25,6 +26,10 @@ Page({
   onUnload() { this.onHide() },
   onPullDownRefresh() { return this.load(true).finally(() => wx.stopPullDownRefresh()) },
   onReachBottom() { if (!this.id && !this.data.loading && this.data.rows.length < this.data.total) return this.load(false) },
+  paymentAdministrator() {
+    const roles=getApp().globalData.roles || []
+    return roles.some(r=>['admin','business_admin'].includes(r)) && !['education','teacher','parent'].includes(access.selected())
+  },
   permitted(action) { return t.auth('staff') && t.can(`system:tuition:${action}`) },
   async load(reset = true) {
     if (!t.auth('staff')) { this.setData({ error: '仅授权管理员或教务可处理收费' }); return }
@@ -39,7 +44,7 @@ Page({
       getApp().globalData.permissions = info.permissions || []
       getApp().globalData.roles = info.roles || []
       if (!t.auth('staff')) throw new Error('收费角色权限已失效')
-      const allowed = {}; ['list', 'query', 'price', 'collect', 'confirm'].forEach(p => { allowed[p] = t.can(`system:tuition:${p}`) }); allowed.download = t.can('system:tuitionReceipt:download')
+      const allowed = {}; ['list', 'query', 'price', 'collect', 'confirm'].forEach(p => { allowed[p] = t.can(`system:tuition:${p}`) }); allowed.confirm = allowed.confirm && this.paymentAdministrator(); allowed.close = allowed.collect && this.paymentAdministrator(); allowed.download = t.can('system:tuitionReceipt:download')
       allowed.refundList = t.can('system:tuitionRefund:list'); allowed.refundQuery = t.can('system:tuitionRefund:query')
       this.setData({ allowed })
       if (!allowed[this.id ? 'query' : 'list']) throw new Error('当前账号没有收费查询权限')
@@ -213,7 +218,7 @@ Page({
     finally { if (this._active && visit === this._visit) this.setData({ submitting: false }) }
   },
   async paymentAction(e) {
-    if (!this._active || this.data.submitting) return
+    if (!this._active || this.data.submitting || !this.paymentAdministrator()) return
     const action = e.currentTarget.dataset.action, id = String(e.currentTarget.dataset.id), visit = this._visit
     if (!['confirm', 'close'].includes(action) || !this.permitted(action === 'confirm' ? 'confirm' : 'collect')) return
     const payment = this.data.detail.payments.find(p => String(p.paymentId) === id)
@@ -223,7 +228,7 @@ Page({
     this.setData({ submitting: true })
     try {
       const data = action === 'close' ? { reason } : { evidenceKey: this.data.evidenceKey || payment.evidenceKey || null, providerTradeNo: this.data.providerTradeNo.trim() || payment.providerTradeNo || null, paidTime: this.data.paidTime.trim() || payment.paidTime || null }
-      if (await t.confirm(action === 'confirm' ? '确认实际收款' : '关闭付款', action === 'confirm' ? `请核对 ${payment.amountText}、实际时间与凭证。确认后形成资金记录和收据。` : `确认此付款没有成功收款后关闭：${reason}`) && this._active && visit === this._visit) {
+      if (await t.confirm(action === 'confirm' ? '确认实际收款' : '关闭付款', action === 'confirm' ? `请核对 ${payment.amountText}、实际时间与凭证。确认后形成资金记录和收据。` : `确认此付款没有成功收款后关闭：${reason}`) && this._active && visit === this._visit && this.paymentAdministrator()) {
         await t.request({ url: `${t.adminUrl}/payments/${encodeURIComponent(id)}/${action}`, method: 'POST', data })
         if (this._active && visit === this._visit) {
           await this.load()

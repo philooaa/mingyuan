@@ -36,10 +36,10 @@ function message(error) { wx.showToast({ title: error.message || '操作失败�
 function auth(role) {
   const data = getApp().globalData
   if (!wx.getStorageSync('token')) { wx.reLaunch({ url: '/pages/register/register' }); return false }
-  if (role === 'staff' ? !(data.roles || []).some(r => ['admin', 'education'].includes(r)) : !(data.roles || []).includes(role)) { message(new Error(role === 'staff' || role === 'admin' ? '仅授权管理员或教务可处理收费' : '仅家长可查看本人财务')); return false }
+  if (role === 'staff' ? !(data.roles || []).some(r => ['admin', 'business_admin', 'education'].includes(r)) : !(data.roles || []).includes(role)) { message(new Error(role === 'staff' || role === 'admin' ? '仅授权管理员或教务可处理收费' : '仅家长可查看本人财务')); return false }
   return true
 }
-function can(permission) { return (getApp().globalData.roles || []).some(r => ['admin', 'education'].includes(r)) && (getApp().globalData.permissions || []).some(p => p === '*:*:*' || p === permission) }
+function can(permission) { return (getApp().globalData.roles || []).some(r => ['admin', 'business_admin', 'education'].includes(r)) && (getApp().globalData.permissions || []).some(p => p === '*:*:*' || p === permission) }
 function confirm(title, content) { return new Promise((resolve, reject) => wx.showModal({ title, content, success: r => resolve(r.confirm), fail: () => reject(new Error('无法显示确认窗口')) })) }
 function intentKey(type, id) { const user = getApp().globalData.userInfo || {}; if (!user.userId) throw new Error('请重新登录以确认账户'); return `tuition:${type}:${user.userId}:${id}` }
 function intent(type, id, payload) {

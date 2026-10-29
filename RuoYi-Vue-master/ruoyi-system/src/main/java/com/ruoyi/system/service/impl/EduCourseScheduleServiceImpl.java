@@ -100,6 +100,11 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public int updateEduCourseSchedule(EduCourseSchedule input) {
+        return updateEduCourseSchedule(input, false);
+    }
+
+    @Override @Transactional(rollbackFor = Exception.class)
+    public int updateEduCourseSchedule(EduCourseSchedule input, boolean force) {
         requirePlanningStaff();
         require(input != null && input.getScheduleId() != null, "请选择排课");
         EduCourseSchedule before = selectEduCourseScheduleByScheduleId(input.getScheduleId());
@@ -108,7 +113,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         lockResources(List.of(before, input));
         EduCourseSchedule current = eduCourseScheduleMapper.lockSchedule(input.getScheduleId());
         own(current);
-        requireNoActiveEnrollments(current, true);
+        if (!force) requireNoActiveEnrollments(current, true);
         require(Objects.equals(before.getTeacherId(), current.getTeacherId()) && Objects.equals(before.getClassroomId(), current.getClassroomId()), "排课已被其他人调整，请刷新后重试");
         require(blank(input.getScheduleCode()) || input.getScheduleCode().equals(current.getScheduleCode()), "排课编码不可修改");
         if (teacherOnly() && "2".equals(current.getClassMode())) {
@@ -122,9 +127,9 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
             availability.validateSingle(effective);
             input.setLessonLocation(""); effective.setLessonLocation("");
         }
-        if ("2".equals(current.getClassMode()) && "0".equals(current.getStatus()) && "1".equals(effective.getStatus()))
+        if (!force && "2".equals(current.getClassMode()) && "0".equals(current.getStatus()) && "1".equals(effective.getStatus()))
             require(db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND del_flag='0' AND enrollment_status IN ('0','1','待确认','已确认','报名成功') FOR UPDATE",current.getScheduleId()).isEmpty(),"仍有有效报名，请先处理报名后再撤回课程");
-        if (hasAttendance(current.getScheduleId()) || !db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND class_date IS NOT NULL FOR UPDATE", current.getScheduleId()).isEmpty()) {
+        if (hasAttendance(current.getScheduleId()) || (!force && !db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND class_date IS NOT NULL FOR UPDATE", current.getScheduleId()).isEmpty())) {
             require(Objects.equals(current.getTeacherId(), effective.getTeacherId())
                 && Objects.equals(current.getClassroomId(), effective.getClassroomId())
                 && Objects.equals(current.getCampusName(), effective.getCampusName())
@@ -166,6 +171,23 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     }
     @Override @Transactional(rollbackFor = Exception.class)
     public int deleteEduCourseScheduleByScheduleId(Long id) { return deleteEduCourseScheduleByScheduleIds(new Long[]{id}); }
+
+    @Override @Transactional(rollbackFor = Exception.class)
+    public int removeConfirmedSchedule(Long id) {
+        requirePlanningStaff();
+        EduCourseSchedule before = selectEduCourseScheduleByScheduleId(id);
+        lockResources(List.of(before));
+        EduCourseSchedule current = eduCourseScheduleMapper.lockSchedule(id);
+        own(current);
+        require(Objects.equals(before.getTeacherId(), current.getTeacherId())
+            && Objects.equals(before.getClassroomId(), current.getClassroomId()), "排课已被其他人调整，请刷新后重试");
+        // 保留主键及全部历史关联，避免物理删除造成财务、报名记录失联。
+        EduCourseSchedule removed = new EduCourseSchedule();
+        removed.setScheduleId(id); removed.setDelFlag("1");
+        removed.setStatus("1"); removed.setRecruitStatus("1");
+        removed.setUpdateBy(SecurityUtils.getUsername()); removed.setUpdateTime(DateUtils.getNowDate());
+        return eduCourseScheduleMapper.updateEduCourseSchedule(removed);
+    }
 
     /**
      * 见接口说明。判据与 {@link #deleteEduCourseScheduleByScheduleIds(Long[])} 里的校验保持一致：
