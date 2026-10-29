@@ -1,7 +1,7 @@
 <view class="page">
   <view class="header">
     <image class="logo" src="/images/logo.png" mode="widthFix"></image>
-    <view class="title">考勤记录</view>
+    <view class="title">出勤记录</view>
   </view>
 
   <view class="summary">

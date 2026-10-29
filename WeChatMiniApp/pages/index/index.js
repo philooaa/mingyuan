@@ -18,7 +18,7 @@ const roleProfiles = {
     actions: [
       { title: '课程报名', icon: '报', tone: 'blue', route: '/pages/enrollment/enrollment' },
       { title: '我的课表', icon: '课', tone: 'orange', route: '/pages/timetable/timetable' },
-      { title: '考勤记录', icon: '勤', tone: 'cyan', route: '/pages/attendance/attendance' },
+      { title: '出勤记录', icon: '勤', tone: 'cyan', route: '/pages/attendance/attendance' },
       { title: '请假申请', icon: '假', tone: 'violet', route: '/pages/parent-leave/parent-leave' },
       { title: '资料商城', icon: '资', tone: 'indigo', route: '/pages/material/material' },
       { title: '我的资料', icon: '料', tone: 'green', route: '/pages/material-orders/material-orders' },
@@ -626,7 +626,7 @@ Page({
       return
     }
     if (route) {
-      if(this.data.currentRole==='parent'&&['课程报名','我的课表','考勤记录','请假申请','我的作业','我的缴费','我的收据','退费记录'].includes(title)){if(this.data.childLoading||this.data.childError){wx.showToast({title:'请先加载孩子资料',icon:'none'});return}if(!this.data.currentChild){this.addChild();return}wx.navigateTo({url:childContext.url(route)})}else wx.navigateTo({ url: route })
+      if(this.data.currentRole==='parent'&&['课程报名','我的课表','出勤记录','请假申请','我的作业','我的缴费','我的收据','退费记录'].includes(title)){if(this.data.childLoading||this.data.childError){wx.showToast({title:'请先加载孩子资料',icon:'none'});return}if(!this.data.currentChild){this.addChild();return}wx.navigateTo({url:childContext.url(route)})}else wx.navigateTo({ url: route })
       return
     }
 
