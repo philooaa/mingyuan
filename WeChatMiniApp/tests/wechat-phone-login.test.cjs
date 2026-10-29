@@ -17,6 +17,7 @@ function load(login) {
 }
 test('微信登录失败不发送mock凭据、不替换当前会话', async () => {
   const h = load(o => o.fail({ errMsg: 'login:fail' }))
+  h.page.changeConsent({ detail: { value: ['privacy'] } })
   await h.page.loginWithWechat('real-phone-code')
   assert.equal(h.calls.length, 0)
   assert.equal(h.storage.token, undefined)
@@ -24,11 +25,13 @@ test('微信登录失败不发送mock凭据、不替换当前会话', async () =
 })
 test('空微信登录code不发送后端请求', async () => {
   const h = load(o => o.success({ code: '' }))
+  h.page.changeConsent({ detail: { value: ['privacy'] } })
   await h.page.loginWithWechat('real-phone-code')
   assert.equal(h.calls.length, 0)
 })
 test('微信授权登录不传客户端角色，核实身份后再激活会话', async () => {
   const h = load(o => o.success({ code: 'real-wx-code' }))
+  h.page.changeConsent({ detail: { value: ['privacy'] } })
   await h.page.loginWithWechat('real-phone-code')
   assert.equal(h.calls[0].url, '/miniapp/login')
   assert.equal(h.calls[0].data.loginCode, 'real-wx-code')
