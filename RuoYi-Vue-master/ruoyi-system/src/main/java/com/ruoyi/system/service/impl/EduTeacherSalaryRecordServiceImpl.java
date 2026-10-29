@@ -345,7 +345,7 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
             {
                 return 0;
             }
-            // 日循环按 ScheduleCalendar 统一口径：连上无假期(1/1) / 上5休1(5/6) / 上6休1(6/7) / 上5休2(5/7)
+            // 日循环按 ScheduleCalendar 统一口径：连上无假期(1/1) / 上5休1(5/6) / 上6休1(6/7) / 上5休2(5/7) / 上4休1(4/5)
             int cycle = com.ruoyi.system.service.ScheduleCalendar.cycle(pattern);
             int study = com.ruoyi.system.service.ScheduleCalendar.studyDays(pattern);
             if (cycle <= 0 || study <= 0)

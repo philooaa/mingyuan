@@ -915,7 +915,7 @@ export default {
     },
     /** 递推模式的中文名（与后端 ScheduleCalendar.label 一致） */
     patternLabel(p) {
-      return { DAILY: '连上无假期', DAILY_5_1: '上5休1', DAILY_6_1: '上6休1', DAILY_5_2: '上5休2', WEEKLY: '每周固定星期' }[p] || p || ''
+      return { DAILY: '连上无假期', DAILY_5_1: '上5休1', DAILY_6_1: '上6休1', DAILY_5_2: '上5休2', DAILY_4_1: '上4休1', WEEKLY: '每周固定星期', OTHER: '其他（暂不排课）' }[p] || p || ''
     },
     /** 当前选中的递推模式：用户改过就用改过的，否则用后端按学期推出的默认（寒暑假=上5休1） */
     patternValue(row) {

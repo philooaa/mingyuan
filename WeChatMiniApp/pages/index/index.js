@@ -4,6 +4,9 @@ const courseState = require('../../utils/teacher-course-state')
 const childContext = require('../../utils/child-context')
 const access = require('../../utils/access')
 
+// 日循环模式的一轮天数与上课天数，与后端 ScheduleCalendar 及 utils/course-calendar.js 保持一致
+const DAILY_CYCLES = { DAILY: [1, 1], DAILY_5_1: [6, 5], DAILY_6_1: [7, 6], DAILY_5_2: [7, 5], DAILY_4_1: [5, 4] }
+
 const roleProfiles = {
   parent: {
     name: '家长',
@@ -97,7 +100,7 @@ const roleProfiles = {
 // 工作台只展示后端实际授予的身份。
 roleProfiles.education = {
   name: '教务', tag: '全校区教务管理', eyebrow: '教务端', title: '课程出勤、收费与退费初审',
-  stats: [], actions: roleProfiles.admin.actions.filter(a => ['排课管理', '教室管理', '教室分配', '学生档案', '收费财务', '退费管理', '学生出勤', '课程定价'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
+  stats: [], actions: roleProfiles.admin.actions.filter(a => ['排课管理', '教室管理', '教室分配', '学生档案', '收费财务', '退费管理', '学生出勤'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
 }
 
 function normalizeRole(roleKey) {
@@ -158,12 +161,15 @@ function computeNextDate(item) {
       dates.push(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()))
       cur.setDate(cur.getDate() + 7)
     }
-  } else if (pattern === 'DAILY_5_1') {
+  } else if (pattern !== 'WEEKLY' && DAILY_CYCLES[pattern]) {
+    // 日循环按 ScheduleCalendar 统一口径：连上无假期(1/1)、上5休1(5/6)、上6休1(6/7)、上5休2(5/7)、上4休1(4/5)
+    const cycle = DAILY_CYCLES[pattern][0]
+    const study = DAILY_CYCLES[pattern][1]
     let cur = new Date(start.getFullYear(), start.getMonth(), start.getDate())
     let cnt = 0
     const stop = new Date(end.getFullYear(), end.getMonth(), end.getDate())
     while (cur <= stop) {
-      if (cnt % 6 < 5) dates.push(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()))
+      if (cnt % cycle < study) dates.push(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()))
       cur.setDate(cur.getDate() + 1)
       cnt++
     }

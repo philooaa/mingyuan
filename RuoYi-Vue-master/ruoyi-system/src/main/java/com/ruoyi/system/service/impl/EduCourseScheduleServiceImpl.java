@@ -257,6 +257,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         require(List.of("0", "1").contains(s.getStatus()), "排课状态无效");
         require(List.of("0", "1", "2").contains(s.getRecruitStatus()), "招生状态无效");
         if ("2".equals(s.getClassMode())) require(Duration.between(s.getStartTime(), s.getEndTime()).toMinutes() == 120 && s.getStartTime().getSecond() == s.getEndTime().getSecond(), "一对一每次固定2小时");
+        // 「其他（暂不排课）」：允许起止日期同时留空，不展开上课日、课次按 0 计，也不参与教师冲突检测
         require((s.getStartDate() == null) == (s.getEndDate() == null), "开课、结课日期需同时填写，或同时保留待排");
         if (s.getStartDate() != null) {
             LocalDate start = ScheduleCalendar.date(s.getStartDate()), end = ScheduleCalendar.date(s.getEndDate());
