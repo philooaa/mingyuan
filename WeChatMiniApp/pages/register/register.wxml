@@ -6,13 +6,15 @@
   </view>
 
   <view class="panel">
-    <view class="panel-title">微信手机号登录</view>
+    <view class="panel-title">手机号快捷登录</view>
     <view class="teacher-error" wx:if="{{loginError}}">{{loginError}}</view>
-    <button wx:if="{{!localPreviewEnabled}}" class="wechat-btn" open-type="getPhoneNumber" bindgetphonenumber="handlePhoneLogin" loading="{{submitting}}" disabled="{{configLoading || submitting}}">微信授权手机号登录</button>
-    <button wx:else class="wechat-btn" bindtap="handleLocalPreview" loading="{{submitting}}" disabled="{{submitting}}">进入系统（本地预览，跳过微信授权）</button>
+    <view wx:if="{{!localPreviewEnabled}}" class="consent-row"><checkbox-group bindchange="changeConsent"><label class="consent-choice"><checkbox value="privacy" checked="{{privacyAgreed}}" disabled="{{submitting}}" color="#1767ba"/><text>我已阅读并同意</text></label></checkbox-group><text class="consent-link" catchtap="openPrivacy">《用户隐私保护指引》</text></view>
+    <button wx:if="{{!localPreviewEnabled && privacyAgreed}}" class="wechat-btn" open-type="getPhoneNumber" bindgetphonenumber="handlePhoneLogin" loading="{{submitting}}" disabled="{{configLoading || submitting}}">手机号快捷登录</button>
+    <button wx:elif="{{!localPreviewEnabled}}" class="wechat-btn consent-pending" bindtap="requirePrivacyConsent">手机号快捷登录</button>
+    <button wx:else class="wechat-btn" bindtap="handleLocalPreview" loading="{{submitting}}" disabled="{{submitting}}">进入系统（本地预览）</button>
     <view class="dev-backend" wx:if="{{debugEnabled && backendLabel}}">当前后端：{{backendLabel}}<text class="dev-tip" bindtap="openBackendSetting">　切换</text></view>
     <view class="dev-backend" wx:if="{{localPreviewEnabled}}"><text class="dev-tip" bindtap="choosePreviewRole">切换身份查看（管理员／教务／家长／教师）</text></view>
-    <view class="register-note" bindtap="openPrivacy">查看《用户隐私保护指引》</view>
+    <view class="register-note" bindtap="browse">先浏览课程和资料 ›</view>
     <view class="register-note">未注册手机号将自动创建家长账号</view>
   </view>
 </view>

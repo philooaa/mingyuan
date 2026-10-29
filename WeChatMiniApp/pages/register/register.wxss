@@ -89,3 +89,8 @@ page {
 .wechat-btn + .wechat-btn { margin-top: 20rpx; }
 .dev-backend { margin-top: 18rpx; text-align: center; color: #94a0b1; font-size: 22rpx; line-height: 1.6; word-break: break-all; }
 .dev-tip { color: #1767ba; }
+.consent-row {display:flex;flex-wrap:wrap;align-items:center;column-gap:4rpx;margin-top:24rpx;color:#65768c;font-size:24rpx;line-height:1.8}
+.consent-choice {display:flex;align-items:center;min-height:76rpx;gap:10rpx}
+.consent-choice checkbox {flex-shrink:0}
+.consent-link {padding:14rpx 0;color:#1767ba}
+.panel .consent-pending {background:#e5ebf3;color:#6f7f92;box-shadow:none}

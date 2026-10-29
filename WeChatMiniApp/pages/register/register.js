@@ -11,6 +11,7 @@ const devRoles = [
 Page({
   data: {
     submitting: false,
+    privacyAgreed: false,
     localPreviewEnabled: false,
     autoPreview: true,
     debugEnabled: false,
@@ -39,6 +40,7 @@ Page({
 
   async onLoad(options = {}) {
     this._unloaded = false
+    this.setData({ privacyAgreed: false })
     const pickRole = options.pickRole === '1'
     if (pickRole) this.setData({ autoPreview: false })
     this.applyBackendOverride()
@@ -358,9 +360,23 @@ Page({
 
   handlePhoneLogin(e) {
     if (this.data.submitting) return
+    if (!this.requirePrivacyConsent()) return
     const phoneCode = e.detail && e.detail.code
-    if (!phoneCode) { this.setData({ loginError: '手机号授权未完成，请重新点击并同意授权；如提示无权限，请联系管理员核对微信配置。' }); return }
+    if (!phoneCode) { this.setData({ loginError: '手机号授权未完成，请重新点击并同意授权；如提示无权限，请联系管理员核对登录配置。' }); return }
     return this.loginWithWechat(phoneCode)
+  },
+
+  browse() { wx.reLaunch({url:'/pages/browse/browse'}) },
+
+  changeConsent(e) {
+    if (this.data.submitting) return
+    this.setData({ privacyAgreed: (e.detail.value || []).includes('privacy'), loginError: '' })
+  },
+
+  requirePrivacyConsent() {
+    if (this.data.privacyAgreed) return true
+    this.setData({ loginError: '请先阅读并自主勾选同意隐私保护指引；暂不同意也可先浏览课程和资料。' })
+    return false
   },
 
   openPrivacy() {
@@ -374,6 +390,7 @@ Page({
 
   async loginWithWechat(phoneCode, devRole) {
     if (this._unloaded || this.data.submitting) return
+    if (phoneCode !== 'mock' && !this.requirePrivacyConsent()) return
     if (phoneCode === 'mock' && !this.data.developmentLoginEnabled) return
     if (devRole === 'teacher' && (this.data.teachersLoading || !this.data.devTeacherId)) {
       wx.showToast({ title: '请先选择教师', icon: 'none' })
@@ -434,10 +451,10 @@ Page({
       wx.login({
         success(res) {
           if (res.code) resolve(res.code)
-          else reject(new Error('未取得微信登录凭据，请重试'))
+          else reject(new Error('未取得登录凭据，请重试'))
         },
         fail() {
-          reject(new Error('微信登录失败，请检查网络后重试'))
+          reject(new Error('登录失败，请检查网络后重试'))
         }
       })
     })
