@@ -379,13 +379,19 @@ public class TimetableImportService
             // pattern 为 null 表示该「学期+期次」判定不出上课模式（如「未识别学期」，或春秋季期次不是周一~周日），设了日期也仍是待排
             plan.put("pattern", pattern);
             plan.put("patternLabel", pattern == null ? "" : ScheduleCalendar.label(pattern));
-            // 寒暑假可选「连上无假期 / 上5休1 / 上6休1 / 上5休2」；春秋季固定每周，不给选
-            plan.put("dailyPatterns", ScheduleCalendar.isDaily(pattern)
-                    ? List.of(ScheduleCalendar.DAILY, ScheduleCalendar.DAILY_5_1, ScheduleCalendar.DAILY_6_1, ScheduleCalendar.DAILY_5_2)
-                    : List.of());
+            // 寒暑假可选「连上无假期 / 上5休1 / 上6休1 / 上5休2 / 上4休1」；春秋季固定每周；两者都可以选「其他（暂不排课）」
+            List<String> patternOptions = new ArrayList<>();
+            if (ScheduleCalendar.isDaily(pattern)) {
+                patternOptions.addAll(List.of(ScheduleCalendar.DAILY, ScheduleCalendar.DAILY_5_1,
+                        ScheduleCalendar.DAILY_6_1, ScheduleCalendar.DAILY_5_2, ScheduleCalendar.DAILY_4_1));
+            } else if (ScheduleCalendar.WEEKLY.equals(pattern)) {
+                patternOptions.add(ScheduleCalendar.WEEKLY);
+            }
+            patternOptions.add(ScheduleCalendar.OTHER);
+            plan.put("dailyPatterns", patternOptions);
             plan.put("schedulable", pattern != null);
             plan.put("patternNote", pattern == null
-                    ? "该学期/期次无法判定上课规则（寒假/暑假可选 连上无假期/上5休1/上6休1/上5休2，春季/秋季=每周固定星期且期次需为周一~周日），这些课次将保持待排"
+                    ? "该学期/期次无法判定上课规则（寒假/暑假可选 连上无假期/上5休1/上6休1/上5休2/上4休1，春季/秋季=每周固定星期且期次需为周一~周日，也可选「其他」暂不排课），这些课次将保持待排"
                     : (ScheduleCalendar.WEEKLY.equals(pattern) ? "每周" + period : ScheduleCalendar.label(pattern)));
             plans.add(plan);
         }

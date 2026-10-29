@@ -6,7 +6,9 @@ const labels = rows => (rows || []).map(r => ({ value: r.value || r.dictLabel, l
 Page({
   data: { loading: false, ready: false, error: '', list: [], total: 0, keyword: '', pageNum: 1, pageSize: 20,
     formOpen: false, saving: false, formError: '', form: {}, campusOptions: [], teachers: [], fields: [],
-    modes: [{label:'班课',value:'1'},{label:'一对一',value:'2'}], patterns:[{label:'每周一次',value:'WEEKLY'},{label:'上五休一',value:'DAILY_5_1'}],
+    modes: [{label:'班课',value:'1'},{label:'一对一',value:'2'}],
+    patterns:[{label:'每周一次',value:'WEEKLY'},{label:'连上无假期',value:'DAILY'},{label:'上5休1',value:'DAILY_5_1'},{label:'上6休1',value:'DAILY_6_1'},{label:'上5休2',value:'DAILY_5_2'},{label:'上4休1',value:'DAILY_4_1'},{label:'其他（暂不排课）',value:'OTHER'}],
+    patternIndex:0,
     recruitOptions:[{label:'开放报名',value:'0'},{label:'停止招生',value:'1'},{label:'已满',value:'2'}], statusOptions:[{label:'正常',value:'0'},{label:'停用',value:'1'}] },
   onLoad(options={}) { this._token=wx.getStorageSync('token');this._alive=true;this._editId=options.id || '';this._editOnLoad=!!this._editId },
   onShow() { this._visible=true;this.load() },
@@ -42,7 +44,7 @@ Page({
   next() { if(this.data.pageNum*this.data.pageSize<this.data.total && !this.data.loading && !this.data.saving) {this.setData({pageNum:this.data.pageNum+1});this.load()} },
   add() {
     if(!this.current() || !this.data.ready || this.data.loading || this.data.saving)return
-    this.setData({form:{campusName:'',courseYear:String(new Date().getFullYear()),courseClassName:'',scheduleCode:'',termName:'',periodName:'',timeSlot:'',startTime:'',endTime:'',gradeName:'',subjectName:'',teacherId:'',teacherLabel:'',classType:'',classMode:'1',classPattern:'WEEKLY',startDate:'',endDate:'',unitPrice:'',enrollLimit:'',recruitStatus:'0',status:'0',remark:''},formOpen:true,formError:''})
+    this.setData({form:{campusName:'',courseYear:String(new Date().getFullYear()),courseClassName:'',scheduleCode:'',termName:'',periodName:'',timeSlot:'',startTime:'',endTime:'',gradeName:'',subjectName:'',teacherId:'',teacherLabel:'',classType:'',classMode:'1',classPattern:'WEEKLY',startDate:'',endDate:'',unitPrice:'',enrollLimit:'',recruitStatus:'0',status:'0',remark:''},patternIndex:0,formOpen:true,formError:''})
   },
   async edit(e) {
     if(!this.current() || !this.data.ready || this.data.saving)return
@@ -52,19 +54,25 @@ Page({
       const res=await request({url:root+'/'+id})
       if(!this.current() || version!==this._version)return
       const f=res.data || {}, teacher=this.data.teachers.find(t=>t.value===String(f.teacherId))
-      this.setData({form:{...f,teacherId:String(f.teacherId || ''),teacherLabel:teacher?teacher.label:f.teacherName,startDate:(f.startDate || '').slice(0,10),endDate:(f.endDate || '').slice(0,10)},formOpen:true,formError:''})
+      this.setData({form:{...f,teacherId:String(f.teacherId || ''),teacherLabel:teacher?teacher.label:f.teacherName,startDate:(f.startDate || '').slice(0,10),endDate:(f.endDate || '').slice(0,10)},patternIndex:this.patternIndexOf(f.classPattern),formOpen:true,formError:''})
     } catch(e) { if(this.current() && version===this._version)wx.showToast({title:e.message || '课程加载失败',icon:'none'}) }
   },
   close() { if(!this.data.saving)this.setData({formOpen:false,formError:''}) },
   input(e) { if(this.current() && !this.data.saving)this.setData({['form.'+e.currentTarget.dataset.key]:e.detail.value}) },
   chooseCampus(e) { if(!this.data.saving && !this.data.form.classroomId)this.setData({'form.campusName':this.data.campusOptions[Number(e.detail.value)] || ''}) },
   chooseTeacher(e) { const t=this.data.teachers[Number(e.detail.value)];if(t && !this.data.saving)this.setData({'form.teacherId':t.value,'form.teacherLabel':t.label}) },
+  /** 上课模式在 patterns 里的下标，找不到时退回「每周一次」 */
+  patternIndexOf(value) {
+    const i=this.data.patterns.findIndex(p=>p.value===value)
+    return i<0?0:i
+  },
   choose(e) {
     if(!this.current() || this.data.saving)return
     const key=e.currentTarget.dataset.key, f=this.data.fields.find(f=>f.key===key)
     const options=f?f.options:({classMode:this.data.modes,classPattern:this.data.patterns,recruitStatus:this.data.recruitOptions,status:this.data.statusOptions})[key]
     const row=options && options[Number(e.detail.value)];if(!row)return
     const change={['form.'+key]:row.value}
+    if(key==='classPattern') change.patternIndex=Number(e.detail.value)
     if(key==='timeSlot') {
       const times=row.value.split(/[-–—]/).map(t=>t.trim())
       if(times.length===2) {change['form.startTime']=times[0].length===4?'0'+times[0]+':00':times[0]+':00';change['form.endTime']=times[1].length===4?'0'+times[1]+':00':times[1]+':00'}
@@ -74,7 +82,7 @@ Page({
   date(e) {
     if(this.data.saving)return
     this.setData({['form.'+e.currentTarget.dataset.key]:e.detail.value})
-    if(this.data.form.classMode==='2')this.setData({'form.startDate':e.detail.value,'form.endDate':e.detail.value,'form.classPattern':'WEEKLY','form.periodName':['周日','周一','周二','周三','周四','周五','周六'][new Date(e.detail.value.replace(/-/g,'/')+' 12:00:00').getDay()]})
+    if(this.data.form.classMode==='2')this.setData({'form.startDate':e.detail.value,'form.endDate':e.detail.value,'form.classPattern':'WEEKLY','patternIndex':0,'form.periodName':['周日','周一','周二','周三','周四','周五','周六'][new Date(e.detail.value.replace(/-/g,'/')+' 12:00:00').getDay()]})
   },
   async save() {
     if(!this.current() || !this.data.ready || this.data.saving)return

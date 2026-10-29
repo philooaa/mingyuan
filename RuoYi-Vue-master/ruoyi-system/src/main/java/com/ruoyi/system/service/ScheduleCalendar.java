@@ -18,12 +18,18 @@ public final class ScheduleCalendar {
     public static final String DAILY_6_1 = "DAILY_6_1";
     /** 上5休2（寒暑假：连续 5 天上课、休息 2 天，7 天一轮） */
     public static final String DAILY_5_2 = "DAILY_5_2";
+    /** 上4休1（寒暑假：连续 4 天上课、第 5 天休息，循环递推） */
+    public static final String DAILY_4_1 = "DAILY_4_1";
+    /** 其他：暂不排课，不展开任何上课日期 */
+    public static final String OTHER = "OTHER";
 
     /** 全部合法的上课模式，按前端下拉顺序排列 */
-    public static final List<String> ALL = List.of(DAILY, DAILY_5_1, DAILY_6_1, DAILY_5_2, WEEKLY);
+    public static final List<String> ALL =
+            List.of(DAILY, DAILY_5_1, DAILY_6_1, DAILY_5_2, DAILY_4_1, WEEKLY, OTHER);
 
     /** 日循环类模式（寒暑假）：从开课日起按「上 N 休 M」循环递推 */
-    private static final List<String> DAILY_PATTERNS = List.of(DAILY, DAILY_5_1, DAILY_6_1, DAILY_5_2);
+    private static final List<String> DAILY_PATTERNS =
+            List.of(DAILY, DAILY_5_1, DAILY_6_1, DAILY_5_2, DAILY_4_1);
 
     public static int weekday(String period) {
         return List.of("周一", "周二", "周三", "周四", "周五", "周六", "周日").indexOf(period == null ? "" : period) + 1;
@@ -38,7 +44,7 @@ public final class ScheduleCalendar {
         return pattern != null && ALL.contains(pattern.trim());
     }
 
-    /** 一轮周期天数：连上无假期=1、上5休1=6、上6休1=7、上5休2=7；非日循环返回 0 */
+    /** 一轮周期天数：连上无假期=1、上5休1=6、上6休1=7、上5休2=7、上4休1=5；非日循环返回 0 */
     public static int cycle(String pattern) {
         String p = pattern == null ? "" : pattern.trim();
         switch (p) {
@@ -46,11 +52,12 @@ public final class ScheduleCalendar {
             case DAILY_5_1: return 6;
             case DAILY_6_1: return 7;
             case DAILY_5_2: return 7;
+            case DAILY_4_1: return 5;
             default: return 0;
         }
     }
 
-    /** 一轮里上课的天数：连上无假期=1、上5休1=5、上6休1=6、上5休2=5；非日循环返回 0 */
+    /** 一轮里上课的天数：连上无假期=1、上5休1=5、上6休1=6、上5休2=5、上4休1=4；非日循环返回 0 */
     public static int studyDays(String pattern) {
         String p = pattern == null ? "" : pattern.trim();
         switch (p) {
@@ -58,6 +65,7 @@ public final class ScheduleCalendar {
             case DAILY_5_1: return 5;
             case DAILY_6_1: return 6;
             case DAILY_5_2: return 5;
+            case DAILY_4_1: return 4;
             default: return 0;
         }
     }
@@ -70,7 +78,9 @@ public final class ScheduleCalendar {
             case DAILY_5_1: return "上5休1";
             case DAILY_6_1: return "上6休1";
             case DAILY_5_2: return "上5休2";
+            case DAILY_4_1: return "上4休1";
             case WEEKLY: return "每周固定星期";
+            case OTHER: return "其他（暂不排课）";
             default: return p;
         }
     }
@@ -102,6 +112,8 @@ public final class ScheduleCalendar {
      */
     public static String patternFor(String termName, String periodName, String override) {
         String forced = override == null ? "" : override.trim();
+        // 「其他（暂不排课）」与学期、星期都无关，指定了就直接生效
+        if (OTHER.equals(forced)) return OTHER;
         if (isValid(forced)) {
             if (WEEKLY.equals(forced)) return weekday(periodName) == 0 ? null : WEEKLY;
             // 日循环模式只对寒暑假开放；春秋季课表的期次是「周六/周日」，仍按每周递推

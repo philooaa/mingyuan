@@ -108,6 +108,8 @@
               <el-option label="上5天休1天" value="DAILY_5_1" />
               <el-option label="上6天休1天" value="DAILY_6_1" />
               <el-option label="上5天休2天" value="DAILY_5_2" />
+              <el-option label="上4天休1天" value="DAILY_4_1" />
+              <el-option label="其他（暂不排课）" value="OTHER" />
             </el-select>
           </el-form-item>
         </el-col>

@@ -1,6 +1,9 @@
 const childContext = require('../../utils/child-context')
 const { request } = require('../../utils/request')
 
+// 日循环模式的一轮天数与上课天数，与后端 ScheduleCalendar 及 utils/course-calendar.js 保持一致
+const DAILY_CYCLES = { DAILY: [1, 1], DAILY_5_1: [6, 5], DAILY_6_1: [7, 6], DAILY_5_2: [7, 5], DAILY_4_1: [5, 4] }
+
 Page(childContext.page({
   data: {
     advisorWechat: 'myedu666888',
@@ -181,12 +184,15 @@ Page(childContext.page({
         dates.push(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()))
         cur.setDate(cur.getDate() + 7)
       }
-    } else if (pattern === 'DAILY_5_1') {
+    } else if (pattern !== 'WEEKLY' && DAILY_CYCLES[pattern]) {
+      // 日循环按 ScheduleCalendar 统一口径：连上无假期(1/1)、上5休1(5/6)、上6休1(6/7)、上5休2(5/7)、上4休1(4/5)
+      const cycle = DAILY_CYCLES[pattern][0]
+      const study = DAILY_CYCLES[pattern][1]
       let cur = new Date(start.getFullYear(), start.getMonth(), start.getDate())
       let cnt = 0
       const stop = new Date(end.getFullYear(), end.getMonth(), end.getDate())
       while (cur <= stop) {
-        if (cnt % 6 < 5) dates.push(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()))
+        if (cnt % cycle < study) dates.push(new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()))
         cur.setDate(cur.getDate() + 1)
         cnt++
       }
