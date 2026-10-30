@@ -65,6 +65,7 @@ page {
 }
 
 .account-toolbar {
+  flex-wrap: wrap;
   position: relative;
   z-index: 1;
   display: flex;

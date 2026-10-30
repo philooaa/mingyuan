@@ -31,6 +31,16 @@ public final class FinanceRules {
         "FORBIDDEN: 教务或管理员权限不足");
   }
 
+  /** 教务负责核价和登记；原始超级管理员保留后台应急处理能力。 */
+  public static void tuitionPreparation(com.ruoyi.system.shop.ShopRepository db, long actor) {
+    require(db.jdbc().queryForObject(
+        "SELECT COUNT(*) FROM sys_user u JOIN sys_user_role ur ON ur.user_id=u.user_id"
+        + " JOIN sys_role r ON r.role_id=ur.role_id WHERE u.user_id=? AND u.status='0' AND u.del_flag='0'"
+        + " AND (r.role_key='education' OR (u.user_id=1 AND r.role_key='admin'))"
+        + " AND r.status='0' AND r.del_flag='0'", Integer.class, actor) > 0,
+        "FORBIDDEN: 核价和登记收款由教务操作，业务管理员负责第三步确认");
+  }
+
   public static String text(Object v) {
     return v == null ? "" : String.valueOf(v).trim();
   }

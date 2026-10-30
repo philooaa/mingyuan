@@ -24,5 +24,44 @@ App({
     this.globalData.token = wx.getStorageSync('token') || ''
     this.globalData.userInfo = wx.getStorageSync('userInfo') || null
     this.globalData.roles = wx.getStorageSync('roles') || []
+    this.initUpdateManager()
+  },
+
+  onShow() {
+    this._foreground = true
+    this.promptUpdate()
+  },
+
+  onHide() { this._foreground = false },
+
+  initUpdateManager() {
+    if (this._updateManager || typeof wx.getUpdateManager !== 'function') return
+    const manager = this._updateManager = wx.getUpdateManager()
+    manager.onUpdateReady(() => {
+      this._updateReady = true
+      this.promptUpdate()
+    })
+    manager.onUpdateFailed(() => {
+      if (this._foreground) wx.showToast({ title: '新版下载失败，请稍后重新打开重试', icon: 'none' })
+    })
+  },
+
+  promptUpdate() {
+    if (!this._foreground || !this._updateReady || this._updatePromptOpen || this._applyingUpdate) return
+    this._updatePromptOpen = true
+    wx.showModal({
+      title: '发现新版本',
+      content: '新版本已下载完成，重新进入即可更新。请先完成并保存当前操作。登录信息会保留。',
+      confirmText: '重新进入',
+      cancelText: '稍后',
+      success: result => {
+        this._updatePromptOpen = false
+        if (result.confirm && !this._applyingUpdate) {
+          this._applyingUpdate = true
+          this._updateManager.applyUpdate()
+        }
+      },
+      fail: () => { this._updatePromptOpen = false }
+    })
   }
 })

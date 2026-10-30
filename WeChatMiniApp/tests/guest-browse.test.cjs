@@ -61,3 +61,11 @@ test('guest term selector has six seasons plus all and combines with grade, subj
  p.onKeyword({detail:{value:''}});p.chooseTerm({detail:{value:0}});assert.equal(p.data.visibleCourses.length,8)
  assert.ok(calls.every(o=>o.url.startsWith('/miniapp/public/')))
 })
+
+test('logged-in startup skips guest browsing without logging out or fetching public courses', async () => {
+ const {p,store,routes,calls}=harness();store.set('token','existing-login');await p.onShow()
+ assert.equal(p.data.loggedIn,true);assert.equal(routes.length,1);assert.equal(calls.length,0)
+ assert.equal(routes.at(-1),'/pages/index/index');assert.equal(store.get('token'),'existing-login')
+ const markup=fs.readFileSync(path.join(root,'pages/browse/browse.wxml'),'utf8')
+ assert.ok(!markup.includes('我的工作台'));assert.ok(markup.includes("loggedIn ? '进入小程序'"))
+})

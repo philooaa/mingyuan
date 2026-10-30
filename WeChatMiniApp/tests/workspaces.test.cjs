@@ -260,3 +260,46 @@ test('parent hides account and payment shortcuts, rejects stale taps and retains
   assert.ok(h.p.data.quickActions.some(a => a.route === '/pages/admin-tuition/admin-tuition'))
   h.p.onUnload()
 })
+
+test('every logged-in workspace hides native home without exposing guest browsing or clearing identity', () => {
+  for (const role of ['parent', 'teacher', 'education', 'admin']) {
+    const h = harness('index', [role])
+    let hidden = 0, roleLoads = 0
+    h.wx.hideHomeButton = () => { hidden++ }
+    h.p.applyLoginRole = () => { roleLoads++ }
+    h.p.onShow(); h.p.onShow()
+    assert.equal(hidden, 2); assert.equal(roleLoads, 2)
+    assert.equal(typeof h.p.browseCourses, 'undefined')
+    assert.equal(h.navigations.length, 0)
+    assert.equal(h.store.get('token'), 'original-token')
+    assert.deepEqual(h.store.get('roles'), [role])
+  }
+  const markup = fs.readFileSync(path.join(root, 'pages/index/index.wxml'), 'utf8')
+  assert.ok(!markup.includes('browseCourses')); assert.ok(!markup.includes('>浏览课程</button>'))
+})
+
+test('administrator homepage moves the badge from accounts to pending collection confirmations', async () => {
+  let count=4
+  const h=harness('index',['admin','education'],['*:*:*'],o=>o.url==='/system/tuition/pending-count'?{data:count}:undefined)
+  h.p.onLoad();h.p._visible=true;await h.p.applyLoginRole();await Promise.resolve()
+  assert.equal(h.p.data.quickActions.find(a=>a.key==='personalAccount').title,'家长与课次账户')
+  assert.equal(h.p.data.quickActions.find(a=>a.key==='personalAccount').badgeText,undefined)
+  assert.equal(h.p.data.quickActions.find(a=>a.key==='tuitionFinance').badgeText,'4')
+  assert.equal(h.calls.some(o=>o.url==='/system/eduTransaction/pending-count'),false)
+  count=0;await h.p.loadFinancePending()
+  assert.equal(h.p.data.quickActions.find(a=>a.key==='tuitionFinance').badgeText,'')
+  count=120;await h.p.loadFinancePending()
+  assert.equal(h.p.data.quickActions.find(a=>a.key==='tuitionFinance').badgeText,'99+')
+  await h.p.switchRole(click('education'))
+  assert.equal(h.p.data.quickActions.find(a=>a.key==='tuitionFinance').badgeText,undefined)
+  h.p.onUnload()
+})
+test('collection confirmation badge ignores a response after leaving the administrator workspace', async () => {
+  const finishes=[];let delayed=false
+  const h=harness('index',['admin','education'],['*:*:*'],o=>o.url==='/system/tuition/pending-count'?(delayed?new Promise(resolve=>{finishes.push(resolve)}):{data:1}):undefined)
+  h.p.onLoad();h.p._visible=true;await h.p.applyLoginRole();await Promise.resolve()
+  delayed=true;const pending=h.p.loadFinancePending()
+  await h.p.switchRole(click('education'));finishes.forEach(finish=>finish({data:8}));await pending
+  assert.equal(h.p.data.quickActions.find(a=>a.key==='tuitionFinance').badgeText,undefined)
+  h.p.onUnload()
+})

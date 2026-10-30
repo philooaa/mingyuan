@@ -25,10 +25,10 @@ const bill = { enrollmentId: '9007199254740995', billingStatus: 'OPEN', financeM
 test('staff selects a coupon using server quote and collects the quoted amount and version', async () => {
   storage = new Map(); const couponId = '9007199254740999'
   env(o => {
-    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
     if (o.url.endsWith('/quote')) return ok(o, { originalAmount: '1000.00', discountAmount: o.data.userCouponId ? '250.00' : '0.00', payableAmount: o.data.userCouponId ? '750.00' : '1000.00', financialVersion: 7, userCouponId: o.data.userCouponId, coupons: [{ userCouponId: couponId, couponName: '课程券', discountAmount: '250.00' }] })
     ok(o, bill)
-  }, 'admin')
+  }, 'education')
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow()
   assert.equal(p.data.couponOptions.length, 2)
   await p.chooseCoupon({ detail: { value: 1 } })
@@ -41,10 +41,10 @@ test('staff selects a coupon using server quote and collects the quoted amount a
 test('failed coupon quote cannot reuse an old amount to collect payment', async () => {
   storage = new Map(); let rejectQuote = false
   env(o => {
-    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
     if (o.url.endsWith('/quote') && rejectQuote) return o.success({ statusCode: 200, data: { code: 500, msg: '优惠券已失效' } })
     ok(o, { ...bill, coupons: [{ userCouponId: '9', couponName: '课程券', discountAmount: '100.00' }] })
-  }, 'admin')
+  }, 'education')
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow()
   rejectQuote = true; await p.chooseCoupon({ detail: { value: 1 } })
   p.setData({ payerName: '付款人' }); await p.collect()
@@ -54,10 +54,10 @@ test('failed coupon quote cannot reuse an old amount to collect payment', async 
 test('a late coupon quote cannot overwrite a newer quote or a hidden page', async () => {
   storage = new Map(); const quotes = []
   env(o => {
-    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
     if (o.url.endsWith('/quote')) { quotes.push(o); return }
     ok(o, bill)
-  }, 'admin')
+  }, 'education')
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); const loading = p.onShow()
   await new Promise(resolve => setImmediate(resolve))
   const newer = p.refreshQuote(); ok(quotes[1], { ...bill, payableAmount: '800.00' }); await newer
@@ -67,11 +67,11 @@ test('a late coupon quote cannot overwrite a newer quote or a hidden page', asyn
 test('unknown collection retries the frozen coupon and amount without requesting a new quote', async () => {
   storage = new Map(); let quoteCount = 0, posts = 0
   env(o => {
-    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
     if (o.url.endsWith('/quote')) { quoteCount++; return ok(o, bill) }
     if (o.url.endsWith('/payments')) { posts++; return o.fail({ errMsg: 'request:fail timeout' }) }
     ok(o, bill)
-  }, 'admin')
+  }, 'education')
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow(); p.setData({ payerName: '付款人' }); await p.collect()
   assert.equal(p.data.retryPayment, true); const saved = structuredClone(helper().savedIntent('admin-payment', bill.enrollmentId))
   await p.refreshQuote(); await p.chooseCoupon({ detail: { value: 0 } }); await p.collect()
@@ -81,9 +81,9 @@ test('unknown collection retries the frozen coupon and amount without requesting
 test('package collection preserves the purchase coupon and cannot switch coupons', async () => {
   storage = new Map(); const couponId = '9007199254740999'
   env(o => {
-    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
     ok(o, { ...bill, billType: 'CREDIT_PACKAGE', userCouponId: couponId, coupons: [] })
-  }, 'admin')
+  }, 'education')
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow()
   assert.equal(calls.find(c => c.url.endsWith('/quote')).data.userCouponId, couponId)
   const count = calls.length; await p.chooseCoupon({ detail: { value: 0 } }); assert.equal(calls.length, count); assert.equal(p.data.quote.userCouponId, couponId)
@@ -91,17 +91,17 @@ test('package collection preserves the purchase coupon and cannot switch coupons
 test('zero payable coupon quote uses FREE without requiring a payment screenshot', async () => {
   storage = new Map()
   env(o => {
-    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
     if (o.url.endsWith('/quote')) return ok(o, { originalAmount: '1000.00', discountAmount: '1000.00', payableAmount: '0.00', financialVersion: 3, userCouponId: null, coupons: [] })
     ok(o, { ...bill, financeMode: 'REAL', mockAllowed: false })
-  }, 'admin')
+  }, 'education')
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow(); p.setData({ payerName: '付款人' }); await p.collect()
   assert.equal(calls.find(c => c.url.endsWith('/payments')).data.channel, 'FREE')
 })
 
 for (const [index, source, filePath] of [[0, 'album', '/tmp/album.jpg'], [1, 'camera', '/tmp/camera.jpg'], [2, 'chat', '/tmp/proof.pdf']]) {
   test(`payment evidence from ${source} uses the existing authenticated private upload`, async () => {
-    env(o => ok(o, {}), 'admin'); app.globalData.permissions = ['system:tuition:collect']
+    env(o => ok(o, {}), 'education'); app.globalData.permissions = ['system:tuition:collect']
     const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); const uploads = []
     wx.showActionSheet = o => { assert.equal(o.itemList.length, 3); o.success({ tapIndex: index }) }
     wx.chooseMedia = o => {
@@ -123,7 +123,7 @@ for (const [index, source, filePath] of [[0, 'album', '/tmp/album.jpg'], [1, 'ca
 }
 test('cancelled or failed evidence selection keeps the existing proof and never uploads', async () => {
   for (const error of ['chooseMedia:fail cancel', 'chooseMedia:fail auth deny']) {
-    env(o => ok(o, {}), 'admin'); app.globalData.permissions = ['system:tuition:collect']
+    env(o => ok(o, {}), 'education'); app.globalData.permissions = ['system:tuition:collect']
     const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); p.setData({ evidenceKey: 'previous-proof' })
     const notices = []; wx.showToast = o => notices.push(o.title)
     wx.showActionSheet = o => o.success({ tapIndex: 0 })
@@ -135,7 +135,7 @@ test('cancelled or failed evidence selection keeps the existing proof and never 
   }
 })
 test('oversized album evidence still respects the private upload size limit', async () => {
-  env(o => ok(o, {}), 'admin'); app.globalData.permissions = ['system:tuition:collect']
+  env(o => ok(o, {}), 'education'); app.globalData.permissions = ['system:tuition:collect']
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); const notices = []
   wx.showToast = o => notices.push(o.title); wx.showActionSheet = o => o.success({ tapIndex: 0 })
   wx.chooseMessageFile = () => assert.fail('do not open chat files')
@@ -145,7 +145,7 @@ test('oversized album evidence still respects the private upload size limit', as
   assert.ok(notices.some(title => title.includes('10MB'))); assert.equal(p.data.evidenceKey, ''); assert.equal(p.data.submitting, false)
 })
 test('cancelling the source menu does not select or upload a proof', () => {
-  env(o => ok(o, {}), 'admin'); app.globalData.permissions = ['system:tuition:collect']
+  env(o => ok(o, {}), 'education'); app.globalData.permissions = ['system:tuition:collect']
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId })
   wx.showActionSheet = o => o.fail({ errMsg: 'showActionSheet:fail cancel' })
   wx.chooseMedia = wx.chooseMessageFile = wx.uploadFile = () => assert.fail('cancel must do nothing')
@@ -153,7 +153,7 @@ test('cancelling the source menu does not select or upload a proof', () => {
   p.chooseEvidence(); assert.equal(p.data.submitting, false)
 })
 test('an account change while choosing a photo cannot upload it under the new account', () => {
-  env(o => ok(o, {}), 'admin'); app.globalData.permissions = ['system:tuition:collect']
+  env(o => ok(o, {}), 'education'); app.globalData.permissions = ['system:tuition:collect']
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); let selection
   wx.showActionSheet = o => o.success({ tapIndex: 0 }); wx.chooseMedia = o => { selection = o }
   wx.uploadFile = () => assert.fail('do not upload across account changes')
@@ -196,7 +196,7 @@ test('teacher cannot read admin bills and missing operation permission prevents 
 })
 test('staff cannot reopen or submit manual pricing for catalog package purchases', async () => {
   storage = new Map()
-  env(o => o.url.endsWith('/getInfo') ? o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } }) : ok(o, { ...bill, billType: 'CREDIT_PACKAGE', financeMode: 'REAL', mockAllowed: false }), 'admin')
+  env(o => o.url.endsWith('/getInfo') ? o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } }) : ok(o, { ...bill, billType: 'CREDIT_PACKAGE', financeMode: 'REAL', mockAllowed: false }), 'education')
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow()
   const step = p.data.billingStep; p.editPrice(); assert.equal(p.data.billingStep, step)
   await p.savePrice(); assert.equal(calls.some(c => c.method === 'PUT'), false)
@@ -215,27 +215,26 @@ test('parent bill pagination, receipt and coupon lists consume TableDataInfo wit
   const coupons = page('my-coupons'); coupons.onLoad(); await coupons.onShow(); assert.equal(coupons.data.rows[0].statusText, '已过期')
   assert.equal(calls.some(c => 'parentId' in c.data), false)
 })
-test('admin authorized price and offline confirmation preserve decimal amount and big IDs', async () => {
+test('administrator confirmation preserves decimal amount and big IDs', async () => {
   storage = new Map()
   env(o => o.url.endsWith('/getInfo') ? o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } }) : ok(o, { ...bill, financeMode: 'REAL', mockAllowed: false, payments: [{ paymentId: '9007199254740999', paymentStatus: 'PENDING', channel: 'BANK_TRANSFER', amount: '900.00', evidenceKey: 'private-key', providerTradeNo: 'transfer-1', paidTime: '2026-10-07 12:00:00' }] }), 'admin')
-  const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow(); p.setData({ price: '1200.00' }); await p.savePrice()
-  const priced = calls.find(c => c.method === 'PUT'); assert.equal(priced.data.originalAmount, '1200.00'); assert.equal(priced.data.financialVersion, 2)
+  const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow()
   await p.paymentAction({ currentTarget: { dataset: { id: '9007199254740999', action: 'confirm' } } }); const confirmed = calls.find(c => c.url.endsWith('/confirm')); assert.ok(confirmed.url.includes('9007199254740999')); assert.equal(confirmed.data.evidenceKey, 'private-key')
 })
 test('successful pricing and offline collection guide staff to the next step without confirming payment automatically', async () => {
   storage = new Map(); let current = { ...bill, financeMode: 'REAL', mockAllowed: false }; const notices = [], sections = []
   env(o => {
-    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
     if (o.method === 'PUT') current = { ...current, financialVersion: 3 }
     if (o.url.endsWith('/payments')) current = { ...current, payments: [{ paymentId: '91', paymentStatus: 'PENDING', amount: '900.00', channel: 'CASH' }] }
     ok(o, current)
-  }, 'admin')
+  }, 'education')
   wx.showToast = o => notices.push(o.title); wx.pageScrollTo = o => sections.push(o.selector)
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow(); await p.savePrice()
   assert.equal(p.data.billingStep, 2)
   assert.ok(notices.includes('核价成功，请登记实际收款')); assert.ok(sections.includes('#collection-form'))
   p.setData({ payerName: '测试付款人', paidTime: '2026-10-13 20:00:00', evidenceKey: 'private-test-proof' }); await p.collect()
-  assert.ok(notices.includes('已登记，请核对并确认收款')); assert.ok(sections.includes('#payment-records'))
+  assert.ok(notices.includes('已登记，等待管理员确认')); assert.ok(sections.includes('#payment-records'))
   assert.equal(calls.filter(c => c.url.endsWith('/payments')).length, 1)
   assert.equal(calls.some(c => c.url.endsWith('/confirm')), false)
   assert.equal(p.data.detail.payments[0].paymentStatus, 'PENDING')
@@ -244,10 +243,10 @@ test('successful pricing and offline collection guide staff to the next step wit
 test('billing step resumes from server state and failed pricing does not advance', async () => {
   storage = new Map(); let current = { ...bill, billingStatus: 'PENDING_PRICE' }
   env(o => {
-    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
     if (o.method === 'PUT') return o.success({ statusCode: 200, data: { code: 500, msg: '核价失败' } })
     ok(o, current)
-  }, 'admin')
+  }, 'education')
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow()
   assert.equal(p.data.billingStep, 1); await p.savePrice(); assert.equal(p.data.billingStep, 1)
   for (const [record, expected] of [
@@ -302,7 +301,7 @@ test('refund return after abandoned modal resets submission without posting an o
 })
 test('admin returning after abandoned price modal resets busy state and rejects old mutation', async () => {
   storage = new Map(); let modal
-  env(o => o.url.endsWith('/getInfo') ? o.success({ statusCode: 200, data: { code: 200, roles: ['admin'], permissions: ['*:*:*'] } }) : ok(o, bill), 'admin'); wx.showModal = o => { modal = o }
+  env(o => o.url.endsWith('/getInfo') ? o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } }) : ok(o, bill), 'education'); wx.showModal = o => { modal = o }
   const p = page('admin-tuition'); p.onLoad({ id: bill.enrollmentId }); await p.onShow(); p.setData({ price: '100.00' }); const pricing = p.savePrice(); p.onHide(); await p.onShow(); modal.success({ confirm: true }); await pricing
   assert.equal(p.data.submitting, false); assert.equal(calls.some(c => c.method === 'PUT'), false)
 })
@@ -475,7 +474,7 @@ test('only administrator workspace can confirm or close payments, even with wild
     const p=page('admin-tuition');p.onLoad({id:bill.enrollmentId});await p.onShow()
     assert.equal(p.data.allowed.confirm,scenario.allowed)
     assert.equal(p.data.allowed.close,scenario.allowed)
-    assert.equal(p.data.allowed.collect,true)
+    assert.equal(p.data.allowed.collect,scenario.workspace==='education')
     if(!scenario.allowed) {
       for(const action of ['confirm','close'])await p.paymentAction({currentTarget:{dataset:{id:'27',action}}})
       assert.equal(calls.some(c=>/payments\/27\/(confirm|close)$/.test(c.url)),false)
@@ -484,4 +483,26 @@ test('only administrator workspace can confirm or close payments, even with wild
   const markup=fs.readFileSync(path.join(root,'pages/admin-tuition/admin-tuition.wxml'),'utf8')
   assert.match(markup,/allowed.close.*data-action="close"/)
   assert.match(markup,/billingStep === 3 && allowed.close/)
+})
+
+test('administrator sees confirmation only and payment progress does not confuse open and pending bills',async()=>{
+ for(const state of [
+   {billingStatus:'PENDING_PRICE',payments:[],pendingPaymentCount:0,expected:'WAIT_EDU_PRICE'},
+   {billingStatus:'OPEN',payments:[],pendingPaymentCount:0,expected:'WAIT_EDU_COLLECT'},
+   {billingStatus:'OPEN',payments:[{paymentId:'28',paymentStatus:'PENDING',amount:'900.00'}],expected:'WAIT_ADMIN'},
+   {billingStatus:'OPEN',payments:[{paymentId:'28',paymentStatus:'SUCCESS',amount:'900.00'}],expected:'COMPLETED'}
+ ]) {
+  storage=new Map()
+  env(o=>o.url.endsWith('/getInfo')?o.success({statusCode:200,data:{code:200,roles:['business_admin'],permissions:['*:*:*']}}):ok(o,{...bill,...state}),'business_admin')
+  const p=page('admin-tuition');p.onLoad({id:bill.enrollmentId});await p.onShow()
+  assert.equal(p.data.confirmationOnly,true);assert.equal(p.data.allowed.price,false);assert.equal(p.data.allowed.collect,false)
+  assert.equal(p.data.detail.progressStage,state.expected)
+  assert.equal(p.data.detail.requiresConfirmation,state.expected==='WAIT_ADMIN')
+  await p.savePrice();await p.collect()
+  assert.ok(!calls.some(c=>c.method==='PUT'||c.url.endsWith('/payments')||c.url.endsWith('/quote')))
+ }
+ storage=new Map()
+ env(o=>o.url.endsWith('/getInfo')?o.success({statusCode:200,data:{code:200,roles:['business_admin'],permissions:['*:*:*']}}):o.success({statusCode:200,data:{code:200,rows:[{...bill,pendingPaymentCount:1}],total:1}}),'business_admin')
+ const p=page('admin-tuition');p.onLoad({});await p.onShow();assert.equal(p.data.rows[0].requiresConfirmation,true)
+ await p.showPending();assert.equal(calls.at(-1).data.paymentStage,'WAIT_ADMIN')
 })

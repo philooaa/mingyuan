@@ -3,3 +3,7 @@
 .paid-date { flex: 1.2; min-width: 0; }
 .paid-clock { flex: 1; min-width: 0; }
 .coupon-quote { margin: 20rpx 0; padding: 20rpx; background: #f4f7fb; border-radius: 12rpx; line-height: 1.7; }
+
+.workflow-progress { margin: 24rpx 0; padding: 24rpx; border-radius: 18rpx; background: #eef5ff; color: #204f85; line-height: 1.7; }
+.workflow-progress .muted { margin-top: 10rpx; }
+.workflow-pending { background: #fff3d9; color: #865b13; border: 2rpx solid #f2d28b; }

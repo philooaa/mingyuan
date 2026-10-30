@@ -51,6 +51,7 @@ public class MiniAppParentServiceImpl implements IMiniAppParentService
         {
             for (Map<String, Object> item : list)
             {
+                com.ruoyi.system.service.ParentTuitionProgress.decorate(item);
                 Object scheduleId = item.get("scheduleId");
                 if (scheduleId != null)
                 {

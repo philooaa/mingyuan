@@ -1,8 +1,12 @@
 const childContext = require('../../utils/child-context')
 const { request } = require('../../utils/request')
+const paymentProgress = require('../../utils/course-payment-progress')
 
 // 日循环模式的一轮天数与上课天数，与后端 ScheduleCalendar 及 utils/course-calendar.js 保持一致
 const DAILY_CYCLES = { DAILY: [1, 1], DAILY_5_1: [6, 5], DAILY_6_1: [7, 6], DAILY_5_2: [7, 5], DAILY_4_1: [5, 4] }
+
+// 报名缴费三个阶段，与右上角状态标签一一对应；unpaid 仅用于一对一单次课
+const PAY_STAGE_TEXT = { pendingPrice: '待核价', pendingPay: '待缴费', paid: '已支付', closed: '已关闭', unpaid: '未支付' }
 
 Page(childContext.page({
   data: {
@@ -28,11 +32,12 @@ Page(childContext.page({
 
   onShow() {
     if (this.redirectTeacher()) return
-    if (this._scheduleDirty || this._loadedToken !== wx.getStorageSync('token')) {
+    if (this._hasShown || this._scheduleDirty || this._loadedToken !== wx.getStorageSync('token')) {
       this._scheduleDirty = false
       this.setData({ timetable: [], groupedTimetable: [], timetableCount: 0 })
       this.loadTimetable()
     }
+    this._hasShown = true
   },
 
   redirectTeacher() {
@@ -107,20 +112,42 @@ Page(childContext.page({
     return list.map((item) => {
       const hasDates = item.startDate || item.endDate
       const next = this.computeNextClass(item)
+      const single = !!item.classDate
+      // 一对一单次课按课包结算，不参与核价三阶段
+      const stage = single ? (this.isPaid(item.payStatus) ? 'paid' : 'unpaid') : this.payStageOf(item)
       return {
         ...item,
-        cancelRequestPending: !!item.classDate && String(item.cancelRequestStatus) === '1',
+        cancelRequestPending: single && String(item.cancelRequestStatus) === '1',
         viewKey: String(item.enrollmentId || item.scheduleId),
         timeText: this.buildTimeText(item),
         placeText: item.lessonLocation || item.classroomName || '',
         subjectTag: this.joinText([item.gradeName, item.subjectName]),
-        payText: item.payStatus === '已支付' ? '已支付' : '未支付',
+        payStage: stage,
+        payText: PAY_STAGE_TEXT[stage] || '待缴费',
+        // 待核价可以取消；待缴费、已支付都不再提供取消入口。一对一单次课仍走老师的取消申请流程。
+        canCancel: single ? true : stage === 'pendingPrice',
+        tuitionView: paymentProgress.describe(item.tuitionProgress),
         nextClassDate: next ? next.date : '',
         nextClassWeekday: next ? next.weekday : '',
         nextClassEnded: hasDates && !next,   // 有日期才可能"已结课"，否则是"待配置"
         nextClassConfigured: hasDates
       }
     })
+  },
+
+  // 三个阶段：待核价（价格未确认）/ 待缴费（已核价未收款）/ 已支付
+  payStageOf(item) {
+    if (this.isPaid(item.payStatus) || this.isPaid(item.orderPayStatus)) return 'paid'
+    // 购物车订单里的课程本身不单独成账单，以所属订单的核价状态为准
+    const billing = String(item.orderBillingStatus || item.billingStatus || '')
+    if (!billing || billing === 'PENDING_PRICE' || billing === 'HISTORY_PENDING') return 'pendingPrice'
+    if (billing === 'CLOSED') return 'closed'
+    return 'pendingPay'
+  },
+
+  isPaid(status) {
+    const value = String(status == null ? '' : status)
+    return value === '已支付' || value === '1'
   },
 
   // 计算下一次课的具体日期与周几
@@ -283,6 +310,11 @@ Page(childContext.page({
       return
     }
     const single = !!record.classDate
+    const stage = single ? (this.isPaid(record.payStatus) ? 'paid' : 'unpaid') : this.payStageOf(record)
+    if (!single && stage !== 'pendingPrice') {
+      wx.showToast({ title: stage === 'paid' ? '已支付，退费请联系教务' : '已核价，取消请联系教务', icon: 'none' })
+      return
+    }
     if (single && String(record.cancelRequestStatus) === '1') {
       wx.showToast({ title: '取消申请待老师处理', icon: 'none' })
       return
@@ -310,7 +342,7 @@ Page(childContext.page({
       showingLoading = true
       await request(single ? {
         url: `/miniapp/parent/enrollment/${enrollmentId}/cancel-request`, method: 'POST',
-        data: { reason: '家长在我的课表确认申请取消本次课' }
+        data: { reason: '家长在我的课程确认申请取消本次课' }
       } : { url: `/miniapp/parent/enrollment/${enrollmentId}`, method: 'DELETE' })
       if (!current()) return
       wx.hideLoading(); showingLoading = false

@@ -5,7 +5,13 @@ const termFilter = require('../../utils/course-term-filter')
 Page({
  data:{loading:false,error:'',tab:'courses',keyword:'',courses:[],visibleCourses:[],materials:[],gradeOptions:['全部年级'],subjectOptions:['全部学科'],gradeIndex:0,subjectIndex:0,termOptions:termFilter.options,termIndex:0,expandedId:'',materialDetail:null,loggedIn:false},
  onLoad(){this._sequence=0;this._hidden=false},
- onShow(){this._hidden=false;this.setData({loggedIn:!!wx.getStorageSync('token')});return this.load()},
+ onShow(){
+  this._hidden=false
+  const loggedIn=!!wx.getStorageSync('token')
+  this.setData({loggedIn})
+  if(loggedIn){wx.reLaunch({url:'/pages/index/index'});return}
+  return this.load()
+ },
  onHide(){this._hidden=true;this._sequence=(this._sequence||0)+1},
  onUnload(){this.onHide()},
  onPullDownRefresh(){return this.load().finally(()=>wx.stopPullDownRefresh())},
