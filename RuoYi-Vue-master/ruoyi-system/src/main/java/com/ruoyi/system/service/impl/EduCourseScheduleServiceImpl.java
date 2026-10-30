@@ -129,7 +129,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         }
         if (!force && "2".equals(current.getClassMode()) && "0".equals(current.getStatus()) && "1".equals(effective.getStatus()))
             require(db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND del_flag='0' AND enrollment_status IN ('0','1','待确认','已确认','报名成功') FOR UPDATE",current.getScheduleId()).isEmpty(),"仍有有效报名，请先处理报名后再撤回课程");
-        if (hasAttendance(current.getScheduleId()) || (!force && !db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND class_date IS NOT NULL FOR UPDATE", current.getScheduleId()).isEmpty())) {
+        if (!force && (hasAttendance(current.getScheduleId()) || !db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND class_date IS NOT NULL FOR UPDATE", current.getScheduleId()).isEmpty())) {
             require(Objects.equals(current.getTeacherId(), effective.getTeacherId())
                 && Objects.equals(current.getClassroomId(), effective.getClassroomId())
                 && Objects.equals(current.getCampusName(), effective.getCampusName())

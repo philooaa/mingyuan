@@ -12,6 +12,21 @@ function billingStep(detail) {
   if (detail.payments.some(p => p.paymentStatus === 'SUCCESS')) return 4
   return 0
 }
+function courseInfo(course) {
+  const value=x=>x===null||x===undefined||String(x).trim()===''?'待安排':String(x)
+  const patterns={WEEKLY:'每周上课',DAILY:'连续上课',DAILY_5_1:'上五休一',DAILY_6_1:'上六休一',DAILY_5_2:'上五休二',DAILY_4_1:'上四休一',OTHER:'暂不排课'}
+  return { ...course,
+    title:course.courseClassName || course.feeTitleSnapshot || '课程名称待补充',
+    subjectText:[course.gradeName,course.subjectName,course.classType].filter(Boolean).join(' · ') || '待补充',
+    teacherText:value(course.teacherName),
+    modeText:course.classMode==='2'?'一对一':course.classMode==='1'?'班课':'待补充',
+    termText:[course.courseYear,course.termName,course.periodName].filter(Boolean).join(' · ') || '待安排',
+    timeText:course.startTime&&course.endTime?`${course.startTime}–${course.endTime}`:value(course.timeSlot),
+    dateText:course.startDate&&course.endDate?(course.startDate===course.endDate?course.startDate:`${course.startDate} 至 ${course.endDate}`):'日期待安排',
+    patternText:patterns[course.classPattern] || '',
+    placeText:[course.campusName,course.classroomName || '教室待分配'].filter(Boolean).join(' · ')
+  }
+}
 function progress(detail) {
   let stage = 'WAIT_EDU_PRICE'
   if (detail.billingStatus === 'HISTORY_PENDING') stage = 'HISTORY'
@@ -67,7 +82,7 @@ Page({
       if (this.id) {
         const res = await t.request({ url: `${t.adminUrl}/${encodeURIComponent(this.id)}` })
         if (!this._active || visit !== this._visit || sequence !== this._loadSequence) return
-        const detail = progress(t.bill(res.data)), pending = t.savedIntent('admin-payment', this.id)
+        const detail = progress(t.bill({...res.data,courses:(res.data.courses || []).map(courseInfo)})), pending = t.savedIntent('admin-payment', this.id)
         this.setData({ billingStep: billingStep(detail), retryPayment: !!pending, allowed: { ...allowed, price: allowed.price && detail.billType !== 'CREDIT_PACKAGE' } })
         this.setData({ detail, price: detail.originalAmount || '', discountAmount: detail.discountAmount ? String(detail.discountAmount) : '', discountReason: detail.remark || '', modeIndex: detail.financeMode === 'MOCK' ? 1 : 0, channels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['MOCK'] : ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['本地模拟'] : ['现金', '银行转账', '微信线下收款'], channelIndex: 0, ...(pending ? { payerName: pending.payerName, providerTradeNo: pending.providerTradeNo || '', paidTime: pending.paidTime || '', evidenceKey: pending.evidenceKey || '', evidenceName: pending.evidenceKey ? '已上传凭证（待确认绑定）' : '' } : {}) })
         this.pricePreview()

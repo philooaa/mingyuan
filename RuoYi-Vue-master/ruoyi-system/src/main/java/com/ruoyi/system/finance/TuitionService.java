@@ -441,6 +441,7 @@ public class TuitionService {
         "这门课属于购物车订单，请在订单主账单里核价收款");
     var e = amounts(db.one(BILL_SELECT + BILL_FROM + " WHERE e.enrollment_id=?", enrollment));
     if(CreditPackageService.isPackage(e))e.put("packageSnapshot",CreditPackageService.snapshot(e));
+    e.put("courses", courseDetails(enrollment, "CART_ORDER".equals(str(e, "billType")), id(e.get("parentId"))));
     if("CART_ORDER".equals(str(e, "billType")))e.put("items", orderItems(enrollment));
     e.put(
         "payments",
@@ -474,6 +475,24 @@ public class TuitionService {
     // 购物车订单没有单一排课，优惠券按课程绑定无法套用，只支持教务手工填优惠。
     e.put("coupons", "CART_ORDER".equals(str(e, "billType")) ? List.of() : coupons.available(e));
     return e;
+  }
+
+  /** Read current course arrangements without changing the financial snapshots. */
+  private List<Map<String, Object>> courseDetails(long enrollment, boolean order, long parent) {
+    return db.rows(
+        "SELECT e.enrollment_id,e.schedule_id,e.student_name,e.fee_title_snapshot,"
+            + "s.course_class_name,s.course_year,s.grade_name,s.subject_name,s.class_type,s.class_mode,"
+            + "s.term_name,s.period_name,s.time_slot,s.class_pattern,"
+            + "TIME_FORMAT(s.start_time,'%H:%i') start_time,TIME_FORMAT(s.end_time,'%H:%i') end_time,"
+            + "DATE_FORMAT(COALESCE(e.class_date,s.start_date),'%Y-%m-%d') start_date,"
+            + "DATE_FORMAT(COALESCE(e.class_date,s.end_date),'%Y-%m-%d') end_date,"
+            + "COALESCE(NULLIF(teacher.nick_name,''),NULLIF(teacher.user_name,''),s.teacher_name) teacher_name,"
+            + "COALESCE(NULLIF(s.campus_name,''),c.campus_name) campus_name,c.classroom_name "
+            + "FROM edu_enrollment e JOIN edu_course_schedule s ON s.schedule_id=e.schedule_id "
+            + "LEFT JOIN sys_user teacher ON teacher.user_id=s.teacher_id "
+            + "LEFT JOIN edu_classroom c ON c.classroom_id=s.classroom_id "
+            + "WHERE " + (order ? "e.order_enrollment_id" : "e.enrollment_id")
+            + "=? AND e.parent_id=? AND e.del_flag='0' ORDER BY e.enrollment_id", enrollment, parent);
   }
 
   /** 购物车订单里的课程明细。 */
