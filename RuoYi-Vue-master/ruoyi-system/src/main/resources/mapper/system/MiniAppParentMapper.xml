@@ -24,6 +24,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             s.tuition_price as tuitionPrice,
             s.lesson_count as lessonCount,
             s.class_pattern as classPattern,
+            s.enroll_limit as enrollLimit,
             s.start_date as startDate,
             s.end_date as endDate,
             COALESCE(NULLIF(s.campus_name,''),c.campus_name) as campusName,
@@ -102,6 +103,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             e.student_name as studentName,
             e.enrollment_status as enrollmentStatus,
             e.pay_status as payStatus,
+            e.billing_status as billingStatus,
+            e.bill_type as billType,
+            e.order_enrollment_id as orderEnrollmentId,
+            o.billing_status as orderBillingStatus,
+            o.pay_status as orderPayStatus,
             s.schedule_code as scheduleCode,
             s.course_year as courseYear,
             s.course_class_name as courseClassName,
@@ -121,6 +127,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             c.classroom_name as classroomName
         from edu_enrollment e
         inner join edu_course_schedule s on s.schedule_id = e.schedule_id
+        left join edu_enrollment o on o.enrollment_id = e.order_enrollment_id
         left join sys_user teacher on teacher.user_id = s.teacher_id
         left join edu_classroom c on c.classroom_id = s.classroom_id
         where e.parent_id = #{parentId}

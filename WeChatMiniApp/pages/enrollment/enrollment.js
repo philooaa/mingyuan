@@ -28,6 +28,7 @@ Page(childContext.page({
     termIndex: 0,
     selectedSchedule: null,
     cart: [], cartCount: 0, cartTotal: '0.00', cartMode: false,
+    orderDoneOpen: false, advisorWechat: 'myedu666888', advisorQrImage: '/images/course-advisor-wechat.png',
     lessonAccounts: [], creditAccount:null, lessonAccountOptions: [], lessonAccountIndex:0, selectedChildId:null, newChild:true, childMissing:false, settlementMethod:'C', accountsError:'', accountsLoading:false,
     form: {
       studentName: '',
@@ -271,20 +272,25 @@ Page(childContext.page({
   decorateSchedules(list) {
     return list.map((item) => {
       const enrolled = Number(item.enrolled) === 1
-      // 班课不按教室容量限制名额（一对一仍看单节课自身的 canEnroll），因此不再出现「已满」
-      const canEnroll = String(item.classMode) === '2' ? !!item.canEnroll : !enrolled
+      // 名额上限来自排课 enroll_limit：为空或 <=0 表示不限，此时家长端只显示「充足」
+      const limit = Number(item.enrollLimit || 0)
+      const enrolledCount = Number(item.enrolledCount || 0)
+      const remaining = limit > 0 ? Math.max(limit - enrolledCount, 0) : null
+      const full = remaining === 0
+      // 班课不按教室容量限制名额（一对一仍看单节课自身的 canEnroll），但排课设了报名上限时满员不可报名
+      const canEnroll = String(item.classMode) === '2' ? !!item.canEnroll : (!enrolled && !full)
       return {
         ...item, viewKey: `${item.scheduleId}:${item.classDate || 'class'}`,
         subjectText: this.labelOf(this.data.subjects, item.subjectName) || item.subjectName,
         gradeText: this.labelOf(this.data.grades, item.gradeName) || item.gradeName,
         timeText: this.buildTimeText(item),
         placeText: this.buildPlaceText(item),
-        countText: `已报名 ${item.enrolledCount || 0} 人`,
+        countText: remaining === null ? '剩余名额：充足' : `剩余名额：${remaining} 人`,
         priceText: this.buildPriceText(item),
         inCart: (this.data.cart || []).some(c => String(c.scheduleId) === String(item.scheduleId)),
         canEnroll,
         statusClass: canEnroll ? 'ok' : 'disabled',
-        statusText: item.classDate ? item.statusText : enrolled ? '已报名' : '报名'
+        statusText: item.classDate ? item.statusText : enrolled ? '已报名' : (full ? '已满' : '报名')
       }
     })
   },
@@ -309,6 +315,25 @@ Page(childContext.page({
   },
 
   openTuition(e) { wx.navigateTo({url:`/pages/tuition-detail/tuition-detail?id=${encodeURIComponent(String(e.currentTarget.dataset.id))}${this.data.scopeAccountId?'&accountId='+encodeURIComponent(this.data.scopeAccountId):''}`}) },
+
+  // 下单成功后的说明弹窗：引导家长扫码或等待课程服务老师联系缴费
+  closeOrderDone() { this.setData({ orderDoneOpen: false }) },
+
+  noop() {},
+
+  copyAdvisorWechat() {
+    if (!this.data.orderDoneOpen) return
+    wx.setClipboardData({
+      data: this.data.advisorWechat,
+      success: () => wx.showToast({ title: '微信号已复制', icon: 'success' }),
+      fail: () => wx.showToast({ title: '复制失败，请长按微信号复制', icon: 'none' })
+    })
+  },
+
+  previewAdvisorQr() {
+    if (!this.data.orderDoneOpen) return
+    wx.previewImage({ current: this.data.advisorQrImage, urls: [this.data.advisorQrImage] })
+  },
 
   buildPlaceText(item) {
     if (item.lessonLocation) return item.lessonLocation
@@ -573,16 +598,9 @@ Page(childContext.page({
       })
       if (!this.current()) return
       if (typeof getCurrentPages === 'function') getCurrentPages().forEach(p => { p._scheduleDirty = true })
-      this.setData({ cart: [], cartMode: false, showSheet: false, selectedSchedule: null })
+      this.setData({ cart: [], cartMode: false, showSheet: false, selectedSchedule: null, orderDoneOpen: true })
       wx.setStorageSync('enrollCart', [])
       this.refreshCartSummary()
-      wx.showModal({
-        title: '订单已提交',
-        content: '报名信息已提交，正在等待教务核价。\n已报名课程可在「我的账户 - 已报课程」中查看。\n核价完成后教务会联系你确认应付金额，请按教务安排线下支付。',
-        confirmText: '查看账单',
-        cancelText: '关闭',
-        success: res => { if (res.confirm) wx.navigateTo({ url: '/pages/tuition-list/tuition-list' }) }
-      })
       await this.loadPage()
     } catch (error) {
       if (this.current()) wx.showToast({ title: error.message || '下单失败', icon: 'none' })

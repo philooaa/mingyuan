@@ -198,6 +198,12 @@ page {
   font-weight: 800;
 }
 
+/* 缴费三阶段：待核价（琥珀）/ 待缴费（蓝）/ 已支付（绿） */
+.pay-tag.pendingPrice { background: #fff6e4; color: #8c5c05; }
+.pay-tag.pendingPay { background: #eaf1ff; color: #2459d9; }
+.pay-tag.paid { background: #eaf7f1; color: #15875d; }
+.pay-tag.closed, .pay-tag.unpaid { background: #f1f4f9; color: #68778c; }
+
 .empty {
   margin: 24rpx;
   padding: 54rpx 24rpx;
