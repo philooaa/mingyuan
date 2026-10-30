@@ -1,6 +1,6 @@
 <template name="personal-account">
 <view class="page">
-  <view class="heading"><view class="title">{{administrator ? '交易管理' : '我的账户'}}<text class="inline-badge" wx:if="{{pendingBadge}}">{{pendingBadge}}</text></view><view class="muted">{{administrator ? '按家长归集孩子课包、付款与交易' : '孩子课包、课程付款与商城交易'}}</view></view>
+  <view class="heading"><view class="title">{{administrator ? '家长与课次账户' : '我的账户'}}<text class="inline-badge" wx:if="{{pendingBadge}}">{{pendingBadge}}</text></view><view class="muted">{{administrator ? '按家长归集孩子课包、付款与交易' : '孩子课包、课程付款与商城交易'}}</view></view>
   <block wx:if="{{administrator && !parentId}}">
     <view class="search"><input value="{{keyword}}" bindinput="inputKeyword" bindconfirm="search" placeholder="家长 / 孩子 / 联系电话"/><button size="mini" bindtap="search">查询</button></view>
     <button class="primary" bindtap="openCreate" disabled="{{submitting || loading}}">添加孩子信息</button>

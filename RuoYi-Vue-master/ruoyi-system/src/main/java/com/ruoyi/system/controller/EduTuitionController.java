@@ -40,6 +40,12 @@ public class EduTuitionController {
     return ok(tuition.refundTargets(id, SecurityUtils.getUserId(), true));
   }
 
+  @PreAuthorize("@ss.hasPermi('system:tuition:list') and @ss.hasPermi('system:tuition:confirm') and @ss.hasRole('admin')")
+  @GetMapping("/pending-count")
+  public AjaxResult pendingCount() {
+    return AjaxResult.success(tuition.pendingConfirmationCount(SecurityUtils.getUserId()));
+  }
+
   @PreAuthorize("@ss.hasPermi('system:tuition:list')")
   @GetMapping("/list")
   public TableDataInfo list(@RequestParam Map<String, String> q) {
@@ -86,7 +92,7 @@ public class EduTuitionController {
     return EduTuitionController.ok(tuition.historyVerify(id, SecurityUtils.getUserId(), b));
   }
 
-  @PreAuthorize("@ss.hasPermi('system:tuition:collect') and @ss.hasRole('admin')")
+  @PreAuthorize("@ss.hasPermi('system:tuition:collect') and @ss.hasAnyRoles('education,admin')")
   @Log(
       title = "学费收款登记",
       businessType = BusinessType.INSERT,

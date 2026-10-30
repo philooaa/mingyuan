@@ -33,10 +33,9 @@ class BusinessAdminFinanceMysqlTest {
     assertThrows(Exception.class, () -> coupons.admin(2));
     assertThrows(Exception.class, () -> FinanceRules.tuitionStaff(fixture.db,2));
   }
-  @Test void collectionAndReceiptActionsAllowBusinessAdministratorsButDenyEducation() {
+  @Test void confirmationAndReceiptActionsAllowBusinessAdministratorsButDenyEducation() {
     var service = new TuitionService(fixture.db, fixture.storage, fixture.receiptService, coupons, false);
     List<java.util.function.LongConsumer> actions = List.of(
-        actor -> service.createPayment(-1, actor, true, Map.of()),
         actor -> service.confirmPayment(-1, actor, true, Map.of()),
         actor -> service.closePayment(-1, actor, Map.of()),
         actor -> service.historyVerify(-1, actor, Map.of()),
@@ -50,6 +49,26 @@ class BusinessAdminFinanceMysqlTest {
       var educationError = assertThrows(RuntimeException.class, () -> action.accept(5));
       assertTrue(String.valueOf(educationError.getMessage()).contains("FORBIDDEN"));
     }
+  }
+  @Test void educationPreparesPaymentButBusinessAdministratorConfirmsIt() {
+    var service = new TuitionService(fixture.db, fixture.storage, fixture.receiptService, coupons, true);
+    long enrollment=fixture.fresh();
+    assertThrows(RuntimeException.class,()->service.price(enrollment,80,fixture.priceBody("MOCK")));
+    service.price(enrollment,5,fixture.priceBody("MOCK"));
+    assertThrows(RuntimeException.class,()->service.createPayment(enrollment,80,true,fixture.payBody(1,"ADMIN_DENIED"+enrollment)));
+    long before=service.pendingConfirmationCount(80);
+    var payment=service.createPayment(enrollment,5,true,fixture.payBody(1,"EDU_PREPARE"+enrollment));
+    assertEquals(before+1,service.pendingConfirmationCount(80));
+    assertThrows(RuntimeException.class,()->service.pendingConfirmationCount(5));
+    long paymentId=FinanceRules.id(payment.get("paymentId"));
+    assertEquals("PENDING",payment.get("paymentStatus"));
+    assertThrows(RuntimeException.class,()->service.confirmPayment(paymentId,5,true,Map.of()));
+    var pending=service.listBills(80,true,Map.of("paymentStage","WAIT_ADMIN"));
+    assertTrue(((List<Map<String,Object>>)pending.get("rows")).stream().anyMatch(row->FinanceRules.id(row.get("enrollmentId"))==enrollment));
+    assertEquals("SUCCESS",service.confirmPayment(paymentId,80,true,Map.of()).get("paymentStatus"));
+    assertEquals(before,service.pendingConfirmationCount(80));
+    var waiting=service.listBills(80,true,Map.of("paymentStage","WAIT_ADMIN"));
+    assertFalse(((List<Map<String,Object>>)waiting.get("rows")).stream().anyMatch(row->FinanceRules.id(row.get("enrollmentId"))==enrollment));
   }
   @Test void disabledRoleOrAccountCannotUseAdministratorGuards() {
     try {

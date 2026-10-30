@@ -12,9 +12,19 @@ function billingStep(detail) {
   if (detail.payments.some(p => p.paymentStatus === 'SUCCESS')) return 4
   return 0
 }
+function progress(detail) {
+  let stage = 'WAIT_EDU_PRICE'
+  if (detail.billingStatus === 'HISTORY_PENDING') stage = 'HISTORY'
+  else if (detail.billingStatus === 'CLOSED' || ['2', '已取消', '3', '已拒绝'].includes(String(detail.enrollmentStatus))) stage = 'CLOSED'
+  else if (Number(detail.successCount) > 0 || (detail.payments || []).some(p => p.paymentStatus === 'SUCCESS') || ['已支付', '部分退款', '已退款', '已减免', '1', '2'].includes(String(detail.payStatus))) stage = 'COMPLETED'
+  else if (detail.activePayment || Number(detail.pendingPaymentCount) > 0) stage = 'WAIT_ADMIN'
+  else if (detail.billingStatus === 'OPEN') stage = 'WAIT_EDU_COLLECT'
+  const labels = { WAIT_EDU_PRICE: '待教务核价', WAIT_EDU_COLLECT: '教务已核价 · 待登记收款', WAIT_ADMIN: '教务已登记 · 待管理员确认', COMPLETED: '管理员已确认 · 已完成', CLOSED: '账单已关闭', HISTORY: '历史账单待核验' }
+  return { ...detail, progressStage: stage, progressText: labels[stage], requiresConfirmation: stage === 'WAIT_ADMIN' }
+}
 Page({
   // Keep the same yyyy-MM-dd HH:mm:ss value used by the web form and API.
-  data: { loading: false, submitting: false, error: '', rows: [], total: 0, pageNum: 1, searchText: '', filterIndex: 0, filters: ['全部账单', '待核价', '已核价', '历史待核验', '已关闭'], detail: null, allowed: {}, price: '', discountAmount: '', discountReason: '', priceBaseText: '待填写', priceDiscountText: '¥0.00', pricePayableText: '待填写', modeIndex: 0, modes: ['REAL', 'MOCK'], modeLabels: ['真实线下收费', '本地模拟（仅本地可用）'], channelIndex: 0, channels: ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: ['现金', '银行转账', '微信线下收款'], payerName: '', providerTradeNo: '', paidTime: '', evidenceKey: '', evidenceName: '', closeReason: '' },
+  data: { loading: false, submitting: false, error: '', rows: [], total: 0, pageNum: 1, searchText: '', filterIndex: 0, confirmationOnly: false, filters: ['全部账单', '待核价', '已核价', '历史待核验', '已关闭', '待管理员确认', '已完成'], detail: null, allowed: {}, price: '', discountAmount: '', discountReason: '', priceBaseText: '待填写', priceDiscountText: '¥0.00', pricePayableText: '待填写', modeIndex: 0, modes: ['REAL', 'MOCK'], modeLabels: ['真实线下收费', '本地模拟（仅本地可用）'], channelIndex: 0, channels: ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: ['现金', '银行转账', '微信线下收款'], payerName: '', providerTradeNo: '', paidTime: '', evidenceKey: '', evidenceName: '', closeReason: '' },
   onLoad(options) {
     this.id = String(options.id || ''); this._visit = 0
     this.setData({ quote: null, quoteLoading: false, quoteError: '', couponOptions: ['不使用优惠券'], availableCoupons: [], couponIndex: 0, selectedCouponId: null })
@@ -30,7 +40,13 @@ Page({
     const roles=getApp().globalData.roles || []
     return roles.some(r=>['admin','business_admin'].includes(r)) && !['education','teacher','parent'].includes(access.selected())
   },
-  permitted(action) { return t.auth('staff') && t.can(`system:tuition:${action}`) },
+  educationWorkspace() {
+    return (getApp().globalData.roles || []).includes('education') && access.selected() === 'education'
+  },
+  permitted(action) {
+    if (['price', 'collect'].includes(action) && !this.educationWorkspace()) return false
+    return t.auth('staff') && t.can(`system:tuition:${action}`)
+  },
   async load(reset = true) {
     if (!t.auth('staff')) { this.setData({ error: '仅授权管理员或教务可处理收费' }); return }
     const visit = this._visit, sequence = this._loadSequence = (this._loadSequence || 0) + 1, pageNum = reset ? 1 : this.data.pageNum + 1
@@ -44,14 +60,14 @@ Page({
       getApp().globalData.permissions = info.permissions || []
       getApp().globalData.roles = info.roles || []
       if (!t.auth('staff')) throw new Error('收费角色权限已失效')
-      const allowed = {}; ['list', 'query', 'price', 'collect', 'confirm'].forEach(p => { allowed[p] = t.can(`system:tuition:${p}`) }); allowed.confirm = allowed.confirm && this.paymentAdministrator(); allowed.close = allowed.collect && this.paymentAdministrator(); allowed.download = t.can('system:tuitionReceipt:download')
+      const allowed = {}; ['list', 'query', 'price', 'collect', 'confirm'].forEach(p => { allowed[p] = t.can(`system:tuition:${p}`) }); allowed.confirm = allowed.confirm && this.paymentAdministrator(); allowed.close = allowed.collect && this.paymentAdministrator(); allowed.price = allowed.price && this.educationWorkspace(); allowed.collect = allowed.collect && this.educationWorkspace(); allowed.download = t.can('system:tuitionReceipt:download')
       allowed.refundList = t.can('system:tuitionRefund:list'); allowed.refundQuery = t.can('system:tuitionRefund:query')
-      this.setData({ allowed })
+      this.setData({ allowed, confirmationOnly: this.paymentAdministrator() })
       if (!allowed[this.id ? 'query' : 'list']) throw new Error('当前账号没有收费查询权限')
       if (this.id) {
         const res = await t.request({ url: `${t.adminUrl}/${encodeURIComponent(this.id)}` })
         if (!this._active || visit !== this._visit || sequence !== this._loadSequence) return
-        const detail = t.bill(res.data), pending = t.savedIntent('admin-payment', this.id)
+        const detail = progress(t.bill(res.data)), pending = t.savedIntent('admin-payment', this.id)
         this.setData({ billingStep: billingStep(detail), retryPayment: !!pending, allowed: { ...allowed, price: allowed.price && detail.billType !== 'CREDIT_PACKAGE' } })
         this.setData({ detail, price: detail.originalAmount || '', discountAmount: detail.discountAmount ? String(detail.discountAmount) : '', discountReason: detail.remark || '', modeIndex: detail.financeMode === 'MOCK' ? 1 : 0, channels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['MOCK'] : ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['本地模拟'] : ['现金', '银行转账', '微信线下收款'], channelIndex: 0, ...(pending ? { payerName: pending.payerName, providerTradeNo: pending.providerTradeNo || '', paidTime: pending.paidTime || '', evidenceKey: pending.evidenceKey || '', evidenceName: pending.evidenceKey ? '已上传凭证（待确认绑定）' : '' } : {}) })
         this.pricePreview()
@@ -60,8 +76,8 @@ Page({
         if (detail.canPay && allowed.collect && !pending) await this.refreshQuote(true)
       } else {
         const statuses = ['', 'PENDING_PRICE', 'OPEN', 'HISTORY_PENDING', 'CLOSED']
-        const res = await t.request({ url: `${t.adminUrl}/list`, data: { pageNum, pageSize: 20, billingStatus: statuses[this.data.filterIndex], studentName: this.data.searchText.trim() } })
-        if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ rows: (reset ? [] : this.data.rows).concat((res.rows || []).map(t.bill)), total: res.total || 0, pageNum })
+        const res = await t.request({ url: `${t.adminUrl}/list`, data: { pageNum, pageSize: 20, billingStatus: statuses[this.data.filterIndex] || '', studentName: this.data.searchText.trim(), paymentStage: this.data.filterIndex === 5 ? 'WAIT_ADMIN' : this.data.filterIndex === 6 ? 'SUCCESS' : '' } })
+        if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ rows: (reset ? [] : this.data.rows).concat((res.rows || []).map(row => progress(t.bill(row)))), total: res.total || 0, pageNum })
       }
     } catch (error) { if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ error: error.message }) }
     finally { if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ loading: false }) }
@@ -114,6 +130,7 @@ Page({
   mode(e) { if (!this.data.submitting) this.setData({ modeIndex: Number(e.detail.value) }) },
   channel(e) { if (!this.data.submitting) this.setData({ channelIndex: Number(e.detail.value) }) },
   filter(e) { this._visit++; this.setData({ filterIndex: Number(e.detail.value), rows: [] }); return this.load(true) },
+  showPending() { if (!this.paymentAdministrator() || this.data.submitting) return; this.setData({ filterIndex: 5, rows: [] }); return this.search() },
   search() { this._visit++; return this.load(true) },
   detail(e) { if (this.data.allowed.query) wx.navigateTo({ url: `/pages/admin-tuition/admin-tuition?id=${encodeURIComponent(String(e.currentTarget.dataset.id))}` }) },
   refunds(e) {
@@ -209,7 +226,7 @@ Page({
       t.clearIntent('admin-payment', this.id)
       if (this._active && visit === this._visit) {
         await this.load()
-        if (this._active && visit === this._visit && !this.data.error) this.nextStep('已登记，请核对并确认收款', '#payment-records')
+        if (this._active && visit === this._visit && !this.data.error) this.nextStep('已登记，等待管理员确认', '#payment-records')
       }
     } catch (error) {
       if (error.applicationRejected) t.clearIntent('admin-payment', this.id)
@@ -220,7 +237,7 @@ Page({
   async paymentAction(e) {
     if (!this._active || this.data.submitting || !this.paymentAdministrator()) return
     const action = e.currentTarget.dataset.action, id = String(e.currentTarget.dataset.id), visit = this._visit
-    if (!['confirm', 'close'].includes(action) || !this.permitted(action === 'confirm' ? 'confirm' : 'collect')) return
+    if (!['confirm', 'close'].includes(action) || !t.auth('staff') || !t.can(`system:tuition:${action === 'confirm' ? 'confirm' : 'collect'}`)) return
     const payment = this.data.detail.payments.find(p => String(p.paymentId) === id)
     if (!payment || !['PENDING', 'UNKNOWN'].includes(payment.paymentStatus)) return
     const reason = this.data.closeReason.trim()

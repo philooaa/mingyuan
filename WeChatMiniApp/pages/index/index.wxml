@@ -58,6 +58,7 @@
       </view>
     </view>
     <view class="course-pending-message" wx:if="{{currentRole === 'teacher' && coursePendingError}}"><text>{{coursePendingError}}</text><text class="pending-retry" bindtap="loadCoursePending">重新加载</text></view>
+    <view class="course-pending-message" wx:if="{{financePendingError}}"><text>{{financePendingError}}</text><text class="pending-retry" bindtap="loadFinancePending">重新加载</text></view>
     <view class="course-pending-message" wx:if="{{accountPendingError}}"><text>{{accountPendingError}}</text><text class="pending-retry" bindtap="loadAccountPending">重新加载</text></view>
   </view>
 

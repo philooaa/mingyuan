@@ -113,6 +113,7 @@ class TuitionMysqlTest {
     db.jdbc().execute("CREATE TABLE sys_dict_data(dict_code bigint AUTO_INCREMENT PRIMARY KEY,dict_type varchar(100),dict_label varchar(100),dict_value varchar(100),dict_sort int,status char(1))");
     db.jdbc().execute("INSERT INTO sys_dict_data(dict_type,dict_label,dict_value,dict_sort,status) VALUES('edu_subject','数学','math',1,'0'),('edu_subject','化学','chemistry',2,'0')");
     runMigration("20261014_coupon_subject_scope.sql");runMigration("20261014_coupon_subject_scope.sql");
+    db.jdbc().execute("ALTER TABLE edu_enrollment ADD bill_type varchar(20) NOT NULL DEFAULT 'COURSE'");
     privateRoot = Files.createTempDirectory("codex-tuition-finance-test-");
     new com.ruoyi.common.config.RuoYiConfig().setProfile(privateRoot.resolve("public").toString());
     storage = new FinancePrivateStorage(privateRoot.resolve("private").toString());
@@ -698,7 +699,8 @@ class TuitionMysqlTest {
                 "2025-01-01 00:00:00",
                 "evidenceKey",
                 proof(5, "PAYMENT", id)));
-    call(s, "confirmPayment", lid(p, "paymentId"), 5L, true, Map.of());
+    assertThrows(Exception.class, () -> call(s, "confirmPayment", lid(p, "paymentId"), 5L, true, Map.of()));
+    call(s, "confirmPayment", lid(p, "paymentId"), 4L, true, Map.of());
     assertEquals(
         1,
         ((List<?>) receiptService.list(5, true, Map.of("enrollmentId", "" + id)).get("rows"))
@@ -1508,7 +1510,8 @@ class TuitionMysqlTest {
                 1,
                 "idempotencyKey",
                 "free" + id));
-    assertEquals("SUCCESS", p.get("paymentStatus"));
+    assertEquals("PENDING", p.get("paymentStatus"));
+    assertEquals("SUCCESS",call(s,"confirmPayment",lid(p,"paymentId"),1L,true,Map.of()).get("paymentStatus"));
     assertEquals("已减免", call(s, "bill", id, 2L, false).get("payStatus"));
     assertThrows(
         Exception.class,

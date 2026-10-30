@@ -288,7 +288,9 @@ public class TuitionService {
           + " p.enrollment_id=e.enrollment_id AND r.refund_status IN"
           + " ('PENDING_REVIEW','APPROVED','PROCESSING','UNKNOWN','WAIT_ADMIN'))"
           + " reserved_amount,(SELECT COUNT(*) FROM edu_tuition_payment p WHERE"
-          + " p.enrollment_id=e.enrollment_id AND p.payment_status='SUCCESS') success_count";
+          + " p.enrollment_id=e.enrollment_id AND p.payment_status='SUCCESS') success_count,"
+          + " (SELECT COUNT(*) FROM edu_tuition_payment p WHERE p.enrollment_id=e.enrollment_id"
+          + " AND p.payment_status IN ('PENDING','UNKNOWN')) pending_payment_count";
 
   private static boolean cancelledSingle(Map<String, Object> e) {
     return e.get("classDate") != null
@@ -336,6 +338,15 @@ public class TuitionService {
     return e;
   }
 
+  public long pendingConfirmationCount(long actor) {
+    coupons.admin(actor);
+    return db.jdbc().queryForObject(
+        "SELECT COUNT(*) FROM edu_tuition_payment p JOIN edu_enrollment e ON e.enrollment_id=p.enrollment_id"
+            + " WHERE e.bill_type<>'COURSE_ITEM' AND e.billing_status='OPEN'"
+            + " AND p.payment_status IN ('PENDING','UNKNOWN')"
+            + (mockEnabled ? "" : " AND e.finance_mode='REAL'"), Long.class);
+  }
+
   public Map<String, Object> listBills(long actor, boolean admin, Map<String, String> q) {
     actor(actor, admin);
     // 购物车订单里的单门课程不单独成账单，收款统一记在订单主账单上。
@@ -363,6 +374,10 @@ public class TuitionService {
             default -> status;
           });
     }
+    if (admin && "WAIT_ADMIN".equals(str(q,"paymentStage")))
+      where += " AND e.billing_status='OPEN' AND EXISTS (SELECT 1 FROM edu_tuition_payment p WHERE p.enrollment_id=e.enrollment_id AND p.payment_status IN ('PENDING','UNKNOWN'))";
+    if (admin && "SUCCESS".equals(str(q,"paymentStage")))
+      where += " AND EXISTS (SELECT 1 FROM edu_tuition_payment p WHERE p.enrollment_id=e.enrollment_id AND p.payment_status='SUCCESS')";
     if (admin && !str(q, "parentId").isBlank()) {
       where += " AND e.parent_id=?";
       a.add(id(q.get("parentId")));
@@ -512,7 +527,7 @@ public class TuitionService {
   }
 
   public Map<String, Object> price(long enrollment, long actor, Map<String, Object> b) {
-    tuitionStaff(db, actor);
+    tuitionPreparation(db, actor);
     return tx(
         () -> {
           var e = lockEnrollment(enrollment, actor, true);
@@ -720,8 +735,8 @@ public class TuitionService {
   public Map<String, Object> createPayment(
       long enrollment, long actor, boolean admin, Map<String, Object> b) {
     require(admin, "FORBIDDEN: 课程费用请联系教务线下缴纳");
-    // 收款登记与确认允许原始管理员及业务管理员，教务不参与。
-    coupons.admin(actor);
+    // 教务登记，管理员在独立的确认接口核对收款。
+    tuitionPreparation(db, actor);
     String key = key(b),
         hash =
             fingerprint(
@@ -735,7 +750,6 @@ public class TuitionService {
                 "providerTradeNo",
                 "evidenceKey",
                 "paidTime");
-    long[] receipt = {0};
     Map<String, Object> result =
         tx(
             () -> {
@@ -886,17 +900,9 @@ public class TuitionService {
                                 coupon)
                         == 1,
                     "COUPON_NOT_AVAILABLE: 券已被占用");
-              if (channel.equals("FREE"))
-                receipt[0] =
-                    succeed(
-                        db.one(
-                            "SELECT * FROM edu_tuition_payment WHERE payment_id=? FOR UPDATE",
-                            payment),
-                        actor,
-                        Map.of());
+              // 零元减免同样等待管理员确认，不在教务登记时生成收据。
               return payment(payment, actor, admin);
             });
-    generate(receipt[0]);
     return result;
   }
 

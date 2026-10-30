@@ -72,11 +72,11 @@ const roleProfiles = {
       { title: '教室管理', icon: '室', tone: 'cyan', route: '/pages/admin-classrooms/admin-classrooms' },
       { title: '教室分配', icon: '分', tone: 'cyan', route: '/pages/admin-room-assign/admin-room-assign' },
       { title: '学生档案', icon: '档', tone: 'green', route: '/pages/admin-students/admin-students' },
-      { key:'personalAccount', title: '交易管理', icon: '交', tone: 'gold', route: '/pages/admin-transactions/admin-transactions' },
+      { key:'personalAccount', title: '家长与课次账户', icon: '户', tone: 'gold', route: '/pages/admin-transactions/admin-transactions' },
       { key:'referral', title: '优惠券管理', icon: '券', tone: 'violet', route: '/pages/admin-referral/admin-referral' },
       { title: '教师管理', icon: '师', tone: 'indigo', route: '/pages/admin-teachers/admin-teachers' },
       { title: '课程定价', icon: '价', tone: 'gold', route: '/pages/admin-course-price/admin-course-price' },
-      { title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' },
+      { key:'tuitionFinance', title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' },
       { title: '退费管理', icon: '退', tone: 'orange', route: '/pages/admin-tuition-refunds/admin-tuition-refunds' },
       { title: '薪资核算', icon: '薪', tone: 'red' },
       { title: '运营分析', icon: '析', tone: 'violet' },
@@ -281,6 +281,9 @@ Page({
 
   onShow() {
     this._visible = true
+    if (wx.getStorageSync('token') && typeof wx.hideHomeButton === 'function') {
+      wx.hideHomeButton({ fail() {} })
+    }
     this.applyLoginRole()
   },
 
@@ -350,11 +353,14 @@ Page({
     this._teacherLoadVersion = (this._teacherLoadVersion || 0) + 1
     this.setData({ teacherDataMessage: '',currentChild:null,parentChildren:[],childLoading:false,childError:'',showChildPicker:false,parentScheduleError:'', roleLocked: workspaces.length < 2, developmentLoginEnabled: this.data.developmentLoginEnabled, ...buildRoleState(role, workspaces) })
     if(role==='education')this.loadSignReviewPending()
-    if(role==='admin') { this.loadAccountPending();if(role==='admin'){this.loadReferralPending();this.loadSignReviewPending()};this._accountTimer=setInterval(()=>{this.loadAccountPending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending()}},30000) }
 
     const actions = this.data.quickActions.filter(a => a.route !== '/pages/admin-tuition/admin-tuition')
-    if (financeAllowed && ['admin', 'education'].includes(role)) actions.push({ title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' })
+    if (financeAllowed && ['admin', 'education'].includes(role)) actions.push({ key:'tuitionFinance', title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' })
     this.setData({ quickActions: access.actions(actions, role) })
+    if(role==='admin') {
+      this.loadFinancePending();this.loadReferralPending();this.loadSignReviewPending()
+      this._accountTimer=setInterval(()=>{this.loadFinancePending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending()}},30000)
+    }
 
     if (role === 'parent') {
       await this.loadParentTag()
@@ -514,8 +520,22 @@ Page({
   },
 
   openChildren() { if(this.data.currentRole==='parent' && getRoleFromStorage()==='parent') wx.navigateTo({url:'/pages/parent-children/parent-children'}) },
-  stopAccountRefresh() {clearInterval(this._accountTimer);this._accountTimer=null;this._accountVersion=(this._accountVersion || 0)+1;this._accountBusy=false;if(!this._unloaded)this.setData({accountPendingError:'',quickActions:this.data.quickActions.map(a=>a.key==='personalAccount'?{...a,badgeText:''}:a)})},
+  stopAccountRefresh() {clearInterval(this._accountTimer);this._accountTimer=null;this._accountVersion=(this._accountVersion || 0)+1;this._accountBusy=false;this._financeVersion=(this._financeVersion||0)+1;this._financeBusy=false;if(!this._unloaded)this.setData({accountPendingError:'',financePendingError:'',quickActions:this.data.quickActions.map(a=>['personalAccount','tuitionFinance'].includes(a.key)?{...a,badgeText:''}:a)})},
+  async loadFinancePending() {
+    const role=this.data.currentRole,token=wx.getStorageSync('token')
+    if(role!=='admin' || getRoleFromStorage()!==role || !access.can('system:tuition:confirm') || !this.data.quickActions.some(a=>a.key==='tuitionFinance') || this._financeBusy || !this._visible || this._unloaded || !token)return
+    const v=this._financeVersion=(this._financeVersion||0)+1
+    const current=()=>!this._unloaded && this._visible && v===this._financeVersion && this.data.currentRole===role && getRoleFromStorage()===role && wx.getStorageSync('token')===token
+    this._financeBusy=true
+    try {
+      const r=await request({url:'/system/tuition/pending-count',timeout:15000})
+      if(current())this.setData({financePendingError:'',quickActions:this.data.quickActions.map(a=>a.key==='tuitionFinance'?{...a,badgeText:courseState.badgeText(Number(r.data))}:a)})
+    } catch(e) {
+      if(current())this.setData({financePendingError:'待确认收款数量暂时无法加载',quickActions:this.data.quickActions.map(a=>a.key==='tuitionFinance'?{...a,badgeText:''}:a)})
+    } finally {if(v===this._financeVersion)this._financeBusy=false}
+  },
   async loadAccountPending() {
+    if(this.data.currentRole==='admin')return this.loadFinancePending()
     if(!this.data.quickActions.some(a=>a.key==='personalAccount'))return
     const role=this.data.currentRole,token=wx.getStorageSync('token');if(this._accountBusy || !this._visible || this._unloaded || !['parent','admin'].includes(role) || getRoleFromStorage()!==role || !token)return
     const v=this._accountVersion=(this._accountVersion || 0)+1,current=()=>!this._unloaded && this._visible && v===this._accountVersion && this.data.currentRole===role && getRoleFromStorage()===role && wx.getStorageSync('token')===token
