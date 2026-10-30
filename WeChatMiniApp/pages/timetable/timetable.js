@@ -1,5 +1,6 @@
 const childContext = require('../../utils/child-context')
 const { request } = require('../../utils/request')
+const paymentProgress = require('../../utils/course-payment-progress')
 
 // 日循环模式的一轮天数与上课天数，与后端 ScheduleCalendar 及 utils/course-calendar.js 保持一致
 const DAILY_CYCLES = { DAILY: [1, 1], DAILY_5_1: [6, 5], DAILY_6_1: [7, 6], DAILY_5_2: [7, 5], DAILY_4_1: [5, 4] }
@@ -28,11 +29,12 @@ Page(childContext.page({
 
   onShow() {
     if (this.redirectTeacher()) return
-    if (this._scheduleDirty || this._loadedToken !== wx.getStorageSync('token')) {
+    if (this._hasShown || this._scheduleDirty || this._loadedToken !== wx.getStorageSync('token')) {
       this._scheduleDirty = false
       this.setData({ timetable: [], groupedTimetable: [], timetableCount: 0 })
       this.loadTimetable()
     }
+    this._hasShown = true
   },
 
   redirectTeacher() {
@@ -114,7 +116,7 @@ Page(childContext.page({
         timeText: this.buildTimeText(item),
         placeText: item.lessonLocation || item.classroomName || '',
         subjectTag: this.joinText([item.gradeName, item.subjectName]),
-        payText: item.payStatus === '已支付' ? '已支付' : '未支付',
+        tuitionView: paymentProgress.describe(item.tuitionProgress),
         nextClassDate: next ? next.date : '',
         nextClassWeekday: next ? next.weekday : '',
         nextClassEnded: hasDates && !next,   // 有日期才可能"已结课"，否则是"待配置"
@@ -310,7 +312,7 @@ Page(childContext.page({
       showingLoading = true
       await request(single ? {
         url: `/miniapp/parent/enrollment/${enrollmentId}/cancel-request`, method: 'POST',
-        data: { reason: '家长在我的课表确认申请取消本次课' }
+        data: { reason: '家长在我的课程确认申请取消本次课' }
       } : { url: `/miniapp/parent/enrollment/${enrollmentId}`, method: 'DELETE' })
       if (!current()) return
       wx.hideLoading(); showingLoading = false
