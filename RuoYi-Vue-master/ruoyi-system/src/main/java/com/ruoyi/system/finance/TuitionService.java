@@ -1781,10 +1781,23 @@ public class TuitionService {
     require(!reason.isBlank() && reason.length() <= 255, "请填写取消原因");
     return tx(
         () -> {
-          var e = lockEnrollment(enrollment, actor, admin);
+          var head = enrollment(enrollment, actor, admin, false);
+          // 一车一单：购物车里的课程（COURSE_ITEM）没有自己的账单，取消任意一门都等于整单取消，
+          // 否则订单金额会与剩余明细不一致，且明细本身没有账单可返回。
+          long billId =
+              "COURSE_ITEM".equals(str(head, "billType")) && head.get("orderEnrollmentId") != null
+                  ? id(head.get("orderEnrollmentId"))
+                  : enrollment;
+          // 统一先锁订单主记录再锁明细，避免与「直接取消整单」的请求交叉死锁。
+          var e = lockEnrollment(billId, actor, admin);
+          if (billId != enrollment) lockEnrollment(enrollment, actor, admin);
           require(!CreditPackageService.isPackage(e), "请从课包订单取消入口操作");
-          if (Set.of("2", "已取消").contains(str(e, "enrollmentStatus")))
-            return bill(enrollment, actor, admin);
+          if (Set.of("2", "已取消").contains(str(e, "enrollmentStatus"))) {
+            // 订单已取消但明细还挂着的历史数据，补一次明细取消，避免残留「在学」状态
+            if (billId != enrollment)
+              withdraw(enrollment, enrollment(enrollment, actor, admin, true), actor, reason);
+            return bill(billId, actor, admin);
+          }
           require(e.get("classDate") == null, "一对一请提交取消申请，由教师处理；财务不能代替教师取消预约");
           require(
               !"HISTORY_PENDING".equals(e.get("billingStatus")),
@@ -1793,7 +1806,7 @@ public class TuitionService {
               db.rows(
                   "SELECT * FROM edu_tuition_payment WHERE enrollment_id=? ORDER BY payment_id FOR"
                       + " UPDATE",
-                  enrollment);
+                  billId);
           for (var p : payments) {
             if (Set.of("UNKNOWN", "SUCCESS").contains(str(p, "paymentStatus")))
               require(
@@ -1811,10 +1824,10 @@ public class TuitionService {
                 db.rows(
                     "SELECT * FROM edu_enrollment WHERE order_enrollment_id=? AND del_flag='0'"
                         + " AND enrollment_status NOT IN ('2','已取消') FOR UPDATE",
-                    enrollment))
+                    billId))
               withdraw(id(item.get("enrollmentId")), item, actor, reason);
-          withdraw(enrollment, enrollment(enrollment, actor, admin, true), actor, reason);
-          return bill(enrollment, actor, admin);
+          withdraw(billId, e, actor, reason);
+          return bill(billId, actor, admin);
         });
   }
 

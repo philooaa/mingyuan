@@ -106,8 +106,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             e.billing_status as billingStatus,
             e.bill_type as billType,
             e.order_enrollment_id as orderEnrollmentId,
+            <!-- 一车一单：取消任意一门会连带取消整单，前端需要知道同单还有几门在学 -->
+            (select count(*) from edu_enrollment oi
+              where oi.order_enrollment_id = e.order_enrollment_id
+                and oi.del_flag = '0'
+                and oi.enrollment_status not in ('2', '已取消')) as orderItemCount,
             bill.billing_status as orderBillingStatus,
             bill.pay_status as orderPayStatus,
+            <!-- 教务核价后家长要能直接看到原价、优惠和实际应缴；核价前这些字段为空 -->
+            bill.original_amount as billOriginalAmount,
+            bill.discount_amount as billDiscountAmount,
+            bill.payable_amount as billPayableAmount,
+            <!-- 购物车里的课程取的是整单金额，前端要标注成「整单应缴」而不是单门课程金额 -->
+            (case when e.bill_type = 'COURSE_ITEM' then 1 else 0 end) as billIsOrder,
             e.settlement_method as tuitionSourceSettlement,
             e.lesson_completed_time as tuitionSourceCompleted,
             bill.enrollment_id as tuitionSourceBillId,
