@@ -520,3 +520,19 @@ test('education keeps billing filters while administrator list has no redundant 
  assert.doesNotMatch(markup,/查看待我确认的收款|bindtap="showPending"/)
  assert.match(markup,/<picker wx:if="{{!confirmationOnly}}"/)
 })
+
+test('education and administrator billing details show every course without changing money',async()=>{
+ for(const role of ['education','business_admin']) {
+  storage=new Map()
+  const courses=[{enrollmentId:'201',courseClassName:'五年级数学',gradeName:'五年级',subjectName:'数学',teacherName:'王老师',courseYear:2026,termName:'秋季',periodName:'周日',startTime:'08:30',endTime:'10:00',startDate:'2026-11-01',endDate:'2026-12-01',classMode:'1',classPattern:'WEEKLY',campusName:'万达'},
+   {enrollmentId:'202',courseClassName:'英语一对一',classMode:'2',startDate:'2026-11-02',endDate:'2026-11-02',classroomName:'A2'}]
+  env(o=>o.url.endsWith('/getInfo')?o.success({statusCode:200,data:{code:200,roles:[role],permissions:['*:*:*']}}):ok(o,{...bill,billType:'CART_ORDER',courses}),role)
+  const p=page('admin-tuition');p.onLoad({id:bill.enrollmentId});await p.onShow()
+  assert.equal(p.data.detail.courses.length,2)
+  const [group,single]=p.data.detail.courses
+  assert.equal(group.teacherText,'王老师');assert.equal(group.timeText,'08:30–10:00')
+  assert.equal(group.dateText,'2026-11-01 至 2026-12-01');assert.equal(group.placeText,'万达 · 教室待分配')
+  assert.equal(single.modeText,'一对一');assert.equal(single.dateText,'2026-11-02');assert.equal(single.teacherText,'待安排')
+  assert.equal(p.data.detail.payableAmount,bill.payableAmount)
+ }
+})

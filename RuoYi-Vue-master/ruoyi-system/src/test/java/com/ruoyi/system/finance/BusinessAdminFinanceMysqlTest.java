@@ -70,6 +70,32 @@ class BusinessAdminFinanceMysqlTest {
     var waiting=service.listBills(80,true,Map.of("paymentStage","WAIT_ADMIN"));
     assertFalse(((List<Map<String,Object>>)waiting.get("rows")).stream().anyMatch(row->FinanceRules.id(row.get("enrollmentId"))==enrollment));
   }
+  @Test void staffBillShowsCurrentCourseDetailsForSingleAndCartOrders() {
+    var db=fixture.db;
+    db.jdbc().execute("ALTER TABLE edu_enrollment ADD order_enrollment_id bigint");
+    db.jdbc().execute("ALTER TABLE edu_course_schedule ADD unit_price decimal(10,2) DEFAULT 0, ADD lesson_count int");
+    var service=new TuitionService(db,fixture.storage,fixture.receiptService,coupons,true);
+    long enrollment=fixture.fresh();
+    try {
+      db.jdbc().update("UPDATE edu_course_schedule SET teacher_id=80,start_time='08:30:00',end_time='10:00:00',start_date='2026-11-01',end_date='2026-12-01' WHERE schedule_id=1");
+      for(long actor:List.of(5L,80L)) {
+        var detail=service.bill(enrollment,actor,true);
+        var courses=(List<Map<String,Object>>)detail.get("courses");
+        assertEquals(1,courses.size());assertEquals("08:30",courses.get(0).get("startTime"));
+        assertEquals("2026-11-01",courses.get(0).get("startDate"));
+        assertEquals("业务管理员",courses.get(0).get("teacherName"));
+        assertEquals("数学",courses.get(0).get("subjectName"));
+      }
+      long child=fixture.fresh(),foreign=fixture.fresh();
+      db.jdbc().update("UPDATE edu_enrollment SET bill_type='CART_ORDER' WHERE enrollment_id=?",enrollment);
+      db.jdbc().update("UPDATE edu_enrollment SET bill_type='COURSE_ITEM',order_enrollment_id=? WHERE enrollment_id IN (?,?)",enrollment,child,foreign);
+      db.jdbc().update("UPDATE edu_enrollment SET parent_id=3 WHERE enrollment_id=?",foreign);
+      var courses=(List<Map<String,Object>>)service.bill(enrollment,80,true).get("courses");
+      assertEquals(1,courses.size());assertEquals(child,FinanceRules.id(courses.get(0).get("enrollmentId")));
+    } finally {
+      db.jdbc().update("UPDATE edu_course_schedule SET teacher_id=NULL,start_time=NULL,end_time=NULL,start_date=NULL,end_date=NULL WHERE schedule_id=1");
+    }
+  }
   @Test void disabledRoleOrAccountCannotUseAdministratorGuards() {
     try {
       fixture.db.jdbc().update("UPDATE sys_role SET status='1' WHERE role_id=80");

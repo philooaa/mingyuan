@@ -441,6 +441,7 @@ public class TuitionService {
         "这门课属于购物车订单，请在订单主账单里核价收款");
     var e = amounts(db.one(BILL_SELECT + BILL_FROM + " WHERE e.enrollment_id=?", enrollment));
     if(CreditPackageService.isPackage(e))e.put("packageSnapshot",CreditPackageService.snapshot(e));
+    e.put("courses", courseDetails(enrollment, "CART_ORDER".equals(str(e, "billType")), id(e.get("parentId"))));
     if("CART_ORDER".equals(str(e, "billType")))e.put("items", orderItems(enrollment));
     e.put(
         "payments",
@@ -474,6 +475,24 @@ public class TuitionService {
     // 购物车订单没有单一排课，优惠券按课程绑定无法套用，只支持教务手工填优惠。
     e.put("coupons", "CART_ORDER".equals(str(e, "billType")) ? List.of() : coupons.available(e));
     return e;
+  }
+
+  /** Read current course arrangements without changing the financial snapshots. */
+  private List<Map<String, Object>> courseDetails(long enrollment, boolean order, long parent) {
+    return db.rows(
+        "SELECT e.enrollment_id,e.schedule_id,e.student_name,e.fee_title_snapshot,"
+            + "s.course_class_name,s.course_year,s.grade_name,s.subject_name,s.class_type,s.class_mode,"
+            + "s.term_name,s.period_name,s.time_slot,s.class_pattern,"
+            + "TIME_FORMAT(s.start_time,'%H:%i') start_time,TIME_FORMAT(s.end_time,'%H:%i') end_time,"
+            + "DATE_FORMAT(COALESCE(e.class_date,s.start_date),'%Y-%m-%d') start_date,"
+            + "DATE_FORMAT(COALESCE(e.class_date,s.end_date),'%Y-%m-%d') end_date,"
+            + "COALESCE(NULLIF(teacher.nick_name,''),NULLIF(teacher.user_name,''),s.teacher_name) teacher_name,"
+            + "COALESCE(NULLIF(s.campus_name,''),c.campus_name) campus_name,c.classroom_name "
+            + "FROM edu_enrollment e JOIN edu_course_schedule s ON s.schedule_id=e.schedule_id "
+            + "LEFT JOIN sys_user teacher ON teacher.user_id=s.teacher_id "
+            + "LEFT JOIN edu_classroom c ON c.classroom_id=s.classroom_id "
+            + "WHERE " + (order ? "e.order_enrollment_id" : "e.enrollment_id")
+            + "=? AND e.parent_id=? AND e.del_flag='0' ORDER BY e.enrollment_id", enrollment, parent);
   }
 
   /** 购物车订单里的课程明细。 */
@@ -1762,10 +1781,23 @@ public class TuitionService {
     require(!reason.isBlank() && reason.length() <= 255, "请填写取消原因");
     return tx(
         () -> {
-          var e = lockEnrollment(enrollment, actor, admin);
+          var head = enrollment(enrollment, actor, admin, false);
+          // 一车一单：购物车里的课程（COURSE_ITEM）没有自己的账单，取消任意一门都等于整单取消，
+          // 否则订单金额会与剩余明细不一致，且明细本身没有账单可返回。
+          long billId =
+              "COURSE_ITEM".equals(str(head, "billType")) && head.get("orderEnrollmentId") != null
+                  ? id(head.get("orderEnrollmentId"))
+                  : enrollment;
+          // 统一先锁订单主记录再锁明细，避免与「直接取消整单」的请求交叉死锁。
+          var e = lockEnrollment(billId, actor, admin);
+          if (billId != enrollment) lockEnrollment(enrollment, actor, admin);
           require(!CreditPackageService.isPackage(e), "请从课包订单取消入口操作");
-          if (Set.of("2", "已取消").contains(str(e, "enrollmentStatus")))
-            return bill(enrollment, actor, admin);
+          if (Set.of("2", "已取消").contains(str(e, "enrollmentStatus"))) {
+            // 订单已取消但明细还挂着的历史数据，补一次明细取消，避免残留「在学」状态
+            if (billId != enrollment)
+              withdraw(enrollment, enrollment(enrollment, actor, admin, true), actor, reason);
+            return bill(billId, actor, admin);
+          }
           require(e.get("classDate") == null, "一对一请提交取消申请，由教师处理；财务不能代替教师取消预约");
           require(
               !"HISTORY_PENDING".equals(e.get("billingStatus")),
@@ -1774,7 +1806,7 @@ public class TuitionService {
               db.rows(
                   "SELECT * FROM edu_tuition_payment WHERE enrollment_id=? ORDER BY payment_id FOR"
                       + " UPDATE",
-                  enrollment);
+                  billId);
           for (var p : payments) {
             if (Set.of("UNKNOWN", "SUCCESS").contains(str(p, "paymentStatus")))
               require(
@@ -1792,10 +1824,10 @@ public class TuitionService {
                 db.rows(
                     "SELECT * FROM edu_enrollment WHERE order_enrollment_id=? AND del_flag='0'"
                         + " AND enrollment_status NOT IN ('2','已取消') FOR UPDATE",
-                    enrollment))
+                    billId))
               withdraw(id(item.get("enrollmentId")), item, actor, reason);
-          withdraw(enrollment, enrollment(enrollment, actor, admin, true), actor, reason);
-          return bill(enrollment, actor, admin);
+          withdraw(billId, e, actor, reason);
+          return bill(billId, actor, admin);
         });
   }
 

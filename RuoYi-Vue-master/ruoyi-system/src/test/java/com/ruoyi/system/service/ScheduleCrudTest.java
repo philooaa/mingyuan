@@ -148,15 +148,20 @@ public class ScheduleCrudTest {
         ServiceException error = assertThrows(ServiceException.class, () -> service.updateEduCourseSchedule(input));
         assertTrue(error.getMessage().contains("报名")); assertNull(captured);
     }
-    @Test void confirmedEditAllowsEnrolledCourseButKeepsAttendanceProtection() {
-        principal(23,"education"); db.activeEnrollments=1;
-        var input=new EduCourseSchedule();input.setScheduleId(10L);input.setCourseClassName("确认修改");
-        assertEquals(1,service.updateEduCourseSchedule(input,true));
-        assertEquals("确认修改",captured.getCourseClassName()); assertNull(captured.getEnrolledCount());
-        db.attendance=1;captured=null;
-        var changed=new EduCourseSchedule();changed.setScheduleId(10L);changed.setEndTime(LocalTime.of(11,0));
-        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(changed,true));
-        assertNull(captured);
+    @Test void confirmedEditAllowsEnrolledCourseWithAttendanceForPlanningStaff() {
+        for (String role : List.of("education", "admin", "business_admin")) {
+            principal(23,role);
+            com.ruoyi.common.utils.SecurityUtils.getLoginUser().getUser().getRoles().forEach(r -> { r.setStatus("0"); r.setDelFlag("0"); });
+            current.setClassMode("1"); db.activeEnrollments=1; db.attendance=1; captured=null;
+            var changed=new EduCourseSchedule();changed.setScheduleId(10L);
+            changed.setCourseClassName("确认修改");changed.setEndTime(LocalTime.of(11,0));
+            assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(changed));
+            assertNull(captured);
+            assertEquals(1,service.updateEduCourseSchedule(changed,true));
+            assertEquals("确认修改",captured.getCourseClassName());
+            assertEquals(LocalTime.of(11,0),captured.getEndTime());
+            assertNull(captured.getEnrolledCount());assertNull(deleted);
+        }
     }
     @Test void confirmedDeletionRetainsEnrolledCourseAndHistoricalReferences() {
         principal(23,"education");db.activeEnrollments=1;db.references=1;db.attendance=1;

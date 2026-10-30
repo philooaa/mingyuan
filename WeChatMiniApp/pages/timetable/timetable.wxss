@@ -326,6 +326,12 @@ page {
 .tuition-connector.connected { background:#8da9ef; }
 .tuition-status { color:#2459d9; font-size:25rpx; font-weight:600; line-height:1.5; }
 .tuition-note { margin-top:6rpx; color:#68778c; font-size:23rpx; line-height:1.6; }
+.tuition-amounts { display:flex; flex-wrap:wrap; align-items:baseline; gap:8rpx 26rpx; margin-top:14rpx; padding:14rpx 18rpx; border-radius:12rpx; background:#f6f8fc; }
+.tuition-amount { display:flex; align-items:baseline; gap:8rpx; min-width:0; }
+.tuition-amount .label { color:#7a8798; font-size:22rpx; }
+.tuition-amount .value { color:#1f2b3d; font-size:26rpx; font-weight:600; }
+.tuition-amount .value.discount { color:#c2542a; }
+.tuition-amount.total .value { color:#2459d9; font-size:30rpx; font-weight:700; }
 .tuition-progress.success .tuition-status { color:#278367; }
 .tuition-progress.muted .tuition-status { color:#68778c; }
 .tuition-progress.warning .tuition-status { color:#9a6519; }

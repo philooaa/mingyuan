@@ -127,7 +127,7 @@ Page({
     this.setData({saving:true,formError:''})
     try {
       if(f.scheduleId) {
-        const result=await wx.showModal({title:'确认修改课程',content:'若已有学员报名，修改后将影响该课程的报名安排。请先与学员沟通；确认后仍可保存。',confirmText:'确认修改'})
+        const result=await wx.showModal({title:'确认修改课程',content:'即使已有报名或签到记录，也将修改课程信息并影响后续上课安排。原报名、签到和财务记录保留，不会自动调整费用。请先与学员沟通，确认后强制保存。',confirmText:'确认修改'})
         if(!result.confirm || !this.current() || version!==this._version)return
       }
       await request({url:root+(f.scheduleId?'?force=true':''),method:f.scheduleId?'PUT':'POST',data:payload})
