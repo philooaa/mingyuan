@@ -19,7 +19,7 @@ const roleProfiles = {
     ],
     actions: [
       { title: '课程报名', icon: '报', tone: 'blue', route: '/pages/enrollment/enrollment' },
-      { title: '我的课表', icon: '课', tone: 'orange', route: '/pages/timetable/timetable' },
+      { title: '我的课程', icon: '课', tone: 'orange', route: '/pages/timetable/timetable' },
       { title: '出勤记录', icon: '勤', tone: 'cyan', route: '/pages/attendance/attendance' },
       { title: '请假申请', icon: '假', tone: 'violet', route: '/pages/parent-leave/parent-leave' },
       { title: '资料商城', icon: '资', tone: 'indigo', route: '/pages/material/material' },
@@ -513,7 +513,7 @@ Page({
         return a.date.localeCompare(b.date)
       })
       const schedule = decorated.filter(r=>r.dateReady&&r.date!=='已结课').slice(0, 3)
-      this.setData({ schedule, parentScheduleError:decorated.some(r=>!r.dateReady)?'部分课程尚未配置日期，可在我的课表查看':'' })
+      this.setData({ schedule, parentScheduleError:decorated.some(r=>!r.dateReady)?'部分课程尚未配置日期，可在我的课程查看':'' })
     } catch (error) {
       if(!this._unloaded&&this._visible&&version===this._parentScheduleVersion&&childContext.current(ticket))this.setData({schedule:[],parentScheduleError:'课程暂时加载失败，请重试'})
     }
@@ -648,7 +648,7 @@ Page({
       return
     }
     if (route) {
-      if(this.data.currentRole==='parent'&&['课程报名','我的课表','出勤记录','请假申请','我的作业','我的缴费','我的收据','退费记录'].includes(title)){if(this.data.childLoading||this.data.childError){wx.showToast({title:'请先加载孩子资料',icon:'none'});return}if(!this.data.currentChild){this.addChild();return}wx.navigateTo({url:childContext.url(route)})}else wx.navigateTo({ url: route })
+      if(this.data.currentRole==='parent'&&['课程报名','我的课程','出勤记录','请假申请','我的作业','我的缴费','我的收据','退费记录'].includes(title)){if(this.data.childLoading||this.data.childError){wx.showToast({title:'请先加载孩子资料',icon:'none'});return}if(!this.data.currentChild){this.addChild();return}wx.navigateTo({url:childContext.url(route)})}else wx.navigateTo({ url: route })
       return
     }
 

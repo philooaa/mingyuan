@@ -312,3 +312,20 @@ page {
 .advisor-copy::after { border: none; }
 .advisor-qr { display: block; width: 100%; max-width: 560rpx; margin: 24rpx auto 0; }
 .advisor-hint { margin-top: 12rpx; color: #73839a; text-align: center; font-size: 23rpx; line-height: 1.7; }
+
+.tuition-progress { width:100%; min-width:0; box-sizing:border-box; padding-top:20rpx; border-top:1rpx solid #edf0f5; }
+.tuition-steps { display:flex; margin-bottom:22rpx; }
+.tuition-step { position:relative; flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; color:#7a8798; }
+.tuition-marker { position:relative; z-index:1; display:flex; align-items:center; justify-content:center; width:36rpx; height:36rpx; border-radius:50%; background:#eef1f6; color:#7a8798; font-size:22rpx; font-weight:600; }
+.tuition-step-label { margin-top:10rpx; font-size:23rpx; line-height:1.5; }
+.tuition-connector { position:absolute; top:17rpx; left:calc(50% + 23rpx); width:calc(100% - 46rpx); height:2rpx; background:#e5eaf2; }
+.tuition-step.done,.tuition-step.current { color:#2459d9; }
+.tuition-step.current .tuition-marker { background:#2459d9; color:white; }
+.tuition-step.current .tuition-step-label { font-weight:600; }
+.tuition-step.done .tuition-marker { background:#edf2ff; color:#2459d9; }
+.tuition-connector.connected { background:#8da9ef; }
+.tuition-status { color:#2459d9; font-size:25rpx; font-weight:600; line-height:1.5; }
+.tuition-note { margin-top:6rpx; color:#68778c; font-size:23rpx; line-height:1.6; }
+.tuition-progress.success .tuition-status { color:#278367; }
+.tuition-progress.muted .tuition-status { color:#68778c; }
+.tuition-progress.warning .tuition-status { color:#9a6519; }

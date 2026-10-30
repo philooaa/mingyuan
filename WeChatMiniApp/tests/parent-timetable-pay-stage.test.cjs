@@ -20,7 +20,9 @@ function load() {
     wx,
     getCurrentPages: () => [],
     require: (id) =>
-      id.endsWith('child-context')
+      id.endsWith('course-payment-progress')
+        ? require('../utils/course-payment-progress')
+        : id.endsWith('child-context')
         ? require('./helpers/child-context.cjs')(wx)
         : { request: async (options) => { calls.push(options); return { data: [] } } }
   })
@@ -126,5 +128,5 @@ test('待核价的报名仍然可以正常取消', async () => {
 test('页面模板按 canCancel 决定是否渲染取消按钮', () => {
   const markup = fs.readFileSync(path.join(__dirname, '../pages/timetable/timetable.wxml'), 'utf8')
   assert.match(markup, /class="cancel-btn" wx:elif="\{\{course\.canCancel\}\}"/)
-  assert.match(markup, /class="pay-tag \{\{course\.payStage\}\}"/)
+  assert.match(markup, /class="tuition-progress \{\{course\.tuitionView\.tone\}\}"/)
 })

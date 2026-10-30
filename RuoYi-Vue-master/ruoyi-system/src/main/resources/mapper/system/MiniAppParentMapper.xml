@@ -106,8 +106,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             e.billing_status as billingStatus,
             e.bill_type as billType,
             e.order_enrollment_id as orderEnrollmentId,
-            o.billing_status as orderBillingStatus,
-            o.pay_status as orderPayStatus,
+            bill.billing_status as orderBillingStatus,
+            bill.pay_status as orderPayStatus,
+            e.settlement_method as tuitionSourceSettlement,
+            e.lesson_completed_time as tuitionSourceCompleted,
+            bill.enrollment_id as tuitionSourceBillId,
+            bill.billing_status as tuitionSourceBillingStatus,
+            bill.pay_status as tuitionSourcePayStatus,
+            payment.payment_status as tuitionSourcePaymentStatus,
+            payment.channel as tuitionSourceChannel,
+            payment.amount as tuitionSourcePaymentAmount,
+            refund.refund_status as tuitionSourceRefundStatus,
+            (select coalesce(sum(r.approved_amount), 0) from edu_tuition_refund r
+             where r.payment_id = payment.payment_id and r.refund_status = 'SUCCESS') as tuitionSourceRefundedAmount,
             s.schedule_code as scheduleCode,
             s.course_year as courseYear,
             s.course_class_name as courseClassName,
@@ -127,7 +138,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             c.classroom_name as classroomName
         from edu_enrollment e
         inner join edu_course_schedule s on s.schedule_id = e.schedule_id
-        left join edu_enrollment o on o.enrollment_id = e.order_enrollment_id
+        <!-- Only the same parent's same-child order can supply a course's financial progress. -->
+        left join edu_enrollment bill
+          on bill.enrollment_id = case when e.bill_type = 'COURSE_ITEM' then e.order_enrollment_id else e.enrollment_id end
+         and bill.parent_id = e.parent_id
+         and bill.lesson_account_id &lt;=&gt; e.lesson_account_id
+         and bill.del_flag = '0'
+         and (e.bill_type != 'COURSE_ITEM' or bill.bill_type = 'CART_ORDER')
+        <!-- These generated unique keys allow at most one effective payment / active refund. -->
+        left join edu_tuition_payment payment on payment.effective_enrollment_id = bill.enrollment_id
+        left join edu_tuition_refund refund on refund.active_payment_id = payment.payment_id
         left join sys_user teacher on teacher.user_id = s.teacher_id
         left join edu_classroom c on c.classroom_id = s.classroom_id
         where e.parent_id = #{parentId}

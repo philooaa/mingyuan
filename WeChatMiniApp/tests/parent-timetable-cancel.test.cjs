@@ -13,7 +13,7 @@ function setup({single=true,pending=false,confirm=true,requestError=null,holdMod
     navigateTo:()=>assert.fail('cancellation must stay on timetable')}
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../pages/timetable/timetable.js'),'utf8'),{
     Page:p=>definition=p,wx,getCurrentPages:()=>[otherPage],
-    require:id=>id.endsWith('child-context')?require('./helpers/child-context.cjs')(wx):({request:async options=>{calls.push(options);if(requestError)throw requestError;return {data:[]}}})
+    require:id=>id.endsWith('child-context')?require('./helpers/child-context.cjs')(wx):id.endsWith('course-payment-progress')?require('../utils/course-payment-progress'):({request:async options=>{calls.push(options);if(requestError)throw requestError;return {data:[]}}})
   })
   const p={...definition,data:structuredClone(definition.data),_loadedToken:storage.token}
   p.setData=o=>Object.assign(p.data,o)

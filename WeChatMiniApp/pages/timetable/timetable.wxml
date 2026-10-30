@@ -1,6 +1,6 @@
 <view class="page">
   <view class="header">
-    <view class="title">{{teacherMode ? '我的课程' : '我的课表'}}</view>
+    <view class="title">我的课程</view>
     <view class="ui-caption">上课安排与学员报名记录</view>
   </view>
 
@@ -53,7 +53,17 @@
                 data-enrollment-id="{{course.enrollmentId}}">{{cancelingId === course.viewKey ? '处理中…' : (course.classDate ? '申请取消' : '取消')}}</view>
         </view>
       </view>
-      <view class="pay-tag {{course.payStage}}" wx:if="{{!teacherMode}}">{{course.payText}}</view>
+      <view class="tuition-progress {{course.tuitionView.tone}}" wx:if="{{!teacherMode}}">
+        <view class="tuition-steps" wx:if="{{course.tuitionView.showSteps}}">
+          <view class="tuition-step {{step.state}}" wx:for="{{course.tuitionView.steps}}" wx:for-item="step" wx:key="label">
+            <view class="tuition-connector {{step.connected ? 'connected' : ''}}" wx:if="{{index < 2}}"></view>
+            <view class="tuition-marker">{{step.marker}}</view>
+            <view class="tuition-step-label">{{step.label}}</view>
+          </view>
+        </view>
+        <view class="tuition-status">{{course.tuitionView.title}}</view>
+        <view class="tuition-note" wx:if="{{course.tuitionView.note}}">{{course.tuitionView.note}}</view>
+      </view>
     </view>
   </view>
   <view class="advisor-card" wx:if="{{!teacherMode}}">
