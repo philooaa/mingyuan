@@ -76,7 +76,7 @@ Page({
         if (detail.canPay && allowed.collect && !pending) await this.refreshQuote(true)
       } else {
         const statuses = ['', 'PENDING_PRICE', 'OPEN', 'HISTORY_PENDING', 'CLOSED']
-        const res = await t.request({ url: `${t.adminUrl}/list`, data: { pageNum, pageSize: 20, billingStatus: statuses[this.data.filterIndex] || '', studentName: this.data.searchText.trim(), paymentStage: this.data.filterIndex === 5 ? 'WAIT_ADMIN' : this.data.filterIndex === 6 ? 'SUCCESS' : '' } })
+        const res = await t.request({ url: `${t.adminUrl}/list`, data: { pageNum, pageSize: 20, billingStatus: this.data.confirmationOnly ? '' : statuses[this.data.filterIndex] || '', studentName: this.data.searchText.trim(), paymentStage: this.data.confirmationOnly || this.data.filterIndex === 5 ? 'WAIT_ADMIN' : this.data.filterIndex === 6 ? 'SUCCESS' : '' } })
         if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ rows: (reset ? [] : this.data.rows).concat((res.rows || []).map(row => progress(t.bill(row)))), total: res.total || 0, pageNum })
       }
     } catch (error) { if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ error: error.message }) }
@@ -130,7 +130,6 @@ Page({
   mode(e) { if (!this.data.submitting) this.setData({ modeIndex: Number(e.detail.value) }) },
   channel(e) { if (!this.data.submitting) this.setData({ channelIndex: Number(e.detail.value) }) },
   filter(e) { this._visit++; this.setData({ filterIndex: Number(e.detail.value), rows: [] }); return this.load(true) },
-  showPending() { if (!this.paymentAdministrator() || this.data.submitting) return; this.setData({ filterIndex: 5, rows: [] }); return this.search() },
   search() { this._visit++; return this.load(true) },
   detail(e) { if (this.data.allowed.query) wx.navigateTo({ url: `/pages/admin-tuition/admin-tuition?id=${encodeURIComponent(String(e.currentTarget.dataset.id))}` }) },
   refunds(e) {
