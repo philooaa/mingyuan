@@ -8,6 +8,32 @@ const DAILY_CYCLES = { DAILY: [1, 1], DAILY_5_1: [6, 5], DAILY_6_1: [7, 6], DAIL
 // 报名缴费三个阶段，与右上角状态标签一一对应；unpaid 仅用于一对一单次课
 const PAY_STAGE_TEXT = { pendingPrice: '待核价', pendingPay: '待缴费', paid: '已支付', closed: '已关闭', unpaid: '未支付' }
 
+// 金额展示：教务核价后才有值，核价前保持空白
+function amountText(value) {
+  if (value === null || value === undefined || value === '') return ''
+  const number = Number(value)
+  return Number.isFinite(number) ? `¥${number.toFixed(2)}` : ''
+}
+
+// 核价后家长要能直接看到原价、优惠和实际应缴；购物车里的课程标注为整单金额
+function buildAmountView(item, stage, single) {
+  const payable = amountText(item.billPayableAmount)
+  const show = !single && !!payable && (stage === 'pendingPay' || stage === 'paid')
+  if (!show) return { show: false }
+  const original = amountText(item.billOriginalAmount)
+  const discountValue = Number(item.billDiscountAmount)
+  const isOrder = String(item.billIsOrder) === '1'
+  return {
+    show: true,
+    isOrder,
+    originalText: original,
+    discountText: discountValue > 0 ? `-${amountText(discountValue)}` : '无',
+    hasDiscount: discountValue > 0,
+    payableText: payable,
+    payableLabel: isOrder ? '整单应缴' : '实际应缴'
+  }
+}
+
 Page(childContext.page({
   data: {
     advisorWechat: 'myedu666888',
@@ -115,6 +141,8 @@ Page(childContext.page({
       const single = !!item.classDate
       // 一对一单次课按课包结算，不参与核价三阶段
       const stage = single ? (this.isPaid(item.payStatus) ? 'paid' : 'unpaid') : this.payStageOf(item)
+      // 一车一单：购物车订单里还有几门在学的课程，取消任意一门会连带取消整单
+      const cartOrderItemCount = single ? 0 : (Number(item.orderItemCount) || 0)
       return {
         ...item,
         cancelRequestPending: single && String(item.cancelRequestStatus) === '1',
@@ -126,7 +154,10 @@ Page(childContext.page({
         payText: PAY_STAGE_TEXT[stage] || '待缴费',
         // 待核价可以取消；待缴费、已支付都不再提供取消入口。一对一单次课仍走老师的取消申请流程。
         canCancel: single ? true : stage === 'pendingPrice',
+        cartOrderItemCount,
+        cartOrderMulti: cartOrderItemCount > 1,
         tuitionView: paymentProgress.describe(item.tuitionProgress),
+        amountView: buildAmountView(item, stage, single),
         nextClassDate: next ? next.date : '',
         nextClassWeekday: next ? next.weekday : '',
         nextClassEnded: hasDates && !next,   // 有日期才可能"已结课"，否则是"待配置"
@@ -325,13 +356,18 @@ Page(childContext.page({
     this._cancelBusy = true
     this.setData({ cancelingId: String(enrollmentId) })
     let showingLoading = false
+    // 一车一单：同一购物车订单里有多门课程时，取消任意一门都会连带取消整单，先向家长说清楚
+    const cartItemCount = single ? 0 : (Number(record.orderItemCount) || 0)
+    const cartMulti = cartItemCount > 1
     try {
       const confirmed = await new Promise((resolve) => {
         wx.showModal({
-          title: single ? '确认申请取消本次课？' : '确认取消报名？',
-          content: `确定要${single ? '申请取消' : '取消'}「${record.studentName || '学生'}」的「${record.courseClassName || '该课程'}」吗？\n${single ? '老师同意后才会取消；待处理期间保留报名、名额及课包暂占。' : '取消后将立即从课表中移除。'}`,
-          confirmText: single ? '提交申请' : '确认取消',
-          cancelText: '再想想',
+          title: single ? '确认申请取消本次课？' : cartMulti ? '整单课程将一起取消' : '确认取消报名？',
+          content: cartMulti
+            ? `「${record.courseClassName || '该课程'}」属于同一个购物车订单。取消后，购物车内其他 ${cartItemCount - 1} 门课程也会同步取消，是否确定取消课程？`
+            : `确定要${single ? '申请取消' : '取消'}「${record.studentName || '学生'}」的「${record.courseClassName || '该课程'}」吗？\n${single ? '老师同意后才会取消；待处理期间保留报名、名额及课包暂占。' : '取消后将立即从课表中移除。'}`,
+          confirmText: single ? '提交申请' : cartMulti ? '是' : '确认取消',
+          cancelText: single ? '再想想' : cartMulti ? '否' : '再想想',
           confirmColor: '#c84444',
           success(res) { resolve(res.confirm) },
           fail() { resolve(false) }

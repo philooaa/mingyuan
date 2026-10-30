@@ -63,6 +63,11 @@
         </view>
         <view class="tuition-status">{{course.tuitionView.title}}</view>
         <view class="tuition-note" wx:if="{{course.tuitionView.note}}">{{course.tuitionView.note}}</view>
+        <view class="tuition-amounts" wx:if="{{course.amountView.show}}">
+          <view class="tuition-amount" wx:if="{{course.amountView.originalText}}"><text class="label">原价</text><text class="value">{{course.amountView.originalText}}</text></view>
+          <view class="tuition-amount" wx:if="{{course.amountView.originalText}}"><text class="label">优惠</text><text class="value {{course.amountView.hasDiscount ? 'discount' : ''}}">{{course.amountView.discountText}}</text></view>
+          <view class="tuition-amount total"><text class="label">{{course.amountView.payableLabel}}</text><text class="value">{{course.amountView.payableText}}</text></view>
+        </view>
       </view>
     </view>
   </view>
