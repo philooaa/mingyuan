@@ -75,7 +75,6 @@ const roleProfiles = {
       { key:'personalAccount', title: '家长与课次账户', icon: '户', tone: 'gold', route: '/pages/admin-transactions/admin-transactions' },
       { key:'referral', title: '优惠券管理', icon: '券', tone: 'violet', route: '/pages/admin-referral/admin-referral' },
       { title: '教师管理', icon: '师', tone: 'indigo', route: '/pages/admin-teachers/admin-teachers' },
-      { title: '课程定价', icon: '价', tone: 'gold', route: '/pages/admin-course-price/admin-course-price' },
       { key:'tuitionFinance', title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' },
       { title: '退费管理', icon: '退', tone: 'orange', route: '/pages/admin-tuition-refunds/admin-tuition-refunds' },
       { title: '薪资核算', icon: '薪', tone: 'red' },

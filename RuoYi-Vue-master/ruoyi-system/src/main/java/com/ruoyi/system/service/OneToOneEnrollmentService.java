@@ -100,7 +100,8 @@ public class OneToOneEnrollmentService {
         String level=null; java.math.BigDecimal lessonCredits=null;
         if("P".equals(settlement)) {
             Object configured=profile(s.getTeacherId()).get("teacherLevel");
-            level=configured == null ? null : configured.toString(); lessonCredits=new java.math.BigDecimal("1.5");
+            check(configured != null && List.of("elite","senior").contains(configured.toString()),"教师级别尚未配置，无法确定课包扣次；可选择单次付费");
+            level=configured.toString(); lessonCredits=java.math.BigDecimal.valueOf("senior".equals(level) ? 2 : 1);
             account=credits.ownForHold(accountId,SecurityUtils.getUserId(),name,lessonCredits);
         }
         String code = "ENR"+UUID.randomUUID().toString().replace("-", "").substring(0,28);

@@ -12,7 +12,7 @@ export async function recognizeAndFill(vm) {
     const teacher=(vm.dims.teachers || []).find(t=>String(t.userId)===String(data.teacherId))
     const proposed={gradeName:data.gradeName,subjectName:data.subjectName,classType:data.classType,teacherId:teacher && teacher.userId}
     if (data.teacherId && !teacher) warnings.push('教师选项已变化，请重新选择教师')
-    if (proposed.classType && Array.from(proposed.classType).length>30) { delete proposed.classType; warnings.push('班型候选超过30个字符，请手动填写') }
+    if (proposed.classType && !(vm.dims.classTypes || []).some(t=>t.value===proposed.classType)) { delete proposed.classType; warnings.push('识别的班型不在启用选项中，请手动选择') }
     const labels={gradeName:'年级',subjectName:'学科',classType:'班型',teacherId:'教师'}
     const lines=Object.keys(proposed).filter(k=>proposed[k]!==undefined && proposed[k]!==null && proposed[k]!=='').map(k=>`${labels[k]}：${k==='teacherId' ? (data.teacherName || proposed[k]) : proposed[k]}`)
     const candidates=data.teacherCandidates || []

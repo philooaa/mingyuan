@@ -118,6 +118,7 @@ test('each assigned role sees only its own workspace; education confirms tuition
     const h = harness('index', [role]); h.p.onLoad(); await h.p.applyLoginRole()
     assert.deepEqual(Array.from(h.p.data.roles, r => r.key), [role]); assert.equal(h.p.data.currentRole, role)
     const routes = h.p.data.quickActions.map(a => a.route)
+    if (['admin', 'education'].includes(role)) assert.equal(routes.includes('/pages/admin-course-price/admin-course-price'), false)
     if (role === 'education') {
       assert.ok(routes.includes('/pages/admin-tuition/admin-tuition'))
       assert.equal(routes.includes('/pages/admin-referral/admin-referral'), false)
