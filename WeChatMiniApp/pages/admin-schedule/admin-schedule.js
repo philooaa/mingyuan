@@ -5,7 +5,7 @@ const labels = rows => (rows || []).map(r => ({ value: r.value || r.dictLabel, l
 
 Page({
   data: { loading: false, ready: false, error: '', list: [], total: 0, keyword: '', pageNum: 1, pageSize: 20,
-    formOpen: false, saving: false, formError: '', form: {}, campusOptions: [], teachers: [], fields: [], timeSlots: [], singleTimeSlots: [],
+    formOpen: false, saving: false, recognizing: false, formError: '', form: {}, campusOptions: [], teachers: [], fields: [], timeSlots: [], singleTimeSlots: [],
     modes: [{label:'班课',value:'1'},{label:'一对一',value:'2'}],
     patterns:[{label:'每周一次',value:'WEEKLY'},{label:'连上无假期',value:'DAILY'},{label:'上5休1',value:'DAILY_5_1'},{label:'上6休1',value:'DAILY_6_1'},{label:'上5休2',value:'DAILY_5_2'},{label:'上4休1',value:'DAILY_4_1'},{label:'其他（暂不排课）',value:'OTHER'}],
     patternIndex:0,
@@ -26,7 +26,7 @@ Page({
       if(!this.current() || version!==this._version)return
       if(!staff(info.roles || (info.data || {}).roles))throw new Error('教务或管理员权限已被撤销')
       const d=res.data || {}, teachers=(d.teachers || []).map(t=>({...t,label:t.realName || t.nickName || t.userName,value:String(t.userId)}))
-      const fields=[['termName','学期',d.terms],['periodName','期次或上课日',d.periods],['timeSlot','时段',d.timeSlots],['gradeName','年级',d.grades],['subjectName','学科',d.subjects],['classType','班型',d.classTypes]]
+      const fields=[['termName','学期',d.terms],['periodName','期次或上课日',d.periods],['timeSlot','时段',d.timeSlots],['gradeName','年级',d.grades],['subjectName','学科',d.subjects]]
         .map(([key,label,options])=>({key,label,options:labels(options)}))
       this.setData({timeSlots:labels(d.timeSlots),singleTimeSlots:labels(d.singleTimeSlots),campusOptions:Object.keys(d.classrooms || {}).filter(c=>c!=='未分配校区'),teachers,fields,ready:true})
       await this.loadList(version)
@@ -44,6 +44,7 @@ Page({
   next() { if(this.data.pageNum*this.data.pageSize<this.data.total && !this.data.loading && !this.data.saving) {this.setData({pageNum:this.data.pageNum+1});this.load()} },
   add() {
     if(!this.current() || !this.data.ready || this.data.loading || this.data.saving)return
+    this._formVersion=(this._formVersion || 0)+1
     this.setSlotOptions('1')
     this.setData({form:{campusName:'',courseYear:String(new Date().getFullYear()),courseClassName:'',scheduleCode:'',termName:'',periodName:'',timeSlot:'',startTime:'',endTime:'',gradeName:'',subjectName:'',teacherId:'',teacherLabel:'',classType:'',classMode:'1',classPattern:'WEEKLY',startDate:'',endDate:'',unitPrice:'',enrollLimit:'',recruitStatus:'0',status:'0',remark:''},patternIndex:0,formOpen:true,formError:''})
   },
@@ -55,6 +56,7 @@ Page({
       const res=await request({url:root+'/'+id})
       if(!this.current() || version!==this._version)return
       const f=res.data || {}, teacher=this.data.teachers.find(t=>t.value===String(f.teacherId))
+      this._formVersion=(this._formVersion || 0)+1
       this.setSlotOptions(f.classMode)
       this.setData({form:{...f,teacherId:String(f.teacherId || ''),teacherLabel:teacher?teacher.label:f.teacherName,startDate:(f.startDate || '').slice(0,10),endDate:(f.endDate || '').slice(0,10)},patternIndex:this.patternIndexOf(f.classPattern),formOpen:true,formError:''})
     } catch(e) { if(this.current() && version===this._version)wx.showToast({title:e.message || '课程加载失败',icon:'none'}) }
@@ -74,8 +76,33 @@ Page({
     } catch(e) { if(this.current() && version===this._version)this.setData({error:e.applicationRejected?e.message:'删除结果未确认，请刷新列表核对。'}) }
     finally { if(this._alive && this._token===wx.getStorageSync('token'))this.setData({saving:false});if(removed && this.current())await this.load() }
   },
-  close() { if(!this.data.saving)this.setData({formOpen:false,formError:''}) },
+  close() { if(!this.data.saving){this._formVersion=(this._formVersion || 0)+1;this.setData({formOpen:false,formError:''})} },
   input(e) { if(this.current() && !this.data.saving)this.setData({['form.'+e.currentTarget.dataset.key]:e.detail.value}) },
+  async recognizeName() {
+    if(!this.current() || !this.data.formOpen || this.data.saving || this.data.recognizing)return
+    const name=String(this.data.form.courseClassName || '').trim(), version=this._version, formVersion=this._formVersion, scheduleId=this.data.form.scheduleId || ''
+    if(!name){wx.showToast({title:'请先填写课程名称',icon:'none'});return}
+    this.setData({recognizing:true})
+    const valid=()=>this.current() && this.data.formOpen && version===this._version && formVersion===this._formVersion && String(this.data.form.courseClassName || '').trim()===name && (this.data.form.scheduleId || '')===scheduleId
+    try {
+      const result=await request({url:root+'/recognize-name',method:'POST',data:{name}});if(!valid())return
+      const data=result.data || {}, warnings=(data.warnings || []).slice(), teacher=this.data.teachers.find(t=>String(t.value)===String(data.teacherId))
+      const proposed={gradeName:data.gradeName,subjectName:data.subjectName,classType:data.classType,teacherId:teacher && teacher.value}
+      if(data.teacherId && !teacher)warnings.push('教师选项已变化，请手动选择')
+      if(proposed.classType && Array.from(proposed.classType).length>30){delete proposed.classType;warnings.push('班型候选超过30个字符，请手动填写')}
+      if((data.teacherCandidates || []).length>1)warnings.push('候选教师：'+data.teacherCandidates.map(t=>`${t.name || t.nickName || '教师'}（账号编号 ${t.id}）`).join('、'))
+      const labels={gradeName:'年级',subjectName:'学科',classType:'班型',teacherId:'教师'}
+      const keys=Object.keys(proposed).filter(k=>proposed[k]!==undefined && proposed[k]!==null && proposed[k]!=='')
+      const conflicts=keys.filter(k=>this.data.form[k]!==undefined && this.data.form[k]!==null && this.data.form[k]!=='' && String(this.data.form[k])!==String(proposed[k]))
+      const lines=keys.map(k=>`${labels[k]}：${k==='teacherId' ? teacher.label : proposed[k]}`)
+      const content=[...(lines.length?lines:['没有可自动填写的字段']),...warnings,...(conflicts.length?['已有字段不同：'+conflicts.map(k=>labels[k]).join('、')]:[])].join('\n')
+      const modal=await wx.showModal({title:'识别结果',content,showCancel:!!conflicts.length,confirmText:conflicts.length?'替换已有':'确定',cancelText:'保留已有'})
+      if(!valid())return
+      const change={};keys.forEach(k=>{const old=this.data.form[k];if((conflicts.length && modal.confirm) || old===undefined || old===null || old===''){change['form.'+k]=proposed[k];if(k==='teacherId')change['form.teacherLabel']=teacher.label}})
+      this.setData(change)
+    } catch(e) { if(valid())wx.showToast({title:e.message || '识别失败，请重试',icon:'none'}) }
+    finally { if(this._alive && this._token===wx.getStorageSync('token'))this.setData({recognizing:false}) }
+  },
   chooseCampus(e) { if(!this.data.saving && !this.data.form.classroomId)this.setData({'form.campusName':this.data.campusOptions[Number(e.detail.value)] || ''}) },
   chooseTeacher(e) { const t=this.data.teachers[Number(e.detail.value)];if(t && !this.data.saving)this.setData({'form.teacherId':t.value,'form.teacherLabel':t.label}) },
   setSlotOptions(mode) {
@@ -115,6 +142,7 @@ Page({
   async save() {
     if(!this.current() || !this.data.ready || this.data.saving)return
     const f=this.data.form
+    if (!f.scheduleId && (!/^\d+(\.\d{1,2})?$/.test(String(f.unitPrice).trim()) || Number(f.unitPrice) <= 0)) { this.setData({formError:'课时单价须大于0且最多保留两位小数'}); return }
     for(const [key,label] of [['campusName','校区'],['termName','学期'],['periodName','期次或上课日'],['timeSlot','时段'],['gradeName','年级'],['subjectName','学科'],['teacherId','教师'],['courseClassName','课程名称']]) {
       if(!String(f[key] || '').trim()) {this.setData({formError:'请填写或选择'+label});return}
     }

@@ -2,6 +2,12 @@
   <view class="card"><view class="title">报名管理</view><view class="muted">先按年级找班次，再查看报名人员</view>
     <view class="search"><input placeholder="学生姓名 / 家长手机号" value="{{keyword}}" bindinput="inputKeyword" bindconfirm="search" confirm-type="search"/><button size="mini" bindtap="search">搜索</button></view>
     <picker range="{{grades}}" value="{{gradeIndex}}" disabled="{{loading}}" bindchange="changeGrade"><view class="filter">年级：{{grades[gradeIndex]}} ▾</view></picker>
+    <picker range="{{subjects}}" value="{{subjectIndex}}" data-key="subjectIndex" disabled="{{loading}}" bindchange="changeFilter"><view class="filter">科目：{{subjects[subjectIndex]}} ▾</view></picker>
+    <picker range="{{modes}}" value="{{modeIndex}}" data-key="modeIndex" disabled="{{loading}}" bindchange="changeFilter"><view class="filter">形式：{{modes[modeIndex]}} ▾</view></picker>
+    <picker range="{{years}}" value="{{yearIndex}}" data-key="yearIndex" disabled="{{loading}}" bindchange="changeFilter"><view class="filter">年份：{{years[yearIndex]}} ▾</view></picker>
+    <picker range="{{terms}}" value="{{termIndex}}" data-key="termIndex" disabled="{{loading}}" bindchange="changeFilter"><view class="filter">季度：{{terms[termIndex]}} ▾</view></picker>
+    <picker range="{{periods}}" value="{{periodIndex}}" data-key="periodIndex" disabled="{{loading}}" bindchange="changeFilter"><view class="filter">期次：{{periods[periodIndex]}} ▾</view></picker>
+    <view class="search"><input placeholder="教师姓名" value="{{teacherKeyword}}" bindinput="inputTeacher" bindconfirm="refreshFilters"/><button size="mini" bindtap="refreshFilters">筛选</button><button size="mini" bindtap="resetFilters">重置</button></view>
   </view>
   <view wx:for="{{groups}}" wx:key="grade" class="group">
     <view class="group-title" bindtap="toggle" data-index="{{index}}">{{item.grade}} <text>{{item.collapsed ? '展开 ＋' : '收起 －'}}</text></view>

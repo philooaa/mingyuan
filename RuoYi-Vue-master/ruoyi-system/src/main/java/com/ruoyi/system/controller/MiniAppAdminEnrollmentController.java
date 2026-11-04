@@ -27,11 +27,13 @@ public class MiniAppAdminEnrollmentController extends BaseController
     public AjaxResult grades() { return success(viewMapper.selectGrades()); }
 
     @GetMapping("/schedules")
-    public TableDataInfo schedules(@RequestParam(required = false) String gradeName)
+    public TableDataInfo schedules(@RequestParam(required = false) String gradeName, @RequestParam(required = false) String subjectName, @RequestParam(required = false) String classMode, @RequestParam(required = false) Long courseYear, @RequestParam(required = false) String termName, @RequestParam(required = false) String periodName, @RequestParam(required = false) String teacherKeyword)
     {
         startPage();
-        return getDataTable(viewMapper.selectSchedules(gradeName));
+        return getDataTable(viewMapper.selectSchedules(gradeName, subjectName, classMode, courseYear, termName, periodName, teacherKeyword));
     }
+    @GetMapping("/filter-options")
+    public AjaxResult filterOptions() { return success(viewMapper.selectFilterOptions()); }
 
     @GetMapping("/schedule/{scheduleId}")
     public AjaxResult schedule(@PathVariable Long scheduleId)
@@ -42,12 +44,18 @@ public class MiniAppAdminEnrollmentController extends BaseController
 
     @GetMapping("/list")
     public TableDataInfo list(@RequestParam(required = false) Long scheduleId,
-                             @RequestParam(defaultValue = "") String keyword)
+                             @RequestParam(defaultValue = "") String keyword,
+                             @RequestParam(required = false) String gradeName, @RequestParam(required = false) String subjectName,
+                             @RequestParam(required = false) String classMode, @RequestParam(required = false) Long courseYear,
+                             @RequestParam(required = false) String termName, @RequestParam(required = false) String periodName, @RequestParam(required = false) String teacherKeyword)
     {
         EduEnrollment query = new EduEnrollment();
         query.setScheduleId(scheduleId);
         query.setDelFlag("0");
         query.getParams().put("adminKeyword", keyword.trim());
+        query.getParams().put("adminGrade",gradeName); query.getParams().put("adminSubject",subjectName);
+        query.getParams().put("adminMode",classMode); query.getParams().put("adminYear",courseYear);
+        query.getParams().put("adminTerm",termName); query.getParams().put("adminPeriod",periodName); query.getParams().put("adminTeacher",teacherKeyword);
         startPage();
         return getDataTable(enrollmentService.selectEduEnrollmentList(query));
     }

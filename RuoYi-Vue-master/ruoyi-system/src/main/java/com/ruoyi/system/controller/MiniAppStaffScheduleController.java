@@ -23,6 +23,11 @@ public class MiniAppStaffScheduleController extends BaseController {
     @Autowired private EduTimetableController timetable;
 
     @GetMapping("/options") public AjaxResult options() { return timetable.dimensions(); }
+    @PostMapping("/recognize-name") public AjaxResult recognizeName(@RequestBody java.util.Map<String,String> body) {
+        AjaxResult dimensions=timetable.dimensions();
+        @SuppressWarnings("unchecked") java.util.Map<String,Object> values=(java.util.Map<String,Object>)dimensions.get("data");
+        return success(com.ruoyi.system.service.CourseNameRecognition.recognize(body.get("name"),values));
+    }
     @GetMapping("/list") public TableDataInfo list(EduCourseSchedule query) {
         startPage(); return getDataTable(schedules.selectEduCourseScheduleList(query));
     }

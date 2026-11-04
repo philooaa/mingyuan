@@ -4,12 +4,51 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ruoyi.system.mapper.EduFinanceDashboardMapper">
 
+    <!-- Options only: preserve raw course dimensions without inventing or rewriting historical values. -->
+    <select id="selectCourseDimensions" resultType="java.util.HashMap">
+        select distinct s.course_year as courseYear, s.term_name as termName, s.period_name as periodName,
+               s.grade_name as gradeName, s.subject_name as subjectName, s.teacher_id as teacherId,
+               coalesce(nullif(trim(u.user_name), ''), nullif(trim(u.nick_name), ''), s.teacher_name) as teacherName
+        from edu_course_schedule s left join sys_user u on u.user_id=s.teacher_id
+        where s.del_flag='0'
+    </select>
+
+    <sql id="studentFilter">
+      from edu_enrollment e join edu_course_schedule s on s.schedule_id=e.schedule_id
+      left join edu_student_lesson_account a on a.account_id=e.lesson_account_id and a.parent_id=e.parent_id
+      left join edu_student st on st.student_id=coalesce(e.student_id,a.student_id)
+      where e.del_flag='0' and coalesce(e.bill_type,'') != 'CART_ORDER'
+        and coalesce(e.enrollment_status,'') not in ('2','3','已取消','已拒绝','老师已拒绝')
+      <if test="year != null">and s.course_year=#{year}</if>
+      <if test="term != null and term != ''">and s.term_name=#{term}</if>
+      <if test="stage == 'primary'">and trim(s.grade_name) in ('一年级','二年级','三年级','四年级','五年级','六年级','小学一年级','小学二年级','小学三年级','小学四年级','小学五年级','小学六年级','小一','小二','小三','小四','小五','小六','1年级','2年级','3年级','4年级','5年级','6年级')</if>
+      <if test="stage == 'junior'">and trim(s.grade_name) in ('初一','初二','初三','初中一年级','初中二年级','初中三年级','七年级','八年级','九年级','7年级','8年级','9年级')</if>
+      <if test="stage == 'senior'">and trim(s.grade_name) in ('高一','高二','高三','高中一年级','高中二年级','高中三年级')</if>
+      <if test="grade != null and grade != ''">and s.grade_name=#{grade}</if>
+      <if test="subject != null and subject != ''">and s.subject_name=#{subject}</if>
+      <if test="teacherId != null">and s.teacher_id=#{teacherId}</if>
+    </sql>
+
+    <!-- A missing student_id cannot safely be deduplicated by name. -->
+    <select id="selectStudentCount" resultType="java.util.HashMap">
+      select count(distinct coalesce(e.student_id, a.student_id)) as studentCount,
+             count(distinct case when coalesce(e.student_id, a.student_id) is null then e.enrollment_id end) as unidentifiedEnrollments
+      <include refid="studentFilter"/>
+    </select>
+    <select id="selectStudents" resultType="java.util.HashMap">
+      select distinct coalesce(e.student_id, a.student_id) as studentId, st.student_name as studentName
+      <include refid="studentFilter"/>
+      and coalesce(e.student_id, a.student_id) is not null
+      order by studentName, studentId
+    </select>
+
     <!-- 课时费：合同=有效报名×排课单价；收入=其中已支付。兼容历史状态值 -->
     <!-- 课程收入改为按「收款流水」口径：实收金额（SUCCESS 付款）净额扣减已成功退款 -->
     <select id="selectLessonMonthly" resultType="java.util.HashMap">
         select date_format(p.paid_time, '%Y-%m') as month,
                sum(p.amount) as contractAmount,
-               sum(p.amount) - coalesce(sum(r.refund_amount), 0) as confirmedAmount
+               sum(p.amount) - coalesce(sum(r.refund_amount), 0) as confirmedAmount,
+               coalesce(sum(r.refund_amount), 0) as refundAmount
         from edu_tuition_payment p
         left join (
             select rf.payment_id, sum(rf.approved_amount) as refund_amount
@@ -27,7 +66,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectShopMonthly" resultType="java.util.HashMap">
         select date_format(o.create_time, '%Y-%m') as month,
                sum(case when o.order_status &lt;&gt; 'CLOSED' then o.payable_amount else 0 end) as contractAmount,
-               sum(case when o.pay_status = '1' then o.payable_amount - o.refunded_amount else 0 end) as confirmedAmount
+               sum(case when o.pay_status = '1' then o.payable_amount - o.refunded_amount else 0 end) as confirmedAmount,
+               sum(case when o.pay_status in ('1','2') then coalesce(o.refunded_amount,0) else 0 end) as refundAmount
         from edu_material_order o
         where o.del_flag = '0'
           and date_format(o.create_time, '%Y-%m') between #{begin} and #{end}

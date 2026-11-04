@@ -53,7 +53,16 @@
         <include refid="scheduleView"/>
         where s.del_flag = '0'
         <if test="gradeName != null and gradeName != ''">and s.grade_name = #{gradeName}</if>
+        <if test="subjectName != null and subjectName != ''">and s.subject_name = #{subjectName}</if>
+        <if test="classMode != null and classMode != ''">and s.class_mode = #{classMode}</if>
+        <if test="courseYear != null">and s.course_year = #{courseYear}</if>
+        <if test="termName != null and termName != ''">and s.term_name = #{termName}</if>
+        <if test="periodName != null and periodName != ''">and s.period_name = #{periodName}</if>
+        <if test="teacherKeyword != null and teacherKeyword != ''">and (s.teacher_name like concat('%', #{teacherKeyword}, '%') or teacher.user_name like concat('%', #{teacherKeyword}, '%') or teacher.nick_name like concat('%', #{teacherKeyword}, '%'))</if>
         order by <include refid="gradeOrder"/>, s.grade_name, s.course_year desc, s.term_name, s.period_name, s.start_time, s.schedule_id
+    </select>
+    <select id="selectFilterOptions" resultType="java.util.HashMap">
+        select distinct subject_name as subjectName, course_year as courseYear, term_name as termName, period_name as periodName from edu_course_schedule where del_flag='0'
     </select>
     <select id="selectSchedule" resultType="java.util.HashMap">
         <include refid="scheduleView"/>

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.system.service.IEduFinanceDashboardService;
 
 /**
@@ -22,6 +23,25 @@ public class EduFinanceDashboardController extends BaseController
 {
     @Autowired
     private IEduFinanceDashboardService dashboardService;
+
+    @PreAuthorize("@ss.hasPermi('system:finance:list') and @ss.hasRole('admin')")
+    @GetMapping("/dashboard/course-dimensions")
+    public AjaxResult courseDimensions() { return success(dashboardService.getCourseDimensions()); }
+
+    @PreAuthorize("@ss.hasPermi('system:finance:list') and @ss.hasRole('admin')")
+    @GetMapping("/dashboard/student-count")
+    public AjaxResult studentCount(@RequestParam(required=false) Long year,@RequestParam(required=false) String term,
+            @RequestParam(required=false) String stage,@RequestParam(required=false) String grade,
+            @RequestParam(required=false) String subject,@RequestParam(required=false) Long teacherId) {
+        return success(dashboardService.getStudentCount(year,term,stage,grade,subject,teacherId));
+    }
+    @PreAuthorize("@ss.hasPermi('system:finance:list') and @ss.hasRole('admin')")
+    @GetMapping("/dashboard/students")
+    public TableDataInfo students(@RequestParam(required=false) Long year,@RequestParam(required=false) String term,@RequestParam(required=false) String stage,
+            @RequestParam(required=false) String grade,@RequestParam(required=false) String subject,@RequestParam(required=false) Long teacherId) {
+        startPage();
+        return getDataTable(dashboardService.getStudents(year,term,stage,grade,subject,teacherId));
+    }
 
     /**
      * 驾驶舱汇总（合同金额/已确认收入/欠款/老师工资/毛利/净利润/成本支出 + 图表数据）

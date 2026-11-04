@@ -1,6 +1,7 @@
 package com.ruoyi.system.service;
 
 import java.time.*;
+import java.math.BigDecimal;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -102,7 +103,7 @@ public class LessonCreditService {
         Long owner=id(before.get("parentId")); check(administrator || owner.equals(SecurityUtils.getUserId()),"无权删除其他家长的孩子");
         db.one("SELECT user_id FROM sys_user WHERE user_id=? FOR UPDATE",owner);
         var a=db.one("SELECT * FROM edu_student_lesson_account WHERE account_id=? AND parent_id=? FOR UPDATE",accountId,owner);
-        check(number(a,"remainingCredits")==0 && number(a,"reservedCredits")==0 && number(a,"consumedCredits")==0,"孩子仍有课次余额或消耗记录，不能删除");
+        check(number(a,"remainingCredits").signum()==0 && number(a,"reservedCredits").signum()==0 && number(a,"consumedCredits").signum()==0,"孩子仍有课次余额或消耗记录，不能删除");
         check(db.rows("SELECT enrollment_id FROM edu_enrollment WHERE lesson_account_id=? LIMIT 1",accountId).isEmpty()
             && db.rows("SELECT event_id FROM edu_lesson_credit_event WHERE account_id=? LIMIT 1",accountId).isEmpty(),"孩子已有报名或交易历史，须保留资料，不能删除");
         check(db.rows("SELECT enrollment_id FROM edu_enrollment WHERE student_id=? LIMIT 1",a.get("studentId")).isEmpty(),"孩子已有报名历史，不能删除");
@@ -116,18 +117,19 @@ public class LessonCreditService {
         check(body.quantity != null && body.quantity>0 && body.quantity<=100000,"课次数量应为1至100000的整数");
         String reason=text(body.reason,255,"操作原因");
         var account=db.one("SELECT * FROM edu_student_lesson_account WHERE account_id=? FOR UPDATE",accountId);
-        change(account,null,body.action,body.quantity,key(body.requestKey),reason);
+        change(account,null,body.action,BigDecimal.valueOf(body.quantity),key(body.requestKey),reason);
     }
-    public Map<String,Object> ownForHold(Long accountId,Long parentId,String studentName,int required) {
+    public Map<String,Object> ownForHold(Long accountId,Long parentId,String studentName,BigDecimal required) {
         check(accountId != null,"请选择孩子的课包账户");
         var account=db.one("SELECT * FROM edu_student_lesson_account WHERE account_id=? FOR UPDATE",accountId);
         check(parentId.equals(id(account.get("parentId"))),"课包不属于当前家长");
         currentProfile(account);
         check(Objects.equals(studentName,account.get("studentName")),"学生姓名须与所选课包账户一致");
-        check(number(account,"remainingCredits")-number(account,"reservedCredits")>=required,"可用课次不足，请联系管理员发放课次或选择单次付费");
+        check(number(account,"remainingCredits").subtract(number(account,"reservedCredits")).compareTo(required)>=0,"可用课次不足，请联系管理员发放课次或选择单次付费");
         return account;
     }
-    public void hold(Map<String,Object> account,Long enrollmentId,int quantity) { change(account,enrollmentId,"HOLD",quantity,"HOLD:"+enrollmentId,"报名暂占"); }
+    public Map<String,Object> ownForHold(Long accountId,Long parentId,String studentName,int required) { return ownForHold(accountId,parentId,studentName,BigDecimal.valueOf(required)); }
+    public void hold(Map<String,Object> account,Long enrollmentId,BigDecimal quantity) { change(account,enrollmentId,"HOLD",quantity,"HOLD:"+enrollmentId,"报名暂占"); }
     public void release(Map<String,Object> enrollment) { fromEnrollment(enrollment,"RELEASE"); }
     public void consume(Map<String,Object> enrollment) { fromEnrollment(enrollment,"CONSUME"); }
     private void fromEnrollment(Map<String,Object> e,String action) {
@@ -138,22 +140,22 @@ public class LessonCreditService {
         check(id(e.get("parentId")).equals(id(account.get("parentId"))),"课包归属不一致");
         change(account,enrollmentId,action,number(e,"lessonCredits"),action+":"+enrollmentId,action.equals("CONSUME") ? "教师确认完成" : "报名取消或拒绝释放");
     }
-    private void change(Map<String,Object> a,Long enrollmentId,String action,int quantity,String key,String reason) {
+    private void change(Map<String,Object> a,Long enrollmentId,String action,BigDecimal quantity,String key,String reason) {
         Long accountId=id(a.get("accountId"));
         // 账户行锁串行化同一学生的所有变更；不锁不存在的流水键，避免跨账户间隙锁互等。
         var previous=db.rows("SELECT account_id,enrollment_id,action,quantity,reason FROM edu_lesson_credit_event WHERE request_key=?",key);
-        if(!previous.isEmpty()) { var old=previous.get(0); check(accountId.equals(id(old.get("accountId"))) && Objects.equals(enrollmentId,id(old.get("enrollmentId"))) && action.equals(old.get("action")) && quantity==number(old,"quantity") && Objects.equals(reason,old.get("reason")),"重复请求内容不一致"); return; }
-        int remaining=number(a,"remainingCredits"),reserved=number(a,"reservedCredits"),consumed=number(a,"consumedCredits");
-        if(action.equals("GRANT")) remaining=Math.addExact(remaining,quantity);
-        if(action.equals("WITHDRAW")) { check(remaining-reserved>=quantity,"收回不能超过可用课次，已预约额度需先由老师处理"); remaining-=quantity; }
-        if(action.equals("HOLD")) { check(remaining-reserved>=quantity,"可用课次不足"); reserved+=quantity; }
+        if(!previous.isEmpty()) { var old=previous.get(0); check(accountId.equals(id(old.get("accountId"))) && Objects.equals(enrollmentId,id(old.get("enrollmentId"))) && action.equals(old.get("action")) && quantity.compareTo(number(old,"quantity"))==0 && Objects.equals(reason,old.get("reason")),"重复请求内容不一致"); return; }
+        BigDecimal remaining=number(a,"remainingCredits"),reserved=number(a,"reservedCredits"),consumed=number(a,"consumedCredits");
+        if(action.equals("GRANT")) remaining=remaining.add(quantity);
+        if(action.equals("WITHDRAW")) { check(remaining.subtract(reserved).compareTo(quantity)>=0,"收回不能超过可用课次，已预约额度需先由老师处理"); remaining=remaining.subtract(quantity); }
+        if(action.equals("HOLD")) { check(remaining.subtract(reserved).compareTo(quantity)>=0,"可用课次不足"); reserved=reserved.add(quantity); }
         if(action.equals("RELEASE") || action.equals("CONSUME")) {
             check(!db.rows("SELECT event_id FROM edu_lesson_credit_event WHERE enrollment_id=? AND action='HOLD'",enrollmentId).isEmpty(),"找不到原预约暂占记录");
             check(db.rows("SELECT event_id FROM edu_lesson_credit_event WHERE enrollment_id=? AND action IN ('RELEASE','CONSUME')",enrollmentId).isEmpty(),"该预约额度已释放或消耗");
-            check(reserved>=quantity,"暂占余额不一致，请核对操作记录"); reserved-=quantity;
-            if(action.equals("CONSUME")) { remaining-=quantity; consumed=Math.addExact(consumed,quantity); }
+            check(reserved.compareTo(quantity)>=0,"暂占余额不一致，请核对操作记录"); reserved=reserved.subtract(quantity);
+            if(action.equals("CONSUME")) { remaining=remaining.subtract(quantity); consumed=consumed.add(quantity); }
         }
-        check(remaining>=reserved && reserved>=0 && remaining<=10000000,"课次余额超出允许范围");
+        check(remaining.compareTo(reserved)>=0 && reserved.signum()>=0 && remaining.compareTo(new BigDecimal("10000000"))<=0,"课次余额超出允许范围");
         db.update("edu_student_lesson_account","account_id",accountId,Map.of("remaining_credits",remaining,"reserved_credits",reserved,"consumed_credits",consumed,"update_by",SecurityUtils.getUsername(),"update_time",LocalDateTime.now(ZONE)));
         var v=new LinkedHashMap<String,Object>(); v.put("account_id",accountId); v.put("enrollment_id",enrollmentId); v.put("action",action); v.put("quantity",quantity);
         v.put("remaining_after",remaining); v.put("reserved_after",reserved); v.put("consumed_after",consumed); v.put("request_key",key); v.put("reason",reason); v.put("actor_id",SecurityUtils.getUserId()); v.put("actor_name",SecurityUtils.getUsername()); v.put("create_time",LocalDateTime.now(ZONE)); db.insert("edu_lesson_credit_event",v);
@@ -166,7 +168,7 @@ public class LessonCreditService {
     private static String key(String raw) { return "ADMIN:"+SecurityUtils.getUserId()+":"+rawKey(raw); }
     private static String text(String raw,int max,String label) { check(raw != null && !raw.isBlank() && raw.trim().length()<=max,label+"不能为空且不能超过"+max+"字"); return raw.trim(); }
     private static String like(String raw) { check(raw == null || raw.length()<=100,"搜索词过长"); return "%"+(raw == null ? "" : raw.trim())+"%"; }
-    private static int number(Map<String,Object> row,String key) { return Integer.parseInt(row.get(key).toString()); }
+    private static BigDecimal number(Map<String,Object> row,String key) { return new BigDecimal(row.get(key).toString()); }
     private static Long id(Object value) { return value == null ? null : Long.valueOf(value.toString()); }
     private static void check(boolean ok,String message) { if(!ok) throw new ServiceException(message); }
 }

@@ -72,9 +72,7 @@
         </el-col>
         <el-col :span="12">
           <el-form-item label="班型" prop="classType">
-            <el-select v-model="form.classType" placeholder="请选择班型（可空）" style="width:100%" clearable>
-              <el-option v-for="c in dims.classTypes" :key="c.value" :label="c.label" :value="c.value" />
-            </el-select>
+            <el-input v-model="form.classType" placeholder="请输入班型（可不填）" maxlength="30" clearable />
           </el-form-item>
         </el-col>
 
@@ -146,7 +144,7 @@
 
         <el-col :span="24">
           <el-form-item label="课程班名称" prop="courseClassName">
-            <el-input v-model="form.courseClassName" placeholder="如：五年级数学校优班（可空，保存时按 年级+科目+班型 自动生成，班型留空则跳过）" maxlength="60" show-word-limit />
+            <el-input v-model="form.courseClassName" placeholder="如：高一数学尖子班陈雅娇" maxlength="60"><el-button slot="append" :loading="recognizing" :disabled="submitting || detailLoading || detailError" @click="recognizeName">识别</el-button></el-input>
           </el-form-item>
         </el-col>
 
@@ -167,6 +165,7 @@
 
 <script>
 import { addTimetableSchedule, updateTimetableSchedule, getTimetableSchedule } from '@/api/system/timetable'
+import { recognizeAndFill } from '@/utils/course-name-recognition'
 
 export default {
   name: 'TimetableDialog',
@@ -178,6 +177,7 @@ export default {
     return {
       visible: false,
       submitting: false,
+      recognizing: false,
       detailLoading: false,
       detailError: false,
       form: this.buildEmptyForm(),
@@ -208,6 +208,7 @@ export default {
     }
   },
   methods: {
+    recognizeName() { return recognizeAndFill(this) },
     // 教师下拉标签：真名优先；真名与昵称不同时把昵称作为别名附在后面
     teacherLabel(t) {
       const real = t.realName || t.userName || ''

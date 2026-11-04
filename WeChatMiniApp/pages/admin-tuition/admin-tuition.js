@@ -41,6 +41,7 @@ Page({
   // Keep the same yyyy-MM-dd HH:mm:ss value used by the web form and API.
   data: { loading: false, submitting: false, error: '', rows: [], total: 0, pageNum: 1, searchText: '', filterIndex: 0, confirmationOnly: false, filters: ['全部账单', '待核价', '已核价', '历史待核验', '已关闭', '待管理员确认', '已完成'], detail: null, allowed: {}, price: '', discountAmount: '', discountReason: '', priceBaseText: '待填写', priceDiscountText: '¥0.00', pricePayableText: '待填写', modeIndex: 0, modes: ['REAL', 'MOCK'], modeLabels: ['真实线下收费', '本地模拟（仅本地可用）'], channelIndex: 0, channels: ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: ['现金', '银行转账', '微信线下收款'], payerName: '', providerTradeNo: '', paidTime: '', evidenceKey: '', evidenceName: '', closeReason: '' },
   onLoad(options) {
+    this.setData({gradeStages:['全部学段','小学','初中','高中','未分类'],gradeStageIndex:0})
     this.id = String(options.id || ''); this._visit = 0
     this.setData({ quote: null, quoteLoading: false, quoteError: '', couponOptions: ['不使用优惠券'], availableCoupons: [], couponIndex: 0, selectedCouponId: null })
     const now = localTime(new Date())
@@ -91,12 +92,13 @@ Page({
         if (detail.canPay && allowed.collect && !pending) await this.refreshQuote(true)
       } else {
         const statuses = ['', 'PENDING_PRICE', 'OPEN', 'HISTORY_PENDING', 'CLOSED']
-        const res = await t.request({ url: `${t.adminUrl}/list`, data: { pageNum, pageSize: 20, billingStatus: this.data.confirmationOnly ? '' : statuses[this.data.filterIndex] || '', studentName: this.data.searchText.trim(), paymentStage: this.data.confirmationOnly || this.data.filterIndex === 5 ? 'WAIT_ADMIN' : this.data.filterIndex === 6 ? 'SUCCESS' : '' } })
+        const res = await t.request({ url: `${t.adminUrl}/list`, data: { pageNum, pageSize: 20, billingStatus: this.data.confirmationOnly ? '' : statuses[this.data.filterIndex] || '', studentName: this.data.searchText.trim(), gradeStage:this.data.confirmationOnly ? ['', 'PRIMARY','JUNIOR','SENIOR','UNKNOWN'][this.data.gradeStageIndex] : '', paymentStage: this.data.confirmationOnly || this.data.filterIndex === 5 ? 'WAIT_ADMIN' : this.data.filterIndex === 6 ? 'SUCCESS' : '' } })
         if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ rows: (reset ? [] : this.data.rows).concat((res.rows || []).map(row => progress(t.bill(row)))), total: res.total || 0, pageNum })
       }
     } catch (error) { if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ error: error.message }) }
     finally { if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ loading: false }) }
   },
+  changeGradeStage(e) { this.setData({gradeStageIndex:Number(e.detail.value)}); return this.load(true) },
   async refreshQuote(fromLoad) {
     if (!this._active || (this.data.submitting && fromLoad !== true) || this.data.retryPayment || !this.data.detail || !this.data.detail.canPay || !this.permitted('collect')) return
     const visit = this._visit, request = this._quoteRequest = (this._quoteRequest || 0) + 1

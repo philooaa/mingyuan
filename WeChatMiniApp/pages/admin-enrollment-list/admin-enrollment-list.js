@@ -2,6 +2,7 @@ const { request, root, guard, decorateEnrollment, decorateSchedule } = require('
 Page({
   data: { scheduleId: '', schedule: null, keyword: '', queryKeyword: '', list: [], loading: false, total: 0, pageNum: 1, error: '', scheduleError: '' },
   onLoad(options) {
+    this.filters = {}; try { if(options.filters) this.filters=JSON.parse(decodeURIComponent(options.filters)) } catch(e) { this.filters={} }
     let keyword = options.keyword || ''
     try { keyword = decodeURIComponent(keyword) } catch (e) { /* 保留已解码或含百分号的搜索词 */ }
     this.setData({ scheduleId: options.scheduleId || '', keyword })
@@ -30,7 +31,7 @@ Page({
     }
     try {
       const res = await request({ url: `${root}/list`, timeout: 15000, data: { pageNum, pageSize: 30,
-        ...(this.data.scheduleId ? { scheduleId: this.data.scheduleId } : {}), keyword } })
+        ...(this.data.scheduleId ? { scheduleId: this.data.scheduleId } : {}), ...(this.filters || {}), keyword } })
       if (generation !== this._generation) return
       this.setData({ list: (append ? this.data.list : []).concat((res.rows || []).map(decorateEnrollment)), total: res.total || 0, pageNum })
     } catch (e) {

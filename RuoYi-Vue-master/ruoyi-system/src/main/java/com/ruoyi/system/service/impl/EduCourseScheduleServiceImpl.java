@@ -80,6 +80,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     public int insertEduCourseSchedule(EduCourseSchedule schedule) {
         requirePlanningStaff();
         require(schedule != null && schedule.getScheduleId() == null, "新增排课不能指定排课ID");
+        requireValidUnitPrice(schedule.getUnitPrice());
         bindTeacher(schedule, null);
         if ("2".equals(schedule.getClassMode())) schedule.setSubjectName(singleService.subject(schedule.getTeacherId()));
         if (blank(schedule.getScheduleCode())) schedule.setScheduleCode("SCH" + UUID.randomUUID().toString().replace("-", "").substring(0, 28));
@@ -107,6 +108,10 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     public int updateEduCourseSchedule(EduCourseSchedule input, boolean force) {
         requirePlanningStaff();
         require(input != null && input.getScheduleId() != null, "请选择排课");
+        if (input.getUnitPrice() != null) {
+            EduCourseSchedule existing = selectEduCourseScheduleByScheduleId(input.getScheduleId());
+            if (existing.getUnitPrice() == null || input.getUnitPrice().compareTo(existing.getUnitPrice()) != 0) requireValidUnitPrice(input.getUnitPrice());
+        }
         EduCourseSchedule before = selectEduCourseScheduleByScheduleId(input.getScheduleId());
         bindTeacher(input, before);
         if (input.getClassroomId() == null) input.setClassroomId(before.getClassroomId());
@@ -242,7 +247,11 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
             || !Objects.equals(ScheduleCalendar.date(a.getStartDate()),ScheduleCalendar.date(b.getStartDate())) || !Objects.equals(ScheduleCalendar.date(a.getEndDate()),ScheduleCalendar.date(b.getEndDate()))
             || !Objects.equals(a.getClassPattern(),b.getClassPattern()) || !Objects.equals(a.getPeriodName(),b.getPeriodName()) || !Objects.equals(a.getTimeSlot(),b.getTimeSlot()) || !Objects.equals(a.getLessonLocation(),b.getLessonLocation());
     }
+    private void requireValidUnitPrice(java.math.BigDecimal price) {
+        require(price != null && price.signum() > 0 && price.stripTrailingZeros().scale() <= 2, "课时单价须大于0且最多保留两位小数");
+    }
     private void validate(EduCourseSchedule s) {
+        if (s.getClassType() != null) require(s.getClassType().codePointCount(0, s.getClassType().length()) <= 30, "班型不能超过30个字符");
         required(s.getScheduleCode(), 32, "排课编码"); required(s.getTermName(), 20, "学期"); required(s.getPeriodName(), 20, "期次或上课日");
         required(s.getTimeSlot(), 30, "时段"); required(s.getGradeName(), 20, "年级"); required(s.getSubjectName(), 20, "学科");
         required(s.getCourseClassName(), 100, "课程班名称");
@@ -418,6 +427,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         s.setCourseYear(in.getCourseYear() == null ? old.getCourseYear() : in.getCourseYear());
         s.setTermName(in.getTermName() == null ? old.getTermName() : in.getTermName()); s.setPeriodName(in.getPeriodName() == null ? old.getPeriodName() : in.getPeriodName());
         s.setTimeSlot(in.getTimeSlot() == null ? old.getTimeSlot() : in.getTimeSlot()); s.setGradeName(in.getGradeName() == null ? old.getGradeName() : in.getGradeName()); s.setSubjectName(in.getSubjectName() == null ? old.getSubjectName() : in.getSubjectName());
+        s.setClassType(in.getClassType() == null ? old.getClassType() : in.getClassType());
         s.setCourseClassName(in.getCourseClassName() == null ? old.getCourseClassName() : in.getCourseClassName());
         s.setStartTime(in.getStartTime() == null ? old.getStartTime() : in.getStartTime()); s.setEndTime(in.getEndTime() == null ? old.getEndTime() : in.getEndTime());
         s.setStartDate(in.getStartDate() == null ? old.getStartDate() : in.getStartDate()); s.setEndDate(in.getEndDate() == null ? old.getEndDate() : in.getEndDate());

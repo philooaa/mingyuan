@@ -11,6 +11,7 @@ public class TeacherOneToOneDraft {
     public String timeSlot;
     public String gradeName;
     public String courseClassName;
+    public java.math.BigDecimal unitPrice;
 
     public LocalDate startDate;
     public EduCourseSchedule toSchedule(String configuredSubject, com.ruoyi.system.service.ScheduleAvailabilityService.Slot slot) {
@@ -20,6 +21,7 @@ public class TeacherOneToOneDraft {
         EduCourseSchedule s = new EduCourseSchedule();
         s.setClassroomId(classroomId); s.setLessonLocation(""); s.setGradeName(gradeName); s.setSubjectName(configuredSubject);
         s.setCourseClassName(courseClassName == null ? null : courseClassName.trim());
+        s.setUnitPrice(unitPrice);
         s.setClassMode("2"); s.setClassType("一对一"); s.setStatus("0"); s.setRecruitStatus("0");
         s.setCourseYear((long) startDate.getYear());
         // 按首课日期区分既有若依网格定位，避免不同日期的同一时段被唯一键误判。

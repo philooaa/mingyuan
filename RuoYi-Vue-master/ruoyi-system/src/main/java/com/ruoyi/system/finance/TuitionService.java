@@ -347,6 +347,9 @@ public class TuitionService {
             + (mockEnabled ? "" : " AND e.finance_mode='REAL'"), Long.class);
   }
 
+  private static String gradeStage(String column) {
+    return "(CASE WHEN TRIM("+column+") IN ('一年级','二年级','三年级','四年级','五年级','六年级','小学一年级','小学二年级','小学三年级','小学四年级','小学五年级','小学六年级','小一','小二','小三','小四','小五','小六','1年级','2年级','3年级','4年级','5年级','6年级','g1','g2','g3','g4','g5','g6') THEN 'PRIMARY' WHEN TRIM("+column+") IN ('初一','初二','初三','初中一年级','初中二年级','初中三年级','七年级','八年级','九年级','7年级','8年级','9年级','g7','g8','g9') THEN 'JUNIOR' WHEN TRIM("+column+") IN ('高一','高二','高三','高中一年级','高中二年级','高中三年级','g10','g11','g12') THEN 'SENIOR' ELSE 'UNKNOWN' END)";
+  }
   public Map<String, Object> listBills(long actor, boolean admin, Map<String, String> q) {
     actor(actor, admin);
     // 购物车订单里的单门课程不单独成账单，收款统一记在订单主账单上。
@@ -378,6 +381,16 @@ public class TuitionService {
       where += " AND e.billing_status='OPEN' AND EXISTS (SELECT 1 FROM edu_tuition_payment p WHERE p.enrollment_id=e.enrollment_id AND p.payment_status IN ('PENDING','UNKNOWN'))";
     if (admin && "SUCCESS".equals(str(q,"paymentStage")))
       where += " AND EXISTS (SELECT 1 FROM edu_tuition_payment p WHERE p.enrollment_id=e.enrollment_id AND p.payment_status='SUCCESS')";
+    if (admin && !str(q,"gradeStage").isEmpty()) {
+      String stage=str(q,"gradeStage");
+      require(List.of("PRIMARY","JUNIOR","SENIOR","UNKNOWN").contains(stage), "学段筛选无效");
+      String packageGrade="CASE WHEN JSON_VALID(e.package_snapshot) THEN JSON_UNQUOTE(JSON_EXTRACT(e.package_snapshot,'$.gradeCode')) ELSE NULL END";
+      String direct=gradeStage("CASE WHEN e.bill_type='CREDIT_PACKAGE' THEN "+packageGrade+" ELSE s.grade_name END");
+      String child=gradeStage("cs.grade_name");
+      where += " AND ((e.bill_type='CART_ORDER' AND EXISTS (SELECT 1 FROM edu_enrollment ci LEFT JOIN edu_course_schedule cs ON cs.schedule_id=ci.schedule_id WHERE ci.order_enrollment_id=e.enrollment_id AND ci.del_flag='0' AND "+child+"=?)) OR (e.bill_type<>'CART_ORDER' AND "+direct+"=?))";
+      if ("UNKNOWN".equals(stage)) where = where.substring(0, where.length()-1) + " OR (e.bill_type='CART_ORDER' AND NOT EXISTS (SELECT 1 FROM edu_enrollment ci WHERE ci.order_enrollment_id=e.enrollment_id AND ci.del_flag='0')))";
+      a.add(stage); a.add(stage);
+    }
     if (admin && !str(q, "parentId").isBlank()) {
       where += " AND e.parent_id=?";
       a.add(id(q.get("parentId")));
