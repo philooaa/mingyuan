@@ -24,13 +24,13 @@ public class MiniAppAdminHomeStatsController {
     @GetMapping("/attendance")
     public AjaxResult attendance() {
         LocalDateTime now = LocalDateTime.now(ZONE);
-        Long count = db.jdbc().queryForObject(
-            "SELECT COUNT(DISTINCT r.schedule_id, r.class_date, "
-            + "COALESCE(CONCAT('E',r.enrollment_id),CONCAT('S',r.sign_in_id))) "
+        java.math.BigDecimal count = db.jdbc().queryForObject(
+            "SELECT COALESCE(SUM(CASE WHEN class_mode='2' THEN 1.5 ELSE 1 END),0) FROM (SELECT DISTINCT r.schedule_id, r.class_date, s.class_mode, "
+            + "COALESCE(CONCAT('E',r.enrollment_id),CONCAT('S',r.sign_in_id)) student_key "
             + "FROM edu_class_sign_in r JOIN edu_course_schedule s ON s.schedule_id=r.schedule_id "
             + "WHERE r.class_date=? AND r.del_flag='0' AND r.sign_status IN ('1','4','5') "
-            + "AND COALESCE(r.review_status,'0')<>'2' AND TIMESTAMP(r.class_date,s.end_time)<=?",
-            Long.class, now.toLocalDate(), now);
+            + "AND COALESCE(r.review_status,'0')<>'2' AND TIMESTAMP(r.class_date,s.end_time)<=?) completed",
+            java.math.BigDecimal.class, now.toLocalDate(), now);
         return AjaxResult.success(Map.of("completedCount", count == null ? 0 : count));
     }
 

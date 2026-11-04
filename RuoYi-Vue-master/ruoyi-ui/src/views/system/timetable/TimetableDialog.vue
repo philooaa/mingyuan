@@ -46,14 +46,14 @@
 
         <el-col :span="12">
           <el-form-item label="年级" prop="gradeName">
-            <el-select v-model="form.gradeName" placeholder="请选择年级" style="width:100%" filterable>
+            <el-select v-model="form.gradeName" @change="autoCourseName" placeholder="请选择年级" style="width:100%" filterable>
               <el-option v-for="g in dims.grades" :key="g.value" :label="g.label" :value="g.value" />
             </el-select>
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="科目" prop="subjectName">
-            <el-select v-model="form.subjectName" placeholder="请选择科目" style="width:100%" filterable>
+            <el-select v-model="form.subjectName" @change="autoCourseName" placeholder="请选择科目" style="width:100%" filterable>
               <el-option v-for="s in dims.subjects" :key="s.value" :label="s.label" :value="s.value" />
             </el-select>
           </el-form-item>
@@ -61,7 +61,7 @@
 
         <el-col :span="12">
           <el-form-item label="教师" prop="teacherId">
-            <el-select v-model="form.teacherId" placeholder="请选择教师" style="width:100%" filterable
+            <el-select v-model="form.teacherId" @change="autoCourseName" placeholder="请选择教师" style="width:100%" filterable
                        :disabled="!dims.isAdmin && dims.isTeacher">
               <el-option v-for="t in dims.teachers" :key="t.userId" :label="teacherLabel(t)" :value="t.userId" />
             </el-select>
@@ -72,7 +72,7 @@
         </el-col>
         <el-col :span="12">
           <el-form-item label="班型" prop="classType">
-            <el-input v-model="form.classType" placeholder="请输入班型（可不填）" maxlength="30" clearable />
+            <el-select v-model="form.classType" @change="autoCourseName" placeholder="请选择班型（可不填）" style="width:100%" clearable><el-option v-for="c in dims.classTypes" :key="c.value" :label="c.label" :value="c.value" /></el-select>
           </el-form-item>
         </el-col>
 
@@ -166,6 +166,7 @@
 <script>
 import { addTimetableSchedule, updateTimetableSchedule, getTimetableSchedule } from '@/api/system/timetable'
 import { recognizeAndFill } from '@/utils/course-name-recognition'
+import { updateAutomaticCourseName } from '@/utils/auto-course-name'
 
 export default {
   name: 'TimetableDialog',
@@ -208,6 +209,7 @@ export default {
     }
   },
   methods: {
+    autoCourseName() { updateAutomaticCourseName(this) },
     recognizeName() { return recognizeAndFill(this) },
     // 教师下拉标签：真名优先；真名与昵称不同时把昵称作为别名附在后面
     teacherLabel(t) {
@@ -251,6 +253,7 @@ export default {
       this.syncClassroomMeta()
     },
     open() {
+      this._automaticCourseName = null
       this.form = this.buildEmptyForm()
       this.detailError = false
       if (this.preset && this.preset.defaults) {
@@ -279,9 +282,7 @@ export default {
     },
     autoFillClassName() {
       if (this.form.courseClassName) return
-      const parts = [this.form.gradeName, this.form.subjectName, this.form.classType]
-        .filter(Boolean)
-      this.form.courseClassName = parts.join('')
+      this.autoCourseName()
     },
     async submit() {
       if (this.submitting || this.detailLoading || this.detailError) return

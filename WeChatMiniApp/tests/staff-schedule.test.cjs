@@ -6,7 +6,7 @@ function setup(roles=['education'],send,confirm=true) {
     requests.push(options)
     if(send){const result=send(options);if(result!==undefined)return result}
     if(options.url==='/getInfo')return {roles:storage.roles}
-    if(options.url.endsWith('/options'))return {data:{classrooms:{'万达':[]},teachers:[{userId:7,realName:'老师甲'}],grades:[{label:'初一',value:'初一'}]}}
+    if(options.url.endsWith('/options'))return {data:{classrooms:{'万达':[]},teachers:[{userId:7,realName:'老师甲'}],grades:[{label:'初一',value:'初一'}],classTypes:[{label:'卓越班',value:'卓越班'}]}}
     if(options.url.endsWith('/list'))return {rows:[],total:0}
     return {data:1}
   }
@@ -30,12 +30,19 @@ test('publishing uses the selected campus and teacher, without assigning a class
   assert.equal(body.campusName,'万达');assert.equal(body.teacherId,7);assert.equal(body.recruitStatus,'0')
   assert.equal(Object.hasOwn(body,'classroomId'),false);assert.equal(p.data.formOpen,false)
 })
-test('staff can save a custom class type without a dictionary entry',async()=>{
+test('staff select a class type from enabled dictionary options',async()=>{
   const {p,requests}=setup();await p.load();p.add()
   Object.assign(p.data.form,{campusName:'万达',teacherId:'7',unitPrice:'100',courseClassName:'初一数学',termName:'秋季',periodName:'周六',timeSlot:'8:00-10:00',gradeName:'初一',subjectName:'数学'})
-  p.input({currentTarget:{dataset:{key:'classType'}},detail:{value:'卓越班'}})
+  p.choose({currentTarget:{dataset:{key:'classType'}},detail:{value:0}})
   await p.save()
   assert.equal(requests.find(r=>r.method==='POST').data.classType,'卓越班')
+})
+test('course name follows selected dimensions while retaining manual edits',async()=>{
+  const {p}=setup();await p.load();p.add()
+  Object.assign(p.data.form,{gradeName:'高一',subjectName:'数学',classType:'尖子班'})
+  p.chooseTeacher({detail:{value:0}});assert.equal(p.data.form.courseClassName,'高一数学尖子班老师甲')
+  p.data.form.subjectName='英语';p.autoCourseName();assert.equal(p.data.form.courseClassName,'高一英语尖子班老师甲')
+  p.data.form.courseClassName='手动课程名';p.data.form.subjectName='物理';p.autoCourseName();assert.equal(p.data.form.courseClassName,'手动课程名')
 })
 test('recognition fills empty fields and keeps existing fields when replacement is declined',async()=>{
   const result={data:{gradeName:'初一',subjectName:'数学',classType:'卓越班',teacherId:'7',teacherName:'老师甲',warnings:[]}}
@@ -58,6 +65,12 @@ test('new courses require a positive unit price with at most two decimals',async
   Object.assign(p.data.form,{campusName:'万达',teacherId:'7',courseClassName:'初一数学',termName:'秋季',periodName:'周六',timeSlot:'8:00-10:00',gradeName:'初一',subjectName:'数学'})
   for(const price of ['', '0', '-1', '1.234']) { p.data.form.unitPrice=price; await p.save(); assert.equal(requests.filter(r=>r.method==='POST').length,0) }
   p.data.form.unitPrice='0.5'; await p.save(); assert.equal(requests.filter(r=>r.method==='POST').length,1)
+})
+test('unit price supports presets and manual input',async()=>{
+  const {p}=setup();await p.load();p.add()
+  for (const [i,value] of ['220','250','280'].entries()) { p.choosePrice({detail:{value:i}});assert.equal(p.data.form.unitPrice,value) }
+  p.choosePrice({detail:{value:3}});assert.equal(p.data.form.unitPrice,'');assert.equal(p.data.priceChoice,'手动填写')
+  p.input({currentTarget:{dataset:{key:'unitPrice'}},detail:{value:'168.50'}});assert.equal(p.data.form.unitPrice,'168.50')
 })
 test('uncertain saves retain the course code instead of generating another new course identity',async()=>{
   const {p,requests}=setup(['admin'],o=>o.method==='POST'?Promise.reject(new Error('timeout')):undefined)

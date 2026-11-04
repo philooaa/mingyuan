@@ -5,10 +5,10 @@ const labels = rows => (rows || []).map(r => ({ value: r.value || r.dictLabel, l
 
 Page({
   data: { loading: false, ready: false, error: '', list: [], total: 0, keyword: '', pageNum: 1, pageSize: 20,
-    formOpen: false, saving: false, recognizing: false, formError: '', form: {}, campusOptions: [], teachers: [], fields: [], timeSlots: [], singleTimeSlots: [],
+    formOpen: false, saving: false, recognizing: false, formError: '', form: {}, campusOptions: [], teachers: [], fields: [], classTypes: [], timeSlots: [], singleTimeSlots: [],
     modes: [{label:'班课',value:'1'},{label:'一对一',value:'2'}],
     patterns:[{label:'每周一次',value:'WEEKLY'},{label:'连上无假期',value:'DAILY'},{label:'上5休1',value:'DAILY_5_1'},{label:'上6休1',value:'DAILY_6_1'},{label:'上5休2',value:'DAILY_5_2'},{label:'上4休1',value:'DAILY_4_1'},{label:'其他（暂不排课）',value:'OTHER'}],
-    patternIndex:0,
+    patternIndex:0, priceOptions:['220','250','280','手动填写'], priceChoice:'',
     recruitOptions:[{label:'开放报名',value:'0'},{label:'停止招生',value:'1'},{label:'已满',value:'2'}], statusOptions:[{label:'正常',value:'0'},{label:'停用',value:'1'}] },
   onLoad(options={}) { this._token=wx.getStorageSync('token');this._alive=true;this._editId=options.id || '';this._editOnLoad=!!this._editId },
   onShow() { this._visible=true;this.load() },
@@ -28,7 +28,7 @@ Page({
       const d=res.data || {}, teachers=(d.teachers || []).map(t=>({...t,label:t.realName || t.nickName || t.userName,value:String(t.userId)}))
       const fields=[['termName','学期',d.terms],['periodName','期次或上课日',d.periods],['timeSlot','时段',d.timeSlots],['gradeName','年级',d.grades],['subjectName','学科',d.subjects]]
         .map(([key,label,options])=>({key,label,options:labels(options)}))
-      this.setData({timeSlots:labels(d.timeSlots),singleTimeSlots:labels(d.singleTimeSlots),campusOptions:Object.keys(d.classrooms || {}).filter(c=>c!=='未分配校区'),teachers,fields,ready:true})
+      this.setData({classTypes:labels(d.classTypes),timeSlots:labels(d.timeSlots),singleTimeSlots:labels(d.singleTimeSlots),campusOptions:Object.keys(d.classrooms || {}).filter(c=>c!=='未分配校区'),teachers,fields,ready:true})
       await this.loadList(version)
       if(this._editOnLoad && this.current() && version===this._version) { this._editOnLoad=false;await this.edit({currentTarget:{dataset:{id:this._editId}}}) }
     } catch(e) { if(this.current() && version===this._version)this.setData({ready:false,list:[],error:e.message || '排课选项加载失败，请重试'}) }
@@ -44,9 +44,10 @@ Page({
   next() { if(this.data.pageNum*this.data.pageSize<this.data.total && !this.data.loading && !this.data.saving) {this.setData({pageNum:this.data.pageNum+1});this.load()} },
   add() {
     if(!this.current() || !this.data.ready || this.data.loading || this.data.saving)return
+    this._automaticCourseName=null
     this._formVersion=(this._formVersion || 0)+1
     this.setSlotOptions('1')
-    this.setData({form:{campusName:'',courseYear:String(new Date().getFullYear()),courseClassName:'',scheduleCode:'',termName:'',periodName:'',timeSlot:'',startTime:'',endTime:'',gradeName:'',subjectName:'',teacherId:'',teacherLabel:'',classType:'',classMode:'1',classPattern:'WEEKLY',startDate:'',endDate:'',unitPrice:'',enrollLimit:'',recruitStatus:'0',status:'0',remark:''},patternIndex:0,formOpen:true,formError:''})
+    this.setData({priceChoice:'',form:{campusName:'',courseYear:String(new Date().getFullYear()),courseClassName:'',scheduleCode:'',termName:'',periodName:'',timeSlot:'',startTime:'',endTime:'',gradeName:'',subjectName:'',teacherId:'',teacherLabel:'',classType:'',classMode:'1',classPattern:'WEEKLY',startDate:'',endDate:'',unitPrice:'',enrollLimit:'',recruitStatus:'0',status:'0',remark:''},patternIndex:0,formOpen:true,formError:''})
   },
   async edit(e) {
     if(!this.current() || !this.data.ready || this.data.saving)return
@@ -56,9 +57,10 @@ Page({
       const res=await request({url:root+'/'+id})
       if(!this.current() || version!==this._version)return
       const f=res.data || {}, teacher=this.data.teachers.find(t=>t.value===String(f.teacherId))
+      this._automaticCourseName=null
       this._formVersion=(this._formVersion || 0)+1
       this.setSlotOptions(f.classMode)
-      this.setData({form:{...f,teacherId:String(f.teacherId || ''),teacherLabel:teacher?teacher.label:f.teacherName,startDate:(f.startDate || '').slice(0,10),endDate:(f.endDate || '').slice(0,10)},patternIndex:this.patternIndexOf(f.classPattern),formOpen:true,formError:''})
+      this.setData({priceChoice:f.unitPrice == null ? '' : [220,250,280].includes(Number(f.unitPrice)) ? String(Number(f.unitPrice)) : '手动填写',form:{...f,teacherId:String(f.teacherId || ''),teacherLabel:teacher?teacher.label:f.teacherName,startDate:(f.startDate || '').slice(0,10),endDate:(f.endDate || '').slice(0,10)},patternIndex:this.patternIndexOf(f.classPattern),formOpen:true,formError:''})
     } catch(e) { if(this.current() && version===this._version)wx.showToast({title:e.message || '课程加载失败',icon:'none'}) }
   },
   async remove(e) {
@@ -89,7 +91,7 @@ Page({
       const data=result.data || {}, warnings=(data.warnings || []).slice(), teacher=this.data.teachers.find(t=>String(t.value)===String(data.teacherId))
       const proposed={gradeName:data.gradeName,subjectName:data.subjectName,classType:data.classType,teacherId:teacher && teacher.value}
       if(data.teacherId && !teacher)warnings.push('教师选项已变化，请手动选择')
-      if(proposed.classType && Array.from(proposed.classType).length>30){delete proposed.classType;warnings.push('班型候选超过30个字符，请手动填写')}
+      if(proposed.classType && !this.data.classTypes.some(t=>t.value===proposed.classType)){delete proposed.classType;warnings.push('识别的班型不在启用选项中，请手动选择')}
       if((data.teacherCandidates || []).length>1)warnings.push('候选教师：'+data.teacherCandidates.map(t=>`${t.name || t.nickName || '教师'}（账号编号 ${t.id}）`).join('、'))
       const labels={gradeName:'年级',subjectName:'学科',classType:'班型',teacherId:'教师'}
       const keys=Object.keys(proposed).filter(k=>proposed[k]!==undefined && proposed[k]!==null && proposed[k]!=='')
@@ -104,7 +106,16 @@ Page({
     finally { if(this._alive && this._token===wx.getStorageSync('token'))this.setData({recognizing:false}) }
   },
   chooseCampus(e) { if(!this.data.saving && !this.data.form.classroomId)this.setData({'form.campusName':this.data.campusOptions[Number(e.detail.value)] || ''}) },
-  chooseTeacher(e) { const t=this.data.teachers[Number(e.detail.value)];if(t && !this.data.saving)this.setData({'form.teacherId':t.value,'form.teacherLabel':t.label}) },
+  choosePrice(e) { if(this.data.saving)return;const choice=this.data.priceOptions[Number(e.detail.value)];if(choice)this.setData({priceChoice:choice,'form.unitPrice':choice==='手动填写'?'':choice}) },
+  chooseTeacher(e) { const t=this.data.teachers[Number(e.detail.value)];if(t && !this.data.saving){this.setData({'form.teacherId':t.value,'form.teacherLabel':t.label});this.autoCourseName()} },
+  autoCourseName() {
+    const f=this.data.form, teacher=this.data.teachers.find(t=>String(t.value)===String(f.teacherId))
+    const name=teacher && (teacher.realName || teacher.userName || teacher.nickName)
+    if(!f.gradeName || !f.subjectName || !f.classType || !name) {if(this._automaticCourseName && f.courseClassName===this._automaticCourseName){this._automaticCourseName=null;this.setData({'form.courseClassName':''})}return}
+    if(f.courseClassName && f.courseClassName!==this._automaticCourseName)return
+    this._automaticCourseName=[f.gradeName,f.subjectName,f.classType,name].join('')
+    this.setData({'form.courseClassName':this._automaticCourseName})
+  },
   setSlotOptions(mode) {
     const options=mode==='2'?this.data.singleTimeSlots:this.data.timeSlots
     this.setData({fields:this.data.fields.map(f=>f.key==='timeSlot'?{...f,options}:f)})
@@ -117,7 +128,7 @@ Page({
   choose(e) {
     if(!this.current() || this.data.saving)return
     const key=e.currentTarget.dataset.key, f=this.data.fields.find(f=>f.key===key)
-    const options=f?f.options:({classMode:this.data.modes,classPattern:this.data.patterns,recruitStatus:this.data.recruitOptions,status:this.data.statusOptions})[key]
+    const options=f?f.options:({classType:this.data.classTypes,classMode:this.data.modes,classPattern:this.data.patterns,recruitStatus:this.data.recruitOptions,status:this.data.statusOptions})[key]
     const row=options && options[Number(e.detail.value)];if(!row)return
     const change={['form.'+key]:row.value}
     if(key==='classMode') {
@@ -133,6 +144,7 @@ Page({
       if(times.length===2) {change['form.startTime']=times[0].length===4?'0'+times[0]+':00':times[0]+':00';change['form.endTime']=times[1].length===4?'0'+times[1]+':00':times[1]+':00'}
     }
     this.setData(change)
+    if(['gradeName','subjectName','classType'].includes(key))this.autoCourseName()
   },
   date(e) {
     if(this.data.saving)return

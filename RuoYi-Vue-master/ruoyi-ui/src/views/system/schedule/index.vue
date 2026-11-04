@@ -278,22 +278,22 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="年级" prop="gradeName">
-              <el-select v-model="form.gradeName" filterable placeholder="请选择年级" style="width:100%"><el-option v-for="item in dims.grades" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+              <el-select v-model="form.gradeName" @change="autoCourseName" filterable placeholder="请选择年级" style="width:100%"><el-option v-for="item in dims.grades" :key="item.value" :label="item.label" :value="item.value" /></el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="科目" prop="subjectName">
-              <el-select v-model="form.subjectName" filterable placeholder="请选择学科" style="width:100%"><el-option v-for="item in dims.subjects" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+              <el-select v-model="form.subjectName" @change="autoCourseName" filterable placeholder="请选择学科" style="width:100%"><el-option v-for="item in dims.subjects" :key="item.value" :label="item.label" :value="item.value" /></el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="教师" prop="teacherId">
-              <el-select v-model="form.teacherId" filterable placeholder="请选择教师账号" :disabled="dims.isTeacher && !dims.isAdmin"><el-option v-for="teacher in dims.teachers" :key="teacher.userId" :value="teacher.userId" :label="`${teacher.nickName}（${teacher.userName}）`" /></el-select>
+              <el-select v-model="form.teacherId" @change="autoCourseName" filterable placeholder="请选择教师账号" :disabled="dims.isTeacher && !dims.isAdmin"><el-option v-for="teacher in dims.teachers" :key="teacher.userId" :value="teacher.userId" :label="`${teacher.nickName}（${teacher.userName}）`" /></el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="班型" prop="classType">
-              <el-input v-model="form.classType" placeholder="请输入班型（可不填）" maxlength="30" clearable />
+              <el-select v-model="form.classType" @change="autoCourseName" placeholder="请选择班型（可不填）" style="width:100%" clearable><el-option v-for="c in dims.classTypes" :key="c.value" :label="c.label" :value="c.value" /></el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -317,7 +317,8 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="课时单价(元)" prop="unitPrice">
-              <el-input-number v-model="form.unitPrice" :min="0" :precision="2" :step="50" controls-position="right" style="width: 100%" placeholder="元/人·次，用于财务统计" />
+              <el-select v-model="priceChoice" placeholder="请选择单价" style="width:100%" @change="choosePrice"><el-option v-for="price in [220,250,280]" :key="price" :label="price + '元'" :value="price" /><el-option label="手动填写" value="custom" /></el-select>
+              <el-input-number v-if="priceChoice === 'custom'" v-model="form.unitPrice" :min="0" :precision="2" controls-position="right" style="width:100%" placeholder="请输入单价" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -366,6 +367,7 @@ import { listSchedule, getSchedule, delSchedule, addSchedule, updateSchedule } f
 import { getTimetableDimensions } from "@/api/system/timetable"
 import OneToOneManager from './OneToOneManager.vue'
 import { recognizeAndFill } from '@/utils/course-name-recognition'
+import { updateAutomaticCourseName } from '@/utils/auto-course-name'
 
 export default {
   name: "Schedule",
@@ -375,7 +377,7 @@ export default {
       // 遮罩层
       loading: true,
       submitting: false,
-      recognizing: false,
+      recognizing: false, priceChoice: null,
       dims: { classroomList: [], teachers: [], terms: [], periods: [], periodMap: {}, timeSlots: [], grades: [], subjects: [], classTypes: [], isTeacher: false, isAdmin: false },
       // 选中数组
       ids: [],
@@ -473,6 +475,8 @@ export default {
     getTimetableDimensions().then(response => { this.dims = response.data || this.dims }).catch(() => {})
   },
   methods: {
+    autoCourseName() { updateAutomaticCourseName(this) },
+    choosePrice(value) { this.form.unitPrice = value === 'custom' ? null : value },
     recognizeName() { return recognizeAndFill(this) },
     openSingle(row = {}, tab = 'slots') {
       if (!this.dims.isAdmin) { this.$modal.msgError('仅管理员可在网页统一管理一对一'); return }
@@ -501,6 +505,8 @@ export default {
     },
     // 表单重置
     reset() {
+      this._automaticCourseName = null
+      this.priceChoice = null
       this.form = {
         scheduleId: null,
         scheduleCode: null,
@@ -565,6 +571,7 @@ export default {
       getSchedule(scheduleId).then(response => {
         if (response.data.classMode === '2' && this.dims.isAdmin) { this.openSingle(response.data, 'courses'); return }
         this.form = response.data
+        this.priceChoice = this.form.unitPrice == null ? null : [220,250,280].includes(Number(this.form.unitPrice)) ? Number(this.form.unitPrice) : 'custom'
         this.form.courseYear = this.form.courseYear == null ? null : String(this.form.courseYear)
         this.open = true
         this.title = "修改课程排课"
