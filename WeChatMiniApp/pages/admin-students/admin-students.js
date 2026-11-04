@@ -177,5 +177,6 @@ Page({
   },
   closeDetail() { this.setData({ detail: null }) },
 
+  openEnrollment(e) { wx.navigateTo({url: '/pages/admin-enrollment-detail/admin-enrollment-detail?id='+e.currentTarget.dataset.id}) },
   noop() {}
 })

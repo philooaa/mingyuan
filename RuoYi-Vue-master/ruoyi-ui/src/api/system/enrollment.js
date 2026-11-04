@@ -42,3 +42,11 @@ export function cancelEnrollment(enrollmentId) {
     method: 'put'
   })
 }
+
+// 独立换课入口，不通过普通报名编辑改写账单。
+export function listTransferOptions(id, params) {
+  return request({ url: `/system/enrollment/${id}/transfer-options`, method: 'get', params })
+}
+export function transferEnrollment(id, data) {
+  return request({ url: `/system/enrollment/${id}/transfer`, method: 'put', data })
+}

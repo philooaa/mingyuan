@@ -93,7 +93,7 @@ public class MiniAppTeacherSignController extends BaseController
             throw new ServiceException("签到内容不能为空");
         }
         assertScheduleAccess(body.getScheduleId());
-        // Preserve free-form trial/transfer students, but never link another class's enrollment.
+        // A transferred student may remain in an existing historical lesson, never a new lesson of the former class.
         if (body.getDetails() != null)
         {
             for (MiniAppSignSubmitBody.Detail detail : body.getDetails())
@@ -101,7 +101,8 @@ public class MiniAppTeacherSignController extends BaseController
                 if (detail != null && detail.getEnrollmentId() != null)
                 {
                     EduEnrollment enrollment = enrollmentMapper.selectEduEnrollmentByEnrollmentId(detail.getEnrollmentId());
-                    if (enrollment == null || !body.getScheduleId().equals(enrollment.getScheduleId())
+                    if (enrollment == null || (!body.getScheduleId().equals(enrollment.getScheduleId())
+                        && !com.ruoyi.system.service.EnrollmentTransferService.hasHistoricalSignIn(singleDb,detail.getEnrollmentId(),body.getScheduleId(),body.getClassDate()))
                         || (enrollment.getClassDate() != null && (!enrollment.getClassDate().toString().equals(body.getClassDate()) || !"1".equals(enrollment.getEnrollmentStatus()))))
                     {
                         throw new ServiceException("签到报名记录不属于当前班级");

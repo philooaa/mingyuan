@@ -237,6 +237,32 @@ class SignReviewMysqlTest {
             assertEquals(5,jdbc.queryForObject("SELECT COUNT(*) FROM edu_class_sign_in WHERE review_status='1'",Integer.class));
         } finally {org.springframework.security.core.context.SecurityContextHolder.clearContext();}
     }
+    @Test void transferredStudentRetainsIdentityAndCombinedAttendanceHistory() {
+        jdbc.update("DELETE FROM edu_student");jdbc.update("INSERT INTO edu_student VALUES(1,30,'换课学生')");
+        jdbc.update("INSERT INTO edu_enrollment(enrollment_id,schedule_id,student_id,parent_id,student_name) VALUES(100,2,1,30,'换课学生')");
+        jdbc.update("UPDATE edu_class_sign_in SET enrollment_id=100 WHERE student_name='学员1'");
+        var overview=service.attendanceOverview(1L,null,null);
+        var students=(List<Map<String,Object>>)overview.get("rows");
+        assertTrue(students.stream().anyMatch(row->"S:1".equals(row.get("studentKey")) && Boolean.TRUE.equals(row.get("linked"))));
+        assertEquals(1,service.attendanceStudent(1L,"S:1",true,null,null,1).get("total"));
+    }
+    @Test void transferredStudentCanCorrectOnlyTheirExistingHistoricalLesson() throws Exception {
+        jdbc.update("INSERT INTO edu_enrollment(enrollment_id,schedule_id,parent_id,student_name) VALUES(100,2,30,'学员1')");
+        jdbc.update("UPDATE edu_class_sign_in SET enrollment_id=100 WHERE student_name='学员1'");
+        long sign=jdbc.queryForObject("SELECT sign_in_id FROM edu_class_sign_in WHERE enrollment_id=100",Long.class);
+        var controller=new com.ruoyi.system.controller.MiniAppTeacherSignController();
+        Map<String,Object> fields=Map.of("homeworkMapper",Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{EduHomeworkMapper.class},(p,m,a)->10L),"signInService",service,"singleDb",new com.ruoyi.system.shop.ShopRepository(jdbc.getDataSource()),
+            "scheduleMapper",Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{EduCourseScheduleMapper.class},(p,m,a)->{var s=new EduCourseSchedule();s.setScheduleId(1L);s.setTeacherId(10L);s.setDelFlag("0");s.setClassMode("1");return s;}),
+            "enrollmentMapper",Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{EduEnrollmentMapper.class},(p,m,a)->{var e=new com.ruoyi.system.domain.EduEnrollment();e.setEnrollmentId(100L);e.setScheduleId(2L);return e;}));
+        for(var entry:fields.entrySet()){var f=controller.getClass().getDeclaredField(entry.getKey());f.setAccessible(true);f.set(controller,entry.getValue());}
+        var body=new com.ruoyi.common.core.domain.model.MiniAppSignSubmitBody();body.setScheduleId(1L);body.setClassDate("2026-10-19");body.setReviewVersion(0L);
+        var d=new com.ruoyi.common.core.domain.model.MiniAppSignSubmitBody.Detail();d.setEnrollmentId(100L);d.setStudentName("学员1");d.setSourceType("1");d.setSignStatus("6");body.setDetails(List.of(d));
+        ScheduleCrudTest.principal(10L,"teacher");controller.submit(body);
+        assertEquals(sign,jdbc.queryForObject("SELECT sign_in_id FROM edu_class_sign_in WHERE enrollment_id=100",Long.class));
+        assertEquals("6",jdbc.queryForObject("SELECT sign_status FROM edu_class_sign_in WHERE enrollment_id=100",String.class));
+        body.setClassDate("2026-10-20");body.setReviewVersion(0L);
+        assertThrows(ServiceException.class,()->controller.submit(body));
+    }
     @BeforeEach void reviewer(){ScheduleCrudTest.principal(20L,"education");}
     @AfterEach void clearReviewer(){org.springframework.security.core.context.SecurityContextHolder.clearContext();}
     @AfterAll void cleanup()throws Exception{if(jdbc!=null&&schema.matches("codex_sign_review_test_[0-9a-f]{12}"))try(var c=DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/","root","")){c.createStatement().execute("DROP DATABASE "+schema);}}

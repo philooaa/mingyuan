@@ -189,6 +189,7 @@
             @click="handleUpdate(scope.row)"
             v-hasPermi="['system:enrollment:edit']"
           >{{ scope.row.classDate ? '预约管理' : '修改' }}</el-button>
+          <el-button v-if="canTransfer(scope.row)" size="mini" type="text" icon="el-icon-sort" @click="handleTransfer(scope.row)">换课</el-button>
           <el-button
             size="mini"
             type="text"
@@ -279,12 +280,31 @@
         <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
+    <el-dialog title="学生换课" :visible.sync="transferOpen" width="760px" append-to-body :close-on-click-modal="false" :show-close="!transferSaving" :close-on-press-escape="!transferSaving">
+      <template v-if="transferRow">
+        <p><b>{{transferRow.studentName}}</b> · 原课程：{{transferRow.courseClassName || transferRow.scheduleId}} · {{transferRow.payStatus || '待核对'}}</p>
+        <el-alert title="换课后保留原报名号、缴费、收据及历史考勤；差价需另行收费或退费。" type="warning" :closable="false" show-icon />
+        <el-form label-width="100px" style="margin-top:20px">
+          <el-form-item label="搜索目标课程"><el-input v-model="transferKeyword" maxlength="100" placeholder="课程、年级、学科或老师" :disabled="transferSaving" @keyup.enter.native="searchTransfer"><el-button slot="append" icon="el-icon-search" :disabled="transferSaving" @click="searchTransfer">搜索</el-button></el-input></el-form-item>
+          <el-form-item label="目标班课">
+            <el-select v-model="transferTarget" placeholder="请选择目标课程" :loading="transferLoading" :disabled="transferSaving || transferLoading" style="width:100%">
+              <el-option v-for="course in transferRows" :key="course.scheduleId" :value="course.scheduleId" :label="transferLabel(course)" />
+            </el-select>
+            <div class="edu-table-secondary">共 {{transferTotal}} 门可选课程，满班、停用及一对一课程不在此列表中。</div>
+            <el-pagination v-if="transferTotal>20" small layout="prev,pager,next" :total="transferTotal" :page-size="20" :current-page="transferPage" :disabled="transferSaving || transferLoading" @current-change="loadTransferOptions"/>
+          </el-form-item>
+          <el-form-item label="换课原因"><el-input v-model="transferReason" type="textarea" :rows="3" maxlength="255" show-word-limit :disabled="transferSaving" placeholder="请填写换课原因" /></el-form-item>
+        </el-form>
+        <template v-if="transferHistory.length"><h4>换课记录</h4><p v-for="item in transferHistory" :key="item.transferId" style="word-break:break-all">{{item.fromCourseName}} → {{item.toCourseName}}<br>{{item.reason}} · {{item.operatorName}} · {{item.createTime}}</p></template>
+      </template>
+      <div slot="footer"><el-button :disabled="transferSaving" @click="transferOpen=false">取消</el-button><el-button type="primary" :loading="transferSaving" :disabled="transferLoading || !transferTarget || !transferReason.trim()" @click="submitTransfer">确认换课</el-button></div>
+    </el-dialog>
     <OneToOneManager ref="oneToOne" :dims="dims" @changed="getList" />
   </div>
 </template>
 
 <script>
-import { listEnrollment, getEnrollment, cancelEnrollment, addEnrollment, updateEnrollment } from "@/api/system/enrollment"
+import { listEnrollment, getEnrollment, cancelEnrollment, addEnrollment, updateEnrollment, listTransferOptions, transferEnrollment } from "@/api/system/enrollment"
 import { personalDetail } from "@/api/system/transaction"
 import { getTimetableDimensions } from '@/api/system/timetable'
 import OneToOneManager from '../schedule/OneToOneManager.vue'
@@ -294,6 +314,8 @@ export default {
   components: { OneToOneManager },
   data() {
     return {
+      transferOpen: false, transferRow: null, transferRows: [], transferHistory: [], transferTotal: 0,
+      transferPage: 1, transferKeyword: '', transferQuery: '', transferTarget: null, transferReason: '', transferLoading: false, transferSaving: false,
       dims: { teachers: [], grades: [], isAdmin: false },
       childChoices: [], childChoice: 'new', childrenLoading:false, childError:'', childVersion:0, childrenParent:null,
       // 遮罩层
@@ -356,6 +378,42 @@ export default {
     this.getList()
   },
   methods: {
+    canTransfer(row) {
+      return !row.classDate && !this.isEnrollmentCancelled(row) && ['0','1','待确认','已确认','报名成功'].includes(String(row.enrollmentStatus))
+        && (this.$store.getters.roles || []).some(role=>['admin','business_admin','education'].includes(role))
+    },
+    transferLabel(course) {
+      return [course.courseClassName, course.gradeName, course.subjectName, course.teacherName,
+        [course.courseYear,course.termName,course.periodName].filter(Boolean).join(' '),
+        course.startTime ? `${course.startTime}–${course.endTime}` : course.timeSlot,
+        [course.campusName,course.classroomName || '教室待分配'].filter(Boolean).join(' '),
+        course.startDate ? `${course.startDate}至${course.endDate}` : '日期待配置'].filter(Boolean).join(' · ')
+    },
+    handleTransfer(row) {
+      this.transferRow={...row};this.transferOpen=true;this.transferKeyword='';this.transferQuery='';this.transferTarget=null;this.transferReason='';this.transferHistory=[];this.transferRows=[];this.transferTotal=0
+      return this.loadTransferOptions(1)
+    },
+    searchTransfer() { if(this.transferSaving)return; this.transferQuery=this.transferKeyword;this.transferTarget=null;return this.loadTransferOptions(1) },
+    async loadTransferOptions(page) {
+      const version=this._transferVersion=(this._transferVersion || 0)+1
+      this.transferLoading=true
+      try {
+        const res=await listTransferOptions(this.transferRow.enrollmentId,{keyword:this.transferQuery,page})
+        if(version!==this._transferVersion)return
+        this.transferRows=res.data.rows || [];this.transferHistory=res.data.history || [];this.transferTotal=res.data.total;this.transferPage=page
+      } catch(e) { if(version===this._transferVersion){this.transferRows=[];this.transferTotal=0;this.$modal.msgError(e.message || '课程加载失败')} }
+      finally {if(version===this._transferVersion)this.transferLoading=false}
+    },
+    async submitTransfer() {
+      if(this.transferSaving || !this.transferTarget || !this.transferReason.trim())return
+      this.transferSaving=true
+      try {
+        await this.$confirm('确认将该学生换至所选课程？原缴费、收据和历史考勤将保留，差价需另行处理。','确认学生换课',{type:'warning'})
+        await transferEnrollment(this.transferRow.enrollmentId,{fromScheduleId:this.transferRow.scheduleId,targetScheduleId:this.transferTarget,reason:this.transferReason.trim()})
+        this.$modal.msgSuccess('换课成功');this.transferOpen=false;this.getList()
+      } catch(e) { if(e!=='cancel' && e!=='close')this.$modal.msgError(e.message || '换课失败，请刷新后重试') }
+      finally {this.transferSaving=false}
+    },
     async openSingle(row = {}) {
       const response = await getTimetableDimensions()
       this.dims = response.data || this.dims
