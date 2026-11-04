@@ -672,6 +672,12 @@ public class TimetableImportService
             if (!complete) incomplete++;
 
             EduCourseSchedule s = new EduCourseSchedule();
+            String importedPrice = str(r.get("unitPrice"));
+            if (StringUtils.isNotEmpty(importedPrice)) {
+                try { s.setUnitPrice(new java.math.BigDecimal(importedPrice)); }
+                catch (NumberFormatException ex) { throw new ServiceException("导入课时单价格式无效"); }
+                if (s.getUnitPrice().signum() <= 0 || s.getUnitPrice().stripTrailingZeros().scale() > 2) throw new ServiceException("导入课时单价必须大于0且最多两位小数");
+            }
             s.setCourseYear(year == null ? (long) Calendar.getInstance().get(Calendar.YEAR) : year);
             s.setTermName(StringUtils.isNotEmpty(t0) ? t0 : PH_TERM);
             s.setPeriodName(StringUtils.isNotEmpty(p0) ? p0 : PH_PERIOD);
@@ -728,6 +734,8 @@ public class TimetableImportService
             EduCourseSchedule exist = classroomId == null ? null : findExisting(s);
             if (exist != null)
             {
+                // Importing a timetable must not silently reprice existing courses.
+                s.setUnitPrice(null);
                 if (!updateSupport) { skipped++; if (skipMsgs.size() < 10) skipMsgs.add("已存在（未勾选覆盖）：" + s.getCourseClassName()); continue; }
                 s.setScheduleId(exist.getScheduleId());
                 // 教师补绑后自动解除停用：这类行当初就是因为「教师未绑定」才被置成停用，
@@ -754,6 +762,8 @@ public class TimetableImportService
             }
             else
             {
+                if (s.getUnitPrice() == null || s.getUnitPrice().signum() <= 0 || s.getUnitPrice().stripTrailingZeros().scale() > 2)
+                    throw new ServiceException("导入的新排课缺少有效课时单价，请在排课页面填写大于0的单价后创建；本次导入未保存");
                 s.setScheduleCode("IMP" + seq + (inserted + updated));
                 s.setDelFlag("0"); s.setStatus("0"); s.setRecruitStatus("0"); s.setEnrolledCount(0L);
                 s.setCreateBy(username);

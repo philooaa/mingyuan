@@ -33,6 +33,7 @@
           <h4>{{ selectedCell.date }} · {{ selectedCell.timeSlot }}</h4>
           <el-form-item label="年级" required><el-select v-model="form.gradeName" :disabled="busy" filterable><el-option v-for="g in dims.grades" :key="g.value" :value="g.value" :label="g.label" /></el-select></el-form-item>
           <el-form-item label="课程名称" required><el-input v-model="form.courseClassName" :disabled="busy" maxlength="100" placeholder="请输入课程名称" /></el-form-item>
+          <el-form-item label="课时单价" :required="!editing"><el-input-number v-model="form.unitPrice" :disabled="busy" :min="0" :precision="2" placeholder="请输入大于0的金额" /></el-form-item>
           <el-form-item label="空闲教室" required><el-select v-model="form.classroomId" :disabled="busy" filterable><el-option v-for="r in selectedCell.classrooms" :key="r.classroomId" :value="r.classroomId" :label="`${r.campusName} · ${r.classroomName}`" /></el-select></el-form-item>
           <el-form-item><el-button type="primary" :loading="busy" :disabled="loading || !!error || !profile.teacherSubject" @click="save">{{ editing ? '保存调整' : '发布一节课程' }}</el-button></el-form-item>
         </el-form>
@@ -91,7 +92,7 @@ export default {
   props: { dims: { type: Object, required: true } },
   data() {
     return { visible: false, tab: 'slots', teacherId: null, date: '', profile: {}, cells: [], courses: [], bookings: [], pendingCount: 0,
-      loading: false, busy: false, error: '', version: 0, selectedCell: null, editing: null, form: { gradeName: '', courseClassName: '', classroomId: null },
+      loading: false, busy: false, error: '', version: 0, selectedCell: null, editing: null, form: { gradeName: '', courseClassName: '', classroomId: null, unitPrice: null },
       scheduleId: null, keyword: '', pendingOnly: false, coursePageNum: 1, bookingPageNum: 1, historyOpen: false, historyLoading: false, historyVersion: 0, events: [] }
   },
   computed: {
@@ -110,13 +111,13 @@ export default {
       if (this.busy) return
       this.visible = true; this.tab = tab; this.teacherId = row.teacherId || null; this.date = row.startDate || this.today()
       this.editing = null; this.scheduleId = tab === 'bookings' ? row.scheduleId || null : null; this.keyword = ''; this.pendingOnly = false
-      this.form = { gradeName: '', courseClassName: '', classroomId: null }; this.coursePageNum = 1; this.bookingPageNum = 1
+      this.form = { gradeName: '', courseClassName: '', classroomId: null, unitPrice: null }; this.coursePageNum = 1; this.bookingPageNum = 1
       await this.refresh()
     },
     close() { if (this.busy) return; this.visible = false; this.version++; this.historyVersion++; this.historyOpen = false },
     allowTabChange() { return !this.busy },
     changeTeacher() {
-      this.editing = null; this.selectedCell = null; this.form = { gradeName: '', courseClassName: '', classroomId: null }; this.scheduleId = null
+      this.editing = null; this.selectedCell = null; this.form = { gradeName: '', courseClassName: '', classroomId: null, unitPrice: null }; this.scheduleId = null
       this.coursePageNum = 1; this.bookingPageNum = 1
       return this.refresh()
     },
@@ -142,7 +143,8 @@ export default {
       const c = this.selectedCell && this.cells.find(c => c.date === this.selectedCell.date && c.timeSlot === this.selectedCell.timeSlot)
       if (!c || !this.flag(c.canPublish) || !c.classrooms.some(r => String(r.classroomId) === String(this.form.classroomId))) { this.$message.warning('请重新选择空闲时段和教室'); return }
       if (!this.form.gradeName || !this.form.courseClassName.trim() || !this.profile.teacherSubject) { this.$message.warning('请填写年级、课程名称，并配置教师学科'); return }
-      const data = { teacherId: this.teacherId, classroomId: this.form.classroomId, timeSlot: c.timeSlot, startDate: c.date, gradeName: this.form.gradeName, courseClassName: this.form.courseClassName.trim() }
+      if (!this.editing && !(Number(this.form.unitPrice) > 0)) { this.$message.warning('课时单价必须大于0'); return }
+      const data = { teacherId: this.teacherId, classroomId: this.form.classroomId, timeSlot: c.timeSlot, startDate: c.date, gradeName: this.form.gradeName, courseClassName: this.form.courseClassName.trim(), unitPrice: this.form.unitPrice }
       this.busy = true
       try {
         if (this.editing) await updateSingle(this.editing.scheduleId, data); else await publishSingle(data)
@@ -153,7 +155,7 @@ export default {
     async editCourse(row) {
       if (this.busy || !row.canEdit) return
       this.teacherId = row.teacherId; this.editing = row; this.date = row.startDate || this.today(); this.tab = 'slots'
-      this.form = { gradeName: row.gradeName, courseClassName: row.courseClassName, classroomId: null }; await this.refresh()
+      this.form = { gradeName: row.gradeName, courseClassName: row.courseClassName, classroomId: null, unitPrice: row.unitPrice || null }; await this.refresh()
     },
     cancelEdit() { if (this.busy) return; this.editing = null; return this.refresh() },
     viewBookings(row) { if (this.busy) return; this.scheduleId = row.scheduleId; this.tab = 'bookings'; this.bookingPageNum = 1; return this.refresh() },

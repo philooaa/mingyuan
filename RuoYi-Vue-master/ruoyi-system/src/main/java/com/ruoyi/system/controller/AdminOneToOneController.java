@@ -50,6 +50,7 @@ public class AdminOneToOneController extends BaseController {
             var row=new LinkedHashMap<String,Object>();
             row.put("scheduleId",s.getScheduleId());row.put("teacherId",s.getTeacherId());row.put("teacherName",s.getTeacherName());
             row.put("courseClassName",s.getCourseClassName());row.put("gradeName",s.getGradeName());row.put("subjectName",s.getSubjectName());
+            row.put("unitPrice",s.getUnitPrice());
             row.put("startDate",ScheduleCalendar.date(s.getStartDate()));row.put("endDate",ScheduleCalendar.date(s.getEndDate()));
             row.put("timeSlot",s.getTimeSlot());row.put("status",s.getStatus());row.put("recruitStatus",s.getRecruitStatus());
             row.put("dates",single.dates(s));row.put("singleBookings",single.bookings(s.getScheduleId()));

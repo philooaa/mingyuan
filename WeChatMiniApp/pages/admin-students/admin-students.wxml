@@ -18,7 +18,7 @@
         <text class="row-name">{{item.studentName}}</text>
         <text class="badge {{item.activeCount > 0 ? 'ok' : 'gray'}}">{{item.statusText}}</text>
       </view>
-      <view class="row-sub">{{item.studentPhone || '无手机号'}}　共报名 {{item.courseCount}} 门课</view>
+      <view class="row-sub">联系电话：{{item.contactPhone || item.parentPhone || item.studentPhone || '未填写'}}　共报名 {{item.courseCount}} 门课</view>
       <view class="row-sub">最近报名：{{item.latestDate || '—'}}</view>
     </view>
     <view wx:if="{{hasMore}}" class="more-tip">上拉加载更多…</view>
@@ -42,7 +42,8 @@
           <text class="course-name">{{c.courseClassName}}</text>
           <text class="badge {{c.active ? 'ok' : 'gray'}}">{{c.enrollmentStatus}}</text>
         </view>
-        <view class="course-sub">{{c.gradeName}} · {{c.subjectName}} · {{c.classType}}</view>
+        <view class="course-sub">{{c.gradeName}} · {{c.subjectName}}</view>
+        <view class="course-sub">季度：{{c.termText}}</view>
         <view class="course-sub">教师：{{c.teacherName}}　缴费：{{c.payStatus}}</view>
         <view class="course-sub">报名：{{c.createTime}}　编号：{{c.enrollmentCode}}</view>
         <view class="course-sub" wx:if="{{c.remark}}">备注：{{c.remark}}</view>

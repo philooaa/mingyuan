@@ -60,9 +60,9 @@ const roleProfiles = {
     eyebrow: '管理员端',
     title: '招生、排课、教室与运营管理',
     stats: [
-      { label: '在读学员', value: '386', suffix: '人' },
-      { label: '本月收入', value: '28.4', suffix: '万' },
-      { label: '续费率', value: '83', suffix: '%' }
+      { key: 'completedCount', label: '本讲消课人次', value: '—', suffix: '人次' },
+      { key: 'income', label: '本周收入', value: '—', suffix: '元' },
+      { key: 'refund', label: '本周退费', value: '—', suffix: '元' }
     ],
     actions: [
       { key:'studentSignReview', title:'学生出勤', icon:'勤', tone:'cyan', route:'/pages/sign-review/sign-review' },
@@ -358,8 +358,8 @@ Page({
     if (financeAllowed && ['admin', 'education'].includes(role)) actions.push({ key:'tuitionFinance', title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' })
     this.setData({ quickActions: access.actions(actions, role) })
     if(role==='admin') {
-      this.loadFinancePending();this.loadReferralPending();this.loadSignReviewPending()
-      this._accountTimer=setInterval(()=>{this.loadFinancePending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending()}},30000)
+      this.loadFinancePending();this.loadReferralPending();this.loadSignReviewPending();this.loadAdminHomeStats()
+      this._accountTimer=setInterval(()=>{this.loadFinancePending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending();this.loadAdminHomeStats()}},30000)
     }
 
     if (role === 'parent') {
@@ -520,7 +520,19 @@ Page({
   },
 
   openChildren() { if(this.data.currentRole==='parent' && getRoleFromStorage()==='parent') wx.navigateTo({url:'/pages/parent-children/parent-children'}) },
-  stopAccountRefresh() {clearInterval(this._accountTimer);this._accountTimer=null;this._accountVersion=(this._accountVersion || 0)+1;this._accountBusy=false;this._financeVersion=(this._financeVersion||0)+1;this._financeBusy=false;if(!this._unloaded)this.setData({accountPendingError:'',financePendingError:'',quickActions:this.data.quickActions.map(a=>['personalAccount','tuitionFinance'].includes(a.key)?{...a,badgeText:''}:a)})},
+  stopAccountRefresh() {clearInterval(this._accountTimer);this._accountTimer=null;this._adminStatsVersion=(this._adminStatsVersion||0)+1;this._adminStatsBusy=false;this._accountVersion=(this._accountVersion || 0)+1;this._accountBusy=false;this._financeVersion=(this._financeVersion||0)+1;this._financeBusy=false;if(!this._unloaded)this.setData({accountPendingError:'',financePendingError:'',quickActions:this.data.quickActions.map(a=>['personalAccount','tuitionFinance'].includes(a.key)?{...a,badgeText:''}:a)})},
+  async loadAdminHomeStats() {
+    const token=wx.getStorageSync('token')
+    if(this._adminStatsBusy || !this._visible || this._unloaded || this.data.currentRole!=='admin' || getRoleFromStorage()!=='admin' || !token)return
+    const version=this._adminStatsVersion=(this._adminStatsVersion||0)+1
+    const current=()=>!this._unloaded && this._visible && version===this._adminStatsVersion && this.data.currentRole==='admin' && getRoleFromStorage()==='admin' && wx.getStorageSync('token')===token
+    this._adminStatsBusy=true
+    const update=(values)=>{if(current())this.setData({stats:this.data.stats.map(item=>Object.prototype.hasOwnProperty.call(values,item.key)?{...item,value:values[item.key]}:item)})}
+    const display=value=>value === null || value === undefined ? '—' : String(value)
+    const attendance=request({url:'/miniapp/admin/home-stats/attendance',timeout:15000}).then(r=>update({completedCount:display(r.data.completedCount)})).catch(()=>update({completedCount:'—'}))
+    const finance=access.can('system:tuition:list') ? request({url:'/miniapp/admin/home-stats/finance',timeout:15000}).then(r=>update({income:display(r.data.income),refund:display(r.data.refund)})).catch(()=>update({income:'—',refund:'—'})) : Promise.resolve()
+    try { await Promise.all([attendance,finance]) } finally {if(version===this._adminStatsVersion)this._adminStatsBusy=false}
+  },
   async loadFinancePending() {
     const role=this.data.currentRole,token=wx.getStorageSync('token')
     if(role!=='admin' || getRoleFromStorage()!==role || !access.can('system:tuition:confirm') || !this.data.quickActions.some(a=>a.key==='tuitionFinance') || this._financeBusy || !this._visible || this._unloaded || !token)return

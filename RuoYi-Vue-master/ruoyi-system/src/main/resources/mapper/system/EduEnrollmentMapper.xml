@@ -28,6 +28,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="remark"    column="remark"    />
         <result property="courseClassName" column="course_class_name" />
         <result property="parentPhone" column="parent_phone" />
+        <result property="courseYear" column="course_year" />
+        <result property="termName" column="term_name" />
+        <result property="periodName" column="period_name" />
         <result property="gradeName"    column="grade_name"    />
         <result property="subjectName"    column="subject_name"    />
         <result property="classType"    column="class_type"    />
@@ -41,7 +44,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectEduEnrollmentVo">
         select e.lesson_account_id,e.class_date,e.cancel_request_status,e.enrollment_id, e.enrollment_code, e.schedule_id, e.parent_id, e.student_name, e.student_phone, e.contact_phone, e.enrollment_status, e.pay_status, e.cancel_time, e.cancel_reason, e.status, e.del_flag, e.create_by, e.create_time, e.update_by, e.update_time, e.remark,
-               s.grade_name, s.subject_name, s.class_type, coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacher_name, s.recruit_status, s.course_class_name, parent.phonenumber as parent_phone,
+               s.grade_name, s.subject_name, s.class_type, s.course_year, s.term_name, s.period_name, coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacher_name, s.recruit_status, s.course_class_name, parent.phonenumber as parent_phone,
                ifnull(history.attended_lesson_count, 0) as attended_lesson_count,
                ifnull(history.pending_lesson_count, 0) as pending_lesson_count,
                ifnull(history.recorded_lesson_count, 0) as recorded_lesson_count,
@@ -82,6 +85,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                      or e.contact_phone like concat('%', #{params.adminKeyword}, '%')
                      or parent.phonenumber like concat('%', #{params.adminKeyword}, '%'))
             </if>
+            <if test="params.adminGrade != null and params.adminGrade != ''">and s.grade_name = #{params.adminGrade}</if>
+            <if test="params.adminSubject != null and params.adminSubject != ''">and s.subject_name = #{params.adminSubject}</if>
+            <if test="params.adminMode != null and params.adminMode != ''">and s.class_mode = #{params.adminMode}</if>
+            <if test="params.adminYear != null">and s.course_year = #{params.adminYear}</if>
+            <if test="params.adminTerm != null and params.adminTerm != ''">and s.term_name = #{params.adminTerm}</if>
+            <if test="params.adminPeriod != null and params.adminPeriod != ''">and s.period_name = #{params.adminPeriod}</if>
+            <if test="params.adminTeacher != null and params.adminTeacher != ''">and (s.teacher_name like concat('%',#{params.adminTeacher},'%') or teacher.user_name like concat('%',#{params.adminTeacher},'%') or teacher.nick_name like concat('%',#{params.adminTeacher},'%'))</if>
             <if test="enrollmentCode != null  and enrollmentCode != ''"> and e.enrollment_code = #{enrollmentCode}</if>
             <if test="scheduleId != null "> and e.schedule_id = #{scheduleId}</if>
             <if test="parentId != null "> and e.parent_id = #{parentId}</if>

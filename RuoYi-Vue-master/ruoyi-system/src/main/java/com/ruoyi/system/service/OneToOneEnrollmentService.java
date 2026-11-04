@@ -97,11 +97,10 @@ public class OneToOneEnrollmentService {
         Map<String,Object> account=credits.enrollmentChild(SecurityUtils.getUserId(),body.getLessonAccountId(),name,s.getGradeName(),body.getContactPhone(),body.getStudentRequestKey());
         name=account.get("studentName").toString();
         Long accountId=id(account,"accountId");
-        String level=null; Integer lessonCredits=null;
+        String level=null; java.math.BigDecimal lessonCredits=null;
         if("P".equals(settlement)) {
             Object configured=profile(s.getTeacherId()).get("teacherLevel");
-            check(configured != null && List.of("elite","senior").contains(configured.toString()),"教师级别尚未配置，无法确定课包扣次；可选择单次付费");
-            level=configured.toString(); lessonCredits="senior".equals(level) ? 2 : 1;
+            level=configured == null ? null : configured.toString(); lessonCredits=new java.math.BigDecimal("1.5");
             account=credits.ownForHold(accountId,SecurityUtils.getUserId(),name,lessonCredits);
         }
         String code = "ENR"+UUID.randomUUID().toString().replace("-", "").substring(0,28);

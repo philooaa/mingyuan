@@ -28,6 +28,20 @@ public class EduFinanceDashboardServiceImpl implements IEduFinanceDashboardServi
     private EduFinanceDashboardMapper dashboardMapper;
 
     @Override
+    public List<Map<String, Object>> getCourseDimensions() { return dashboardMapper.selectCourseDimensions(); }
+
+    @Override
+    public Map<String,Object> getStudentCount(Long year,String term,String stage,String grade,String subject,Long teacherId) {
+        if (stage != null && !stage.isBlank() && !List.of("primary","junior","senior").contains(stage)) throw new com.ruoyi.common.exception.ServiceException("学段无效");
+        return dashboardMapper.selectStudentCount(year,term,stage,grade,subject,teacherId);
+    }
+
+    @Override
+    public List<Map<String,Object>> getStudents(Long year,String term,String stage,String grade,String subject,Long teacherId) {
+        if (stage != null && !stage.isBlank() && !List.of("primary","junior","senior").contains(stage)) throw new com.ruoyi.common.exception.ServiceException("学段无效");
+        return dashboardMapper.selectStudents(year,term,stage,grade,subject,teacherId);
+    }
+    @Override
     public Map<String, Object> getDashboard(String beginMonth, String endMonth)
     {
         YearMonth end = parseMonth(endMonth, YearMonth.now());
@@ -43,10 +57,12 @@ public class EduFinanceDashboardServiceImpl implements IEduFinanceDashboardServi
 
         Map<String, BigDecimal> lessonContract = new LinkedHashMap<>();
         Map<String, BigDecimal> lessonConfirmed = new LinkedHashMap<>();
+        BigDecimal totalRefund = BigDecimal.ZERO;
         for (Map<String, Object> row : dashboardMapper.selectLessonMonthly(beginStr, endStr))
         {
             lessonContract.put((String) row.get("month"), toDecimal(row.get("contractAmount")));
             lessonConfirmed.put((String) row.get("month"), toDecimal(row.get("confirmedAmount")));
+            totalRefund = totalRefund.add(toDecimal(row.get("refundAmount")));
         }
         Map<String, BigDecimal> shopContract = new LinkedHashMap<>();
         Map<String, BigDecimal> shopConfirmed = new LinkedHashMap<>();
@@ -54,6 +70,7 @@ public class EduFinanceDashboardServiceImpl implements IEduFinanceDashboardServi
         {
             shopContract.put((String) row.get("month"), toDecimal(row.get("contractAmount")));
             shopConfirmed.put((String) row.get("month"), toDecimal(row.get("confirmedAmount")));
+            totalRefund = totalRefund.add(toDecimal(row.get("refundAmount")));
         }
         Map<String, BigDecimal> salary = new LinkedHashMap<>();
         for (Map<String, Object> row : dashboardMapper.selectSalaryMonthly(beginStr, endStr))
@@ -98,6 +115,7 @@ public class EduFinanceDashboardServiceImpl implements IEduFinanceDashboardServi
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("contractAmount", totalContract);
         summary.put("confirmedRevenue", totalConfirmed);
+        summary.put("refundTotal", totalRefund);
         summary.put("receivable", totalContract.subtract(totalConfirmed));
         summary.put("teacherSalary", totalSalary);
         summary.put("expenseTotal", totalExpense);

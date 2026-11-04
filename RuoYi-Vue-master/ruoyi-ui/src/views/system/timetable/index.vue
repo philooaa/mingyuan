@@ -349,6 +349,7 @@
 
       <el-table v-if="imp.rows.length" :data="imp.pageRows" size="mini" border max-height="330" v-loading="imp.confirming"
                 :row-class-name="impRowClass">
+        <el-table-column label="课时单价" width="130"><template slot-scope="s"><el-input-number v-model="s.row.unitPrice" :min="0" :precision="2" size="mini" controls-position="right" style="width:120px" /></template></el-table-column>
         <el-table-column prop="sheetName" label="Sheet" width="90" show-overflow-tooltip />
         <el-table-column prop="termName" label="学期" width="55" />
         <el-table-column prop="periodName" label="期次" width="65" />
@@ -403,7 +404,7 @@
         <el-button type="warning" size="mini" icon="el-icon-magic-stick" :loading="imp.oneClicking" @click="doOneClick">一键导入</el-button>
         <el-button type="success" size="mini" :disabled="!imp.rows.length" :loading="imp.confirming" @click="doConfirm">确认导入</el-button>
         <el-button size="mini" @click="imp.open = false">取 消</el-button>
-        <div v-if="!imp.rows.length" style="margin-top:6px;color:#8993a4;font-size:12px">一键导入：自动同步课表、教师（缺失自动建号，密码123456）、教室（缺失自动补建）。首次点击会先解析文件列出各学期/期次，填好各自的上课日期后再点一次即落库</div>
+        <div v-if="!imp.rows.length" style="margin-top:6px;color:#8993a4;font-size:12px">一键导入：自动同步课表、教师（缺失自动建号，密码123456）、教室（缺失自动补建）。首次点击会先解析文件，请填写课时单价与上课日期后再确认导入</div>
         <div v-else-if="imp.datePlans.some(p => p.schedulable)" style="margin-top:6px;color:#e6a23c;font-size:12px">提示：{{ imp.datePlans.filter(p => p.schedulable).length }} 个「学期 / 期次」可设上课日期，未填写的导入后保持「待排」（可稍后在课表中补填）</div>
       </div>
     </el-dialog>
@@ -523,7 +524,7 @@ import {
   delTimetableSchedule,
   importTimetablePreview,
   importTimetableConfirm,
-  importTimetableOneClick,
+
   getTimetableOccurrences,
   getTimetableCalendar,
   cancelTimetableOccurrence,
@@ -997,7 +998,7 @@ export default {
         if (ranges.length) fd.append('dateRanges', JSON.stringify(ranges))
         const res = await importTimetablePreview(fd)
         const d = res.data || {}
-        this.imp.rows = d.rows || []
+        this.imp.rows = (d.rows || []).map(row => ({ ...row, unitPrice: null }))
         this.imp.sheetNames = d.sheets || []
         this.imp.datePlans = d.datePlans || []
         this.imp.warnCount = d.warnCount || 0
@@ -1017,6 +1018,7 @@ export default {
     },
     async doConfirm() {
       if (!this.imp.rows.length) return
+      if (this.imp.rows.some(row => !(Number(row.unitPrice) > 0))) { this.$message.warning('请为每条课程填写大于0的课时单价；已有课程保留原单价'); return }
       const ranges = this.collectDateRanges()
       if (!ranges) return
       this.imp.confirming = true
@@ -1039,32 +1041,9 @@ export default {
     },
     async doOneClick() {
       if (!this.imp.file) { this.$message.warning('请先选择课表文件'); return }
-      // 一键导入也要按学期设日期，而学期要解析后才知道 → 未解析时先自动解析一次，让用户填完再点
-      if (!this.imp.datePlans.length) {
-        const ok = await this.doPreview()
-        if (ok && this.imp.datePlans.length) {
-          this.$message.info(`已解析出 ${this.imp.datePlans.length} 个「学期 / 期次」（${this.imp.datePlans.map(p => p.periodName ? p.termName + '/' + p.periodName : p.termName).join('、')}）。请在「按学期 / 期次设置上课日期」中填写起止日期后再次点击「一键导入」；留空的将保持「待排」`)
-        }
-        return
-      }
-      const ranges = this.collectDateRanges()
-      if (!ranges) return
-      this.imp.oneClicking = true
-      try {
-        const fd = new FormData()
-        fd.append('file', this.imp.file)
-        fd.append('courseYear', this.imp.courseYear)
-        fd.append('updateSupport', 'true')
-        if (ranges.length) fd.append('dateRanges', JSON.stringify(ranges))
-        const res = await importTimetableOneClick(fd)
-        const switched = await this.applyImportScope(res.data)
-        this.imp.open = false
-        this.showImportResult(res.data, switched)
-      } catch (e) {
-        /* 错误由 request 拦截器统一提示 */
-      } finally {
-        this.imp.oneClicking = false
-      }
+      if (this.imp.rows.length) return this.doConfirm()
+      await this.doPreview()
+      this.$message.info('请填写各课程课时单价后确认导入')
     },
     async applyImportScope(d) {
       // 先刷新维度：导入可能新增「未识别学期 / 未识别期次」等占位值，必须让下拉能选到

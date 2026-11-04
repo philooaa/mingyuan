@@ -17,7 +17,7 @@
       <view class="wallet-actions"><view class="wallet-history" data-id="{{creditAccount.accountId}}" bindtap="creditHistory">课次记录 ›</view><button class="wallet-buy" bindtap="purchasePackage" disabled="{{submitting || showSheet}}">购买课包 ＋</button></view>
     </block>
     <view class="wallet-state" wx:else>请先选择或完善孩子信息<view class="wallet-history" bindtap="manageChildren">管理孩子信息 ›</view></view>
-    <view class="wallet-footnote">每节2小时 · 精英教师扣1次 · 资深教师扣2次</view>
+    <view class="wallet-footnote">每节2小时 · 每次扣1.5课时</view>
   </view>
 
   <view class="filter-bar">
@@ -148,7 +148,7 @@
     </block>
     <view class="field"><view class="label">报名孩子</view><picker range="{{lessonAccountOptions}}" value="{{lessonAccountIndex}}" bindchange="chooseLessonAccount" disabled="{{submitting || accountsLoading || accountsError || scopeAccountId}}"><view>{{lessonAccountOptions[lessonAccountIndex] || '加载孩子资料…'}}　›</view></picker><view class="meta" bindtap="manageChildren">管理孩子信息 ›</view><view class="meta" wx:if="{{accountsError || childMissing}}" bindtap="loadLessonAccounts">{{accountsError || '孩子资料已变化，请重新选择'}} · 点击重试</view></view>
     <view class="field" wx:if="{{newChild}}"><view class="label">孩子姓名</view><input class="input" value="{{form.studentName}}" data-field="studentName" bindinput="handleFormInput" maxlength="30" placeholder="请输入孩子姓名" disabled="{{submitting}}"/><view class="meta">年级：{{cartMode ? '按所报课程' : selectedSchedule.gradeText}}。报名成功后同步到孩子信息，自动建立零余额账户。</view></view>
-    <view class="meta" wx:if="{{!cartMode && selectedSchedule.classDate && settlementMethod === 'P'}}">请选择已有课包余额的孩子；普通／精英教师占1次，资深教师占2次，课后正式消耗。</view>
+    <view class="meta" wx:if="{{!cartMode && selectedSchedule.classDate && settlementMethod === 'P'}}">请选择已有课包余额的孩子；预约暂占1.5课时，课后正式消耗。</view>
     <view class="field">
       <view class="label">联系电话</view>
       <input class="input" type="number" maxlength="11" value="{{form.contactPhone}}" data-field="contactPhone" bindinput="handleFormInput" placeholder="默认使用家长手机号" />

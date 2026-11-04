@@ -10,6 +10,9 @@ import java.util.Map;
  */
 public interface IEduFinanceDashboardService
 {
+    java.util.List<Map<String, Object>> getCourseDimensions();
+    Map<String, Object> getStudentCount(Long year, String term, String stage, String grade, String subject, Long teacherId);
+    java.util.List<Map<String,Object>> getStudents(Long year, String term, String stage, String grade, String subject, Long teacherId);
     /**
      * 驾驶舱汇总数据
      *

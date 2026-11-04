@@ -108,6 +108,7 @@ Page({
           gradeName: r.gradeName || '—',
           subjectName: r.subjectName || '—',
           classType: r.classType || '—',
+          termText: [r.courseYear, r.termName, r.periodName].filter(Boolean).join(' · ') || '季度待核对',
           teacherName: realName(r.teacherName),
           enrollmentStatus: r.enrollmentStatus || '—',
           payStatus: r.payStatus || '—',
@@ -124,7 +125,7 @@ Page({
         s.latestDate = dateOnly(s.latestTime)
         s.statusText = s.activeCount > 0 ? `在读 ${s.activeCount} 门` : '已全部取消'
         s.searchText = [
-          s.studentName, s.studentPhone, s.contactPhone,
+          s.studentName, s.studentPhone, s.contactPhone, s.parentPhone,
           ...s.courses.map((c) => `${c.courseClassName} ${c.subjectName} ${c.teacherName}`)
         ].join(' ')
         return s

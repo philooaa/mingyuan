@@ -35,6 +35,25 @@ function harness(name, roles = ['parent'], permissions = ['*:*:*'], custom) {
 }
 const click = role => ({ currentTarget: { dataset: { role } } })
 
+test('administrator home displays independent real attendance and weekly finance results', async () => {
+  const h = harness('index', ['admin'], ['system:tuition:list'], o => {
+    if (o.url.endsWith('/home-stats/attendance')) return { data: { completedCount: 2 } }
+    if (o.url.endsWith('/home-stats/finance')) return { data: { income: '100.00', refund: '25.50' } }
+  })
+  h.p.onLoad(); h.p._visible = true; await h.p.applyLoginRole(); await Promise.resolve(); await Promise.resolve()
+  assert.deepEqual(Array.from(h.p.data.stats, s => [s.label, s.value]), [['本讲消课人次','2'], ['本周收入','100.00'], ['本周退费','25.50']])
+  h.p.onUnload()
+})
+test('home financial figures require permission and failed attendance does not look like zero', async () => {
+  const h = harness('index', ['admin'], [], o => {
+    if (o.url.endsWith('/home-stats/attendance')) return Promise.reject(new Error('offline'))
+  })
+  h.p.onLoad(); h.p._visible = true; await h.p.applyLoginRole(); await Promise.resolve(); await Promise.resolve()
+  assert.deepEqual(Array.from(h.p.data.stats, s => s.value), ['—','—','—'])
+  assert.equal(h.calls.some(o => o.url.endsWith('/home-stats/finance')), false)
+  h.p.onUnload()
+})
+
 test('top-right role menu switches only assigned workspaces and remembers the choice', async () => {
   const h = harness('index', ['admin', 'education', 'teacher'])
   h.p.onLoad(); h.p._visible = true; await h.p.applyLoginRole()

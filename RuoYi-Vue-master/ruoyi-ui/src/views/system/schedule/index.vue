@@ -292,6 +292,11 @@
             </el-form-item>
           </el-col>
           <el-col :span="24">
+            <el-form-item label="班型" prop="classType">
+              <el-input v-model="form.classType" placeholder="请输入班型（可不填）" maxlength="30" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
             <el-form-item label="授课形式" prop="classMode">
               <el-select v-model="form.classMode" placeholder="请选择授课形式" :disabled="!form.scheduleId && dims.isTeacher && !dims.isAdmin">
                 <el-option label="班课" value="1" />
@@ -317,7 +322,7 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="课程班名称" prop="courseClassName">
-              <el-input v-model="form.courseClassName" placeholder="请输入课程班名称" />
+              <el-input v-model="form.courseClassName" placeholder="请输入课程班名称"><el-button slot="append" :loading="recognizing" :disabled="submitting" @click="recognizeName">识别</el-button></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -360,6 +365,7 @@
 import { listSchedule, getSchedule, delSchedule, addSchedule, updateSchedule } from "@/api/system/schedule"
 import { getTimetableDimensions } from "@/api/system/timetable"
 import OneToOneManager from './OneToOneManager.vue'
+import { recognizeAndFill } from '@/utils/course-name-recognition'
 
 export default {
   name: "Schedule",
@@ -369,6 +375,7 @@ export default {
       // 遮罩层
       loading: true,
       submitting: false,
+      recognizing: false,
       dims: { classroomList: [], teachers: [], terms: [], periods: [], periodMap: {}, timeSlots: [], grades: [], subjects: [], classTypes: [], isTeacher: false, isAdmin: false },
       // 选中数组
       ids: [],
@@ -418,6 +425,7 @@ export default {
       form: {},
       // 表单校验
       rules: {
+        unitPrice: [{ validator: (rule, value, callback) => this.form.scheduleId || (value !== null && value !== undefined && Number(value) > 0) ? callback() : callback(new Error('课时单价必须大于0')), trigger: 'change' }],
         lessonLocation: [{ validator: (rule, value, callback) => this.form.classMode !== '2' || (value && value.trim()) ? callback() : callback(new Error("请填写上课地点")), trigger: "blur" }],
         teacherId: [{ required: true, message: "请选择教师账号", trigger: "change" }],
         classroomId: [
@@ -465,6 +473,7 @@ export default {
     getTimetableDimensions().then(response => { this.dims = response.data || this.dims }).catch(() => {})
   },
   methods: {
+    recognizeName() { return recognizeAndFill(this) },
     openSingle(row = {}, tab = 'slots') {
       if (!this.dims.isAdmin) { this.$modal.msgError('仅管理员可在网页统一管理一对一'); return }
       return this.$refs.oneToOne.open(row, tab)

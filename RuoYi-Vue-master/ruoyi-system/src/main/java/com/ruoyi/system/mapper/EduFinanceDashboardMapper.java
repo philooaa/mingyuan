@@ -12,6 +12,11 @@ import org.apache.ibatis.annotations.Param;
  */
 public interface EduFinanceDashboardMapper
 {
+    List<Map<String, Object>> selectCourseDimensions();
+    Map<String, Object> selectStudentCount(@Param("year") Long year, @Param("term") String term,
+        @Param("stage") String stage, @Param("grade") String grade, @Param("subject") String subject, @Param("teacherId") Long teacherId);
+    List<Map<String,Object>> selectStudents(@Param("year") Long year, @Param("term") String term,
+        @Param("stage") String stage, @Param("grade") String grade, @Param("subject") String subject, @Param("teacherId") Long teacherId);
     /**
      * 课时费按月：month / contractAmount / confirmedAmount
      * 兼容历史状态值：enrollment_status 取消='2'/'已取消'，pay_status 已支付='1'/'已支付'

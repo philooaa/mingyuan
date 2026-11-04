@@ -31,7 +31,7 @@ public class CreditPackageService {
   private Map<String,Object> child(long account,long actor,boolean lock){
     return db.one("SELECT a.account_id,a.parent_id,a.student_id,st.student_name,st.grade_code,st.student_phone,(SELECT d.dict_label FROM sys_dict_data d WHERE d.dict_type='edu_grade' AND d.dict_value=st.grade_code ORDER BY d.status,d.dict_code LIMIT 1) AS grade_name FROM edu_student_lesson_account a JOIN edu_student st ON st.student_id=a.student_id AND st.parent_id=a.parent_id JOIN sys_user u ON u.user_id=a.parent_id WHERE a.account_id=? AND a.parent_id=? AND st.del_flag='0' AND u.status='0' AND u.del_flag='0'"+(lock?" FOR UPDATE":""),account,actor);
   }
-  public Map<String,Object> catalog(){return values("creditsPerPackage",15,"prices",List.of(values("label","小学","unitPrice","400.00"),values("label","初一、初二","unitPrice","500.00"),values("label","初三","unitPrice","600.00"),values("label","高一、高二","unitPrice","700.00"),values("label","高三","unitPrice","800.00")),"discounts",List.of(values("label","1包95折","rate","0.95"),values("label","2包92折","rate","0.92"),values("label","3包及以上9折","rate","0.90")),"notice","每包15基础次数。每节2小时，精英扣1、资深扣2。按本次购买包数折扣后抵扣适用通用券，线下确认收款后入账。");}
+  public Map<String,Object> catalog(){return values("creditsPerPackage",15,"prices",List.of(values("label","小学","unitPrice","400.00"),values("label","初一、初二","unitPrice","500.00"),values("label","初三","unitPrice","600.00"),values("label","高一、高二","unitPrice","700.00"),values("label","高三","unitPrice","800.00")),"discounts",List.of(values("label","1包95折","rate","0.95"),values("label","2包92折","rate","0.92"),values("label","3包及以上9折","rate","0.90")),"notice","每包15基础次数。每节2小时，扣除1.5课时。按本次购买包数折扣后抵扣适用通用券，线下确认收款后入账。");}
   private Map<String,Object> quote(Map<String,Object> b,long actor,boolean lock){
     long account=id(b.get("accountId"));int count=integer(b.get("packageCount"),1,100);
     var c=child(account,actor,lock);String grade=str(c,"gradeCode");require(grade.matches("g(?:[1-9]|1[0-2])"),"孩子年级尚未完善，请先更新档案");
@@ -82,11 +82,11 @@ public class CreditPackageService {
     require(!db.rows("SELECT payment_id FROM edu_tuition_payment WHERE enrollment_id=? AND payment_status='SUCCESS' AND amount=?",order,e.get("payableAmount")).isEmpty(),"确认收款前不能增加课次");
     var a=db.one("SELECT * FROM edu_student_lesson_account WHERE account_id=? AND parent_id=? FOR UPDATE",e.get("lessonAccountId"),e.get("parentId"));
     require(Objects.equals(str(a,"studentId"),str(e,"studentId")),"孩子账户归属不一致");
-    int quantity=integer(snapshot(e).get("credits"),15,1500),remaining=integer(a.get("remainingCredits"),0,10000000),reserved=integer(a.get("reservedCredits"),0,10000000),consumed=integer(a.get("consumedCredits"),0,10000000);
-    require(remaining+quantity<=10000000,"课次余额超过上限，请联系管理员核对");
+    BigDecimal quantity=BigDecimal.valueOf(integer(snapshot(e).get("credits"),15,1500)),remaining=new BigDecimal(a.get("remainingCredits").toString()),reserved=new BigDecimal(a.get("reservedCredits").toString()),consumed=new BigDecimal(a.get("consumedCredits").toString());
+    require(remaining.add(quantity).compareTo(new BigDecimal("10000000"))<=0,"课次余额超过上限，请联系管理员核对");
     require(db.rows("SELECT event_id FROM edu_lesson_credit_event WHERE request_key=?","PURCHASE:"+order).isEmpty(),"课包入账流水已存在但账单未标记，请核对");
-    db.update("edu_student_lesson_account","account_id",id(a.get("accountId")),values("remaining_credits",remaining+quantity,"update_by",coupons.username(actor),"update_time",now()));
-    db.insert("edu_lesson_credit_event",values("account_id",a.get("accountId"),"enrollment_id",order,"action","GRANT","quantity",quantity,"remaining_after",remaining+quantity,"reserved_after",reserved,"consumed_after",consumed,"request_key","PURCHASE:"+order,"reason","课包收款确认入账","actor_id",actor,"actor_name",coupons.username(actor),"create_time",now()));
+    db.update("edu_student_lesson_account","account_id",id(a.get("accountId")),values("remaining_credits",remaining.add(quantity),"update_by",coupons.username(actor),"update_time",now()));
+    db.insert("edu_lesson_credit_event",values("account_id",a.get("accountId"),"enrollment_id",order,"action","GRANT","quantity",quantity,"remaining_after",remaining.add(quantity),"reserved_after",reserved,"consumed_after",consumed,"request_key","PURCHASE:"+order,"reason","课包收款确认入账","actor_id",actor,"actor_name",coupons.username(actor),"create_time",now()));
     db.update("edu_enrollment","enrollment_id",order,values("package_credited_time",now(),"enrollment_status","1","update_by",coupons.username(actor),"update_time",now()));
   }
 }

@@ -541,7 +541,7 @@ Page(childContext.page({
     const packageMode=!!selectedSchedule.classDate && this.data.settlementMethod==='P',account=this.data.lessonAccounts.find(a=>String(a.accountId)===String(this.data.selectedChildId))
     if(!this.data.newChild && !account){wx.showToast({title:'请重新选择孩子',icon:'none'});return}
     if(packageMode && (this.data.accountsError || this.data.accountsLoading || !account)) { wx.showToast({title:'请先选择有效的学生课包账户',icon:'none'}); return }
-    if(packageMode && Number(account.availableCredits)<=0) { wx.showToast({title:'可用课次不足，请联系管理员或选择单次付费',icon:'none'}); return }
+    if(packageMode && Number(account.availableCredits)<1.5) { wx.showToast({title:'可用课时不足1.5，请联系管理员或选择单次付费',icon:'none'}); return }
     this.setData({ submitting: true })
     try {
       await request({
