@@ -287,11 +287,13 @@
         <el-form label-width="100px" style="margin-top:20px">
           <el-form-item label="搜索目标课程"><el-input v-model="transferKeyword" maxlength="100" placeholder="课程、年级、学科或老师" :disabled="transferSaving" @keyup.enter.native="searchTransfer"><el-button slot="append" icon="el-icon-search" :disabled="transferSaving" @click="searchTransfer">搜索</el-button></el-input></el-form-item>
           <el-form-item label="目标班课">
-            <el-select v-model="transferTarget" placeholder="请选择目标课程" :loading="transferLoading" :disabled="transferSaving || transferLoading" style="width:100%">
-              <el-option v-for="course in transferRows" :key="course.scheduleId" :value="course.scheduleId" :label="transferLabel(course)" />
+            <el-select v-model="transferTarget" placeholder="请选择目标课程" :loading="transferLoading && !transferRows.length" :disabled="transferSaving" popper-class="transfer-course-dropdown" style="width:100%">
+              <el-option v-for="course in transferRows" :key="course.scheduleId" :value="course.scheduleId" :label="transferLabel(course)" :disabled="transferLoading || transferSaving" />
+              <li v-if="transferTotal>20" class="transfer-dropdown-pager" @mousedown.prevent @click.stop>
+                <el-pagination small layout="prev,pager,next" :total="transferTotal" :page-size="20" :current-page="transferPage" :disabled="transferSaving || transferLoading" @current-change="loadTransferOptions"/>
+              </li>
             </el-select>
             <div class="edu-table-secondary">共 {{transferTotal}} 门可选课程，满班、停用及一对一课程不在此列表中。</div>
-            <el-pagination v-if="transferTotal>20" small layout="prev,pager,next" :total="transferTotal" :page-size="20" :current-page="transferPage" :disabled="transferSaving || transferLoading" @current-change="loadTransferOptions"/>
           </el-form-item>
           <el-form-item label="换课原因"><el-input v-model="transferReason" type="textarea" :rows="3" maxlength="255" show-word-limit :disabled="transferSaving" placeholder="请填写换课原因" /></el-form-item>
         </el-form>
@@ -628,3 +630,19 @@ export default {
 </style>
 
 <style scoped src="@/assets/styles/education-workspace.css"></style>
+
+<style lang="scss">
+.transfer-course-dropdown {
+  .el-select-dropdown__list { padding-bottom: 0; }
+  .transfer-dropdown-pager {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding: 8px 12px;
+    list-style: none;
+    border-top: 1px solid #ebeef5;
+    background: #fff;
+    .el-pagination { display: flex; justify-content: center; }
+  }
+}
+</style>
