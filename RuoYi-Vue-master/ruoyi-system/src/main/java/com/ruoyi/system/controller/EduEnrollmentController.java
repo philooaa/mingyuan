@@ -34,6 +34,26 @@ public class EduEnrollmentController extends BaseController
     @Autowired
     private IEduEnrollmentService eduEnrollmentService;
 
+    @Autowired private com.ruoyi.system.service.EnrollmentTransferService transfers;
+
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @GetMapping("/{enrollmentId}/transfer-options")
+    public AjaxResult transferOptions(@PathVariable long enrollmentId,
+        @org.springframework.web.bind.annotation.RequestParam(defaultValue="") String keyword,
+        @org.springframework.web.bind.annotation.RequestParam(defaultValue="1") int page) {
+        return success(transfers.options(enrollmentId,keyword,page,getUserId()));
+    }
+
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @Log(title="学生换课",businessType=BusinessType.UPDATE)
+    @PutMapping("/{enrollmentId}/transfer")
+    public AjaxResult transfer(@PathVariable long enrollmentId,
+        @RequestBody com.ruoyi.system.service.EnrollmentTransferService.TransferRequest body) {
+        if(body.fromScheduleId()==null || body.targetScheduleId()==null) return error("请选择原课程和目标课程");
+        transfers.transfer(enrollmentId,body.fromScheduleId(),body.targetScheduleId(),body.reason(),getUserId());
+        return success("换课成功，原缴费记录保留");
+    }
+
     /**
      * 查询课程报名列表
      */

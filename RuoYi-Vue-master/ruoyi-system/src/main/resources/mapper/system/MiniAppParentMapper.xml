@@ -205,10 +205,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             sum(case when ifnull(a.attendance_status, '0') = '0' then 1 else 0 end) as pendingCount,
             sum(case when ifnull(a.attendance_status, '0') = '2' then 1 else 0 end) as canceledCount
         from edu_enrollment e
-        inner join edu_course_schedule s on s.schedule_id = e.schedule_id
         left join edu_attendance a
           on a.enrollment_id = e.enrollment_id
          and a.del_flag = '0'
+        inner join edu_course_schedule s on s.schedule_id = coalesce(a.schedule_id, e.schedule_id)
         where e.parent_id = #{parentId}
           and e.del_flag = '0'
           and (e.enrollment_status in ('1', '报名成功') or a.attendance_status = '1')
@@ -221,7 +221,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectParentAttendanceDetails" resultType="java.util.HashMap">
         select
             e.enrollment_id as enrollmentId,
-            e.schedule_id as scheduleId,
+            s.schedule_id as scheduleId,
             e.student_name as studentName,
             s.course_class_name as courseClassName,
             s.term_name as termName,
@@ -238,11 +238,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             a.attended_time as attendedTime,
             a.confirm_name as confirmName
         from edu_enrollment e
-        inner join edu_course_schedule s on s.schedule_id = e.schedule_id
-        left join edu_classroom c on c.classroom_id = s.classroom_id
         left join edu_attendance a
           on a.enrollment_id = e.enrollment_id
          and a.del_flag = '0'
+        inner join edu_course_schedule s on s.schedule_id = coalesce(a.schedule_id, e.schedule_id)
+        left join edu_classroom c on c.classroom_id = s.classroom_id
         where e.parent_id = #{parentId}
           and e.del_flag = '0'
           and (e.enrollment_status in ('1', '报名成功') or a.attendance_status = '1')

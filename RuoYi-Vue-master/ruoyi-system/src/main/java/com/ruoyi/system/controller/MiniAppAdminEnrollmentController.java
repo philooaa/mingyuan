@@ -17,11 +17,12 @@ import com.ruoyi.system.service.IEduEnrollmentService;
 /** 小程序管理员报名管理：复用既有报名查询、统计及取消事务。 */
 @RestController
 @RequestMapping("/miniapp/admin/enrollment")
-@PreAuthorize("@ss.hasRole('admin')")
+@PreAuthorize("@ss.hasAnyRoles('admin,education')")
 public class MiniAppAdminEnrollmentController extends BaseController
 {
     @Autowired private MiniAppAdminEnrollmentMapper viewMapper;
     @Autowired private IEduEnrollmentService enrollmentService;
+    @Autowired private com.ruoyi.system.service.EnrollmentTransferService transfers;
 
     @GetMapping("/grades")
     public AjaxResult grades() { return success(viewMapper.selectGrades()); }
@@ -61,9 +62,26 @@ public class MiniAppAdminEnrollmentController extends BaseController
         data.put("enrollment", enrollment);
         data.put("schedule", viewMapper.selectSchedule(enrollment.getScheduleId()));
         data.put("history", viewMapper.selectHistory(enrollmentId));
+        data.put("transfers", transfers.history(enrollmentId,getUserId()));
         return success(data);
     }
 
+    @GetMapping("/{enrollmentId}/transfer-options")
+    public AjaxResult transferOptions(@PathVariable long enrollmentId,
+        @RequestParam(defaultValue="") String keyword,@RequestParam(defaultValue="1") int page) {
+        return success(transfers.options(enrollmentId,keyword,page,getUserId()));
+    }
+
+    @PutMapping("/{enrollmentId}/transfer")
+    @Log(title="小程序学生换课",businessType=BusinessType.UPDATE)
+    public AjaxResult transfer(@PathVariable long enrollmentId,
+        @RequestBody com.ruoyi.system.service.EnrollmentTransferService.TransferRequest body) {
+        if(body.fromScheduleId()==null || body.targetScheduleId()==null) return error("请选择原课程和目标课程");
+        transfers.transfer(enrollmentId,body.fromScheduleId(),body.targetScheduleId(),body.reason(),getUserId());
+        return success("换课成功，原缴费记录保留");
+    }
+
+    @PreAuthorize("@ss.hasRole('admin')")
     @PutMapping("/{enrollmentId}/cancel")
     @Log(title = "小程序取消报名", businessType = BusinessType.UPDATE)
     public AjaxResult cancel(@PathVariable Long enrollmentId)

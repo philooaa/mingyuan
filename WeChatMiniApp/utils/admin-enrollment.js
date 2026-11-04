@@ -1,8 +1,8 @@
 const { request } = require('./request')
 const root = '/miniapp/admin/enrollment'
 function guard() {
-  if ((wx.getStorageSync('roles') || []).includes('admin')) return true
-  wx.showToast({ title: '需要管理员身份', icon: 'none' })
+  if ((wx.getStorageSync('roles') || []).some(r => ['admin', 'education'].includes(r))) return true
+  wx.showToast({ title: '需要教务或管理员身份', icon: 'none' })
   wx.reLaunch({ url: '/pages/index/index' })
   return false
 }

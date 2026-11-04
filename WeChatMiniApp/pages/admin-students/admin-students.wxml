@@ -45,6 +45,7 @@
         <view class="course-sub">{{c.gradeName}} · {{c.subjectName}} · {{c.classType}}</view>
         <view class="course-sub">教师：{{c.teacherName}}　缴费：{{c.payStatus}}</view>
         <view class="course-sub">报名：{{c.createTime}}　编号：{{c.enrollmentCode}}</view>
+        <button size="mini" data-id="{{c.enrollmentId}}" bindtap="openEnrollment">报名详情 / 换课</button>
         <view class="course-sub" wx:if="{{c.remark}}">备注：{{c.remark}}</view>
       </view>
       <view wx:if="{{!detail.courses.length}}" class="tip">暂无报名课程</view>

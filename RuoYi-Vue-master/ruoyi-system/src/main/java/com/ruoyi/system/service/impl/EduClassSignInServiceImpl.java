@@ -224,7 +224,12 @@ public class EduClassSignInServiceImpl implements IEduClassSignInService
             }
             String name = d.getStudentName().trim();
             if(name.length()>30 || (d.getRemark()!=null && d.getRemark().length()>500)) throw new ServiceException("姓名或备注过长");
-            if (d.getEnrollmentId()!=null) singleDb.one("SELECT enrollment_id FROM edu_enrollment WHERE enrollment_id=? AND schedule_id=?",d.getEnrollmentId(),scheduleId);
+            if (d.getEnrollmentId()!=null) {
+                var enrollment=singleDb.one("SELECT schedule_id FROM edu_enrollment WHERE enrollment_id=?",d.getEnrollmentId());
+                if (!scheduleId.toString().equals(String.valueOf(enrollment.get("scheduleId")))
+                    && !com.ruoyi.system.service.EnrollmentTransferService.hasHistoricalSignIn(singleDb,d.getEnrollmentId(),scheduleId,classDate))
+                    throw new ServiceException("签到报名记录不属于当前班级或原有课次");
+            }
             boolean duplicate = d.getEnrollmentId() == null
                 ? !freeNames.add(name) || names.contains(name)
                 : !enrollmentIds.add(d.getEnrollmentId()) || freeNames.contains(name);
@@ -270,7 +275,7 @@ public class EduClassSignInServiceImpl implements IEduClassSignInService
         return result;
     }
 
-    private static final String ATTENDANCE_JOINS=" FROM edu_class_sign_in r JOIN edu_course_schedule c ON c.schedule_id=r.schedule_id LEFT JOIN edu_enrollment e ON e.enrollment_id=r.enrollment_id AND e.schedule_id=r.schedule_id LEFT JOIN edu_student st ON st.student_id=e.student_id AND st.parent_id=e.parent_id LEFT JOIN sys_user p ON p.user_id=e.parent_id LEFT JOIN sys_user t ON t.user_id=c.teacher_id ";
+    private static final String ATTENDANCE_JOINS=" FROM edu_class_sign_in r JOIN edu_course_schedule c ON c.schedule_id=r.schedule_id LEFT JOIN edu_enrollment e ON e.enrollment_id=r.enrollment_id LEFT JOIN edu_student st ON st.student_id=e.student_id AND st.parent_id=e.parent_id LEFT JOIN sys_user p ON p.user_id=e.parent_id LEFT JOIN sys_user t ON t.user_id=c.teacher_id ";
     private static final String ATTENDANCE_FIELDS="r.sign_in_id,r.schedule_id,DATE_FORMAT(r.class_date,'%Y-%m-%d') class_date,e.enrollment_id,r.student_name recorded_name,r.sign_status,r.source_type,COALESCE(r.review_status,'0') review_status,st.student_id,st.parent_id,st.student_name current_name,e.student_name enrolled_name,p.phonenumber parent_phone,c.course_class_name,COALESCE(NULLIF(TRIM(t.user_name),''),c.teacher_name) teacher_name,c.grade_name,c.subject_name";
     private static final Map<String,String> SIGN_LABELS=Map.of("1","到课","2","录播","3","请假","4","试听到课","5","调课到课","6","未到课");
     private void attendanceAdmin() {if(!SecurityUtils.isAdmin() && !SecurityUtils.hasRole("admin") && !SecurityUtils.hasRole("education"))throw new ServiceException("只有教务或管理员可以查看学生出勤总览");}
