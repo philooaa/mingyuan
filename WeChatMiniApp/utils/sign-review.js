@@ -9,9 +9,10 @@ async function authorize(current) {
   if (!access.staff()) throw new Error('仅教务或管理员可审核出勤')
   return true
 }
+function canReviewStage(stage) { return access.selected() === (stage === 'initial' ? 'education' : 'admin') }
 function images(value) {
   return String(value || '').split(',').filter(Boolean).map(require('./public-file-url'))
 }
-function confirm(content) { return new Promise((resolve, reject) => wx.showModal({ title: '教务审核确认', content, success: r => resolve(r.confirm), fail: () => reject(new Error('无法打开确认窗口，请重试')) })) }
+function confirm(content) { return new Promise((resolve, reject) => wx.showModal({ title: '出勤审核确认', content, success: r => resolve(r.confirm), fail: () => reject(new Error('无法打开确认窗口，请重试')) })) }
 function isStaff() { return !!wx.getStorageSync('token') && access.staff() }
-module.exports = { request, base, authorize, images, confirm, isStaff }
+module.exports = { request, base, authorize, images, confirm, isStaff, canReviewStage }

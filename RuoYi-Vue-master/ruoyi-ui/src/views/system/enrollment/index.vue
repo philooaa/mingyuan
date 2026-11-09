@@ -1,5 +1,6 @@
 <template>
   <div class="app-container edu-workspace">
+    <attendance-roster />
     <div class="edu-page-heading"><div><h2>课程报名</h2><p>查看学员报名、课程安排和上课记录</p></div><div class="edu-result-count">共 <strong>{{ total }}</strong> 条报名</div></div>
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="100px">
       <el-form-item label="报名编码" prop="enrollmentCode" v-show="showAdvancedFilters">
@@ -310,10 +311,11 @@ import { listEnrollment, getEnrollment, cancelEnrollment, addEnrollment, updateE
 import { personalDetail } from "@/api/system/transaction"
 import { getTimetableDimensions } from '@/api/system/timetable'
 import OneToOneManager from '../schedule/OneToOneManager.vue'
+import AttendanceRoster from './AttendanceRoster.vue'
 
 export default {
   name: "Enrollment",
-  components: { OneToOneManager },
+  components: { OneToOneManager, AttendanceRoster },
   data() {
     return {
       transferOpen: false, transferRow: null, transferRows: [], transferHistory: [], transferTotal: 0,

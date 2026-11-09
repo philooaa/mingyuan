@@ -29,7 +29,7 @@ public class MiniAppAdminHomeStatsController {
             + "COALESCE(CONCAT('E',r.enrollment_id),CONCAT('S',r.sign_in_id)) student_key "
             + "FROM edu_class_sign_in r JOIN edu_course_schedule s ON s.schedule_id=r.schedule_id "
             + "WHERE r.class_date=? AND r.del_flag='0' AND r.sign_status IN ('1','4','5') "
-            + "AND COALESCE(r.review_status,'0')<>'2' AND TIMESTAMP(r.class_date,s.end_time)<=?) completed",
+            + "AND r.review_status='1' AND TIMESTAMP(r.class_date,s.end_time)<=?) completed",
             java.math.BigDecimal.class, now.toLocalDate(), now);
         return AjaxResult.success(Map.of("completedCount", count == null ? 0 : count));
     }

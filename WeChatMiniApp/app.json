@@ -58,7 +58,9 @@
     "pages/teacher-leave/teacher-leave",
     "pages/admin-coupon-section/admin-coupon-section",
     "pages/admin-referral-grant/admin-referral-grant",
-    "pages/admin-course-price/admin-course-price"
+    "pages/admin-course-price/admin-course-price",
+    "pages/attendance-roster/attendance-roster",
+    "pages/attendance-todos/attendance-todos"
   ],
   "permission": {
     "scope.userLocation": {

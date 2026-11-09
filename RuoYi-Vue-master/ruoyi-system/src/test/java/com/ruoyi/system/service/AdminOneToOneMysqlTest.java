@@ -28,6 +28,8 @@ class AdminOneToOneMysqlTest {
         }
         var ds=new DriverManagerDataSource("jdbc:mysql://127.0.0.1:3306/"+schema+"?serverTimezone=Asia/Shanghai","root","");
         db=new ShopRepository(ds);
+        if(db.rows("SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='edu_course_schedule' AND column_name='enroll_limit'").isEmpty())db.jdbc().execute("ALTER TABLE edu_course_schedule ADD COLUMN enroll_limit INT NULL");
+        for(String column:List.of("term_name","period_name")) if(db.rows("SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='edu_schedule_adjustment' AND column_name=?",column).isEmpty())db.jdbc().execute("ALTER TABLE edu_schedule_adjustment ADD COLUMN "+column+" VARCHAR(64) NULL");
         var factory=new SqlSessionFactoryBean();factory.setDataSource(ds);factory.setTypeAliasesPackage("com.ruoyi.system.domain");
         factory.setMapperLocations(new ClassPathResource("mapper/system/EduCourseScheduleMapper.xml"),new ClassPathResource("mapper/system/EduEnrollmentMapper.xml"),new ClassPathResource("mapper/system/MiniAppParentMapper.xml"));
         var session=new SqlSessionTemplate(factory.getObject());
@@ -116,7 +118,7 @@ class AdminOneToOneMysqlTest {
         ScheduleCrudTest.principal(11,"teacher");assertEquals(0,service.transactions().size());
     }
     com.ruoyi.system.controller.AdminOneToOneController.Draft draft(LocalDate day){
-        var d=new com.ruoyi.system.controller.AdminOneToOneController.Draft();d.teacherId=10L;d.classroomId=1L;d.timeSlot="8:00-10:00";d.startDate=day;d.gradeName="五年级";d.courseClassName="管理员发布数学";return d;
+        var d=new com.ruoyi.system.controller.AdminOneToOneController.Draft();d.teacherId=10L;d.classroomId=1L;d.timeSlot="8:00-10:00";d.startDate=day;d.gradeName="五年级";d.courseClassName="管理员发布数学";d.unitPrice=new java.math.BigDecimal("200");return d;
     }
     @Test void adminPublishAndEditKeepRealClassroomAndOperator(){
         var day=LocalDate.now(ZoneId.of("Asia/Shanghai")).plusDays(40);

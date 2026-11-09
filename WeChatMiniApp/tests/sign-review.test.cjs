@@ -1,7 +1,7 @@
 const test = require('node:test'), assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
 const root = path.resolve(__dirname, '..')
-const sheet = { teacherName: '任课教师', timeSlot: '10:00-12:00', submittedBy: 'teacher-test', submittedTime: '2026-10-19 12:00', submissionVersion: 'sheet-v1', stats: { totalCount: 5, actualCount: 3, attended: 1, recorded: 1, leave: 1, audited: 1, transferred: 1 }, review: { reviewStatus: '0', confirmedCount: 0 }, details: [1, 2, 3, 4, 5].map(n => ({ signInId: String(n), studentName: '学员' + n, signStatus: String(n), sourceType: '1', teacherName: '任课教师', courseClassName: '测试班' })) }
+const sheet = { teacherName: '任课教师', timeSlot: '10:00-12:00', submittedBy: 'teacher-test', submittedTime: '2026-10-19 12:00', submissionVersion: 'sheet-v1', stats: { totalCount: 5, actualCount: 3, attended: 1, recorded: 1, leave: 1, audited: 1, transferred: 1 }, canInitialReview:true, canFinalReview:false, canCorrect:false, review: { reviewStage:'PENDING_FIRST', reviewStatus: '0', reviewVersion:0, confirmedCount: 0 }, details: [1, 2, 3, 4, 5].map(n => ({ signInId: String(n), studentName: '学员' + n, signStatus: String(n), sourceType: '1', teacherName: '任课教师', courseClassName: '测试班' })) }
 function harness(name, roles = ['education'], custom) {
   let definition, currentSheet = structuredClone(sheet)
   const store = new Map([['token', 'a']]), app = { globalData: { roles, userInfo: { userId: '41' }, permissions: [], baseUrl: 'http://localhost' } }
@@ -11,8 +11,8 @@ function harness(name, roles = ['education'], custom) {
     calls.push(structuredClone(o)); if (custom) { const value = custom(o); if (value !== undefined) return value }
     if (o.url === '/getInfo') return { roles: app.globalData.roles, permissions: [] }
     if (o.url.endsWith('/list')) return { data: [{ scheduleId: '9007199254740999', classDate: '2026-10-19', reviewStatus: '0', teacherName: '任课教师', totalCount: 5, actualCount: 3 }] }
-    if (o.method === 'POST') { currentSheet.review = { reviewStatus: '1', review1AdminName: '教务甲', review1Time: '2026-10-19 12:05' }; return { reviewStatus: '1', requiredConfirmations: 1 } }
-    return { data: currentSheet }
+    if (o.method === 'POST') { currentSheet.review = { reviewStatus: '1', reviewStage:'FINAL', canInitialReview:false, review1AdminName: '教务甲', review1Time: '2026-10-19 12:05' }; return { reviewStatus: '1', requiredConfirmations: 1 } }
+    return { data: {...currentSheet,canInitialReview:currentSheet.review.reviewStatus === '0' && currentSheet.review.reviewStage !== 'PENDING_FINAL',canCorrect:currentSheet.review.reviewStatus === '2'} }
   }
   function load(file) {
     if (file === path.join(root, 'utils', 'request.js')) return { request }
@@ -25,10 +25,10 @@ function harness(name, roles = ['education'], custom) {
   const p = { ...definition, data: structuredClone(definition.data), setData(v) { Object.assign(this.data, v) } }
   return { p, app, calls, notices, store, wx, setSheet: value => { currentSheet = value } }
 }
-async function open(h) { h.p.onLoad?.({ scheduleId: '9007199254740999', classDate: '2026-10-19' }); await h.p.onShow?.(); await new Promise(r => setImmediate(r)) }
+async function open(h) { h.p.onLoad?.({ scheduleId: '9007199254740999', classDate: '2026-10-19' }); await h.p.onShow?.(); if(h.p.data.canInitialReview)h.p.setData({pendingImages:['/profile/monitor.jpg']}); await new Promise(r => setImmediate(r)) }
 test('education can see pending roll-call sheets through the shared education endpoint', async () => {
   const h = harness('sign-review'); await h.p.onShow()
-  assert.ok(h.calls.some(o => o.url === '/miniapp/education/sign/list')); assert.equal(h.p.data.list[0].reviewText, '待教务确认')
+  assert.ok(h.calls.some(o => o.url === '/miniapp/education/sign/list')); assert.equal(h.p.data.list[0].reviewText, '待教务初审')
 })
 test('review detail retains teacher, server statistics and large schedule identity', async () => {
   const h = harness('sign-review-detail'); await open(h)
@@ -50,7 +50,7 @@ test('reject requires a reason and sends the inspected version without approving
   await open(h); await h.p.rejectReview(); assert.equal(h.calls.some(o => o.method === 'POST'), false)
   h.p.setData({ reason: '漏记未到课' }); await h.p.rejectReview()
   const post = h.calls.find(o => o.method === 'POST')
-  assert.equal(post.url, '/miniapp/education/sign/reject'); assert.equal(post.data.reason, '漏记未到课'); assert.equal(post.data.submissionVersion, 'sheet-v1')
+  assert.equal(post.url, '/miniapp/education/sign/review'); assert.equal(post.data.reason, '漏记未到课'); assert.equal(post.data.submissionVersion, 'sheet-v1')
 })
 test('different students keep independent draft states and reasons until one batch save', async () => {
   const h = harness('sign-review-detail', ['education'], o => o.url.endsWith('/correct') ? { code: 200 } : undefined)
@@ -66,15 +66,15 @@ test('different students keep independent draft states and reasons until one bat
   const posts = h.calls.filter(o => o.method === 'POST'); assert.equal(posts.length, 1)
   assert.deepEqual(posts[0].data.corrections, [{ signInId: '1', signStatus: '3', reason: '家长已请假' }, { signInId: '2', signStatus: '6', reason: '核实未到课' }])
 })
-test('unsaved drafts block final approval even after an earlier saved correction', async () => {
+test('returned sheets cannot approve and unsaved drafts still block submission', async () => {
   const h = harness('sign-review-detail'), d = structuredClone(sheet); d.review.reviewStatus = '2'
   d.details[0].reviewHistory = '[{"action":"CORRECT","beforeStatus":"1","afterStatus":"6"}]'
-  h.setSheet(d); await open(h); assert.equal(h.p.data.canReview, true)
+  h.setSheet(d); await open(h); assert.equal(h.p.data.canReview, false)
   h.p.chooseCorrection({ currentTarget: { dataset: { id: '2' } }, detail: { value: 3 } })
   await h.p.confirmReview(); assert.equal(h.calls.some(o => o.method === 'POST'), false)
   assert.equal(h.p.data.canReview, false)
   h.p.chooseCorrection({ currentTarget: { dataset: { id: '2' } }, detail: { value: 1 } })
-  assert.equal(h.p.data.pendingCount, 0); assert.equal(h.p.data.canReview, true)
+  assert.equal(h.p.data.pendingCount, 0); assert.equal(h.p.data.canReview, false)
 })
 test('missing reasons stop the batch locally and a definite rejection preserves every draft', async () => {
   const h = harness('sign-review-detail', ['education'], o => { if (o.url.endsWith('/correct')) { const error = new Error('出勤版本已变化'); error.uncertain = false; throw error } })
@@ -99,7 +99,7 @@ test('staff correction carries stable student identity and reason, then refreshe
 test('a corrected exception can be confirmed while a switched login cannot post corrections', async () => {
   const h = harness('sign-review-detail'); const d = structuredClone(sheet); d.review.reviewStatus = '2'
   d.details[0].reviewHistory = '[{"action":"REJECT"},{"action":"CORRECT","beforeStatus":"1","afterStatus":"6"}]'
-  h.setSheet(d); await open(h); assert.equal(h.p.data.canReview, true)
+  h.setSheet(d); await open(h); assert.equal(h.p.data.canReview, false)
   h.p.chooseCorrection({ currentTarget: { dataset: { id: '1' } }, detail: { value: 3 } }); h.p.onCorrectionReason({ currentTarget: { dataset: { id: '1' } }, detail: { value: '核实' } })
   let modal; h.wx.showModal = o => { modal = o }; const work = h.p.correctAttendance(); await new Promise(r => setImmediate(r))
   h.store.set('token', 'changed'); modal.success({ confirm: true }); await work
@@ -108,7 +108,7 @@ test('a corrected exception can be confirmed while a switched login cannot post 
 test('one confirmation submits only the inspected sheet version and becomes read-only', async () => {
   const h = harness('sign-review-detail'); await open(h); await h.p.confirmReview(); await h.p.confirmReview()
   const posts = h.calls.filter(o => o.method === 'POST'); assert.equal(posts.length, 1)
-  assert.deepEqual(posts[0].data, { scheduleId: '9007199254740999', classDate: '2026-10-19', submissionVersion: 'sheet-v1', images: [] })
+  assert.deepEqual(posts[0].data, { scheduleId: '9007199254740999', classDate: '2026-10-19', submissionVersion: 'sheet-v1', reviewVersion:0, action:'APPROVE', images: ['/profile/monitor.jpg'] })
   assert.equal(h.p.data.review.reviewStatus, '1'); assert.equal(h.p.data.canReview, false)
 })
 test('teacher or parent cannot read or confirm education sheets by manually opening the route', async () => {
@@ -131,15 +131,15 @@ test('list date changes reject stale responses and failures offer retry without 
   h.p.setData({ filterDate: '2026-10-18' }); const second = h.p.loadList(); await new Promise(r => setImmediate(r))
   pending[1]({ data: [{ scheduleId: '2', classDate: '2026-10-18', reviewStatus: '2' }] }); await second
   pending[0]({ data: [{ scheduleId: '1', classDate: '2026-10-19', reviewStatus: '0' }] }); await first
-  assert.equal(h.p.data.list[0].scheduleId, '2'); assert.match(h.p.data.list[0].reviewText, /审核异常/)
+  assert.equal(h.p.data.list[0].scheduleId, '2'); assert.match(h.p.data.list[0].reviewText, /已退回/)
   const failed = harness('sign-review', ['education'], o => { if (o.url.endsWith('/list')) throw Error('连接失败') })
   await failed.p.onShow(); assert.equal(failed.p.data.error, '连接失败'); assert.equal(failed.p.data.showEmpty, false)
 })
-test('teacher exception sheets keep the exact occurrence and stay locked for staff correction', async () => {
+test('teacher returned sheets keep the exact occurrence and permit resubmission', async () => {
   const h = harness('sign-in-edit', ['teacher']), d = structuredClone(sheet)
   d.review = { reviewStatus: '2', reviewReason: '出勤有误', reviewVersion: 7 }; h.setSheet(d)
   h.p.onLoad({ scheduleId: '9007199254740999', classDate: '2026-10-18' }); await new Promise(r => setImmediate(r))
-  assert.equal(h.p.data.locked, true); assert.equal(h.p.data.scheduleId, '9007199254740999'); assert.equal(h.p.data.classDate, '2026-10-18')
+  assert.equal(h.p.data.locked, false); assert.equal(h.p.data.scheduleId, '9007199254740999'); assert.equal(h.p.data.classDate, '2026-10-18')
   const source = fs.readFileSync(path.join(root, 'pages/sign-in-edit/sign-in-edit.js'), 'utf8')
   assert.match(source, /reviewVersion: this.data.review\?\.reviewVersion \|\| 0/)
 })
@@ -147,4 +147,39 @@ test('parent attendance keeps attendance facts separate from the staff review st
   const { p } = harness('attendance', ['parent'])
   const row = p.decorateDetails([{ attendanceStatus: '1', reviewStatus: '2' }])[0]
   assert.equal(row.statusText, '已上课'); assert.equal(row.reviewText, '审核异常，教务核查中')
+})
+
+test('education workspace of a multi-role account cannot confirm final review',async()=>{
+ const h=harness('sign-review-detail',['admin','business_admin','education']);h.store.set('miniappWorkspace:41','education')
+ const d=structuredClone(sheet);d.canInitialReview=false;d.canFinalReview=true;d.review={reviewStage:'PENDING_FINAL',reviewStatus:'0',canFinalReview:true};h.setSheet(d);await open(h)
+ assert.equal(h.p.data.canFinalReview,false);assert.equal(h.p.data.canReview,false);await h.p.confirmReview();assert.equal(h.calls.some(o=>o.method==='POST'),false)
+ h.store.set('miniappWorkspace:41','admin');await h.p.onShow();assert.equal(h.p.data.canFinalReview,true)
+})
+test('review UI hides generated account names and non-correction audit entries',async()=>{
+ const h=harness('sign-review-detail');const d=structuredClone(sheet);d.teacherName='mp_17870732258_8e6b7670';d.submittedBy=d.teacherName;d.review.review1AdminName=d.teacherName;d.review.review1Time='2026-11-06T23:43:04.139487';d.details[0].reviewHistory=JSON.stringify([{action:'SUBMIT',actorName:d.teacherName},{action:'INITIAL_APPROVE',actorName:d.teacherName},{action:'CORRECT',beforeStatus:'1',afterStatus:'3',reason:'家长请假',time:'2026-11-06T23:43:04.139487'}]);h.setSheet(d);await open(h)
+ assert.equal(h.p.data.teacherName,'');assert.equal(h.p.data.review.review1AdminName,'');assert.equal(h.p.data.review.review1Time,'2026-11-06 23:43');assert.equal(h.p.data.rows[0].history.length,1);assert.equal(h.p.data.rows[0].history[0].text,'到课 → 请假')
+})
+
+test('switching away from admin during final confirmation never posts approval',async()=>{
+ const h=harness('sign-review-detail',['admin','education']);h.store.set('miniappWorkspace:41','admin')
+ const d=structuredClone(sheet);d.canInitialReview=false;d.canFinalReview=true;d.review={reviewStage:'PENDING_FINAL',reviewStatus:'0',canFinalReview:true};h.setSheet(d);await open(h)
+ let modal;h.wx.showModal=o=>modal=o;const confirming=h.p.confirmReview();await new Promise(r=>setImmediate(r));h.store.set('miniappWorkspace:41','education');modal.success({confirm:true});await confirming
+ assert.equal(h.calls.some(o=>o.method==='POST'),false)
+})
+
+test('return reason opens only on request and cancellation never submits',async()=>{
+ const h=harness('sign-review-detail');await open(h);let dialog;h.wx.showModal=o=>dialog=o
+ h.p.openReturnDialog();assert.equal(dialog.editable,true);dialog.success({confirm:false,content:''});dialog.complete();assert.equal(h.calls.some(o=>o.method==='POST'),false)
+ h.p.openReturnDialog();h.store.set('token','other');dialog.success({confirm:true,content:'需重新核对'});assert.equal(h.calls.some(o=>o.method==='POST'),false)
+})
+test('return dialog retains required reason validation',async()=>{
+ const h=harness('sign-review-detail');await open(h);h.wx.showModal=o=>o.success({confirm:true,content:'   '});h.p.openReturnDialog();await new Promise(r=>setImmediate(r));assert.equal(h.calls.some(o=>o.method==='POST'),false);assert.match(h.p.data.error,/原因/)
+})
+
+test('review category filters compose with status and reset without changing source sheets',async()=>{
+ const rows=[{scheduleId:'1',classDate:'2026-11-06',subjectName:'数学',gradeName:'一年级',teacherName:'王老师',reviewStatus:'0'},{scheduleId:'2',classDate:'2026-11-06',subjectName:'语文',gradeName:'一年级',teacherName:'李老师',reviewStatus:'1'}]
+ const h=harness('sign-review',['education'],o=>o.url.endsWith('/list')?{data:rows}:undefined);h.p.data.mode='review';await h.p.onShow()
+ h.p.onAttendanceFilter({currentTarget:{dataset:{field:'subjectName'}},detail:{value:h.p.data.filterOptions.subjectName.indexOf('语文')}})
+ assert.equal(h.p.data.list.length,0);h.p.changeFilter({currentTarget:{dataset:{index:2}}});assert.equal(h.p.data.list[0].scheduleId,'2')
+ await h.p.resetAttendanceFilters();assert.equal(h.p.data.list.length,2);assert.equal(rows[0].reviewStatus,'0')
 })

@@ -1,0 +1,31 @@
+<import src="../../utils/attendance-filters.wxml"/>
+<view class="page">
+  <view class="todo-hero">
+    <view class="hero-copy">
+      <view class="hero-eyebrow">课程出勤</view>
+      <view class="hero-title">{{role === 'teacher' ? '教师点名' : role === 'education' ? '教务初审' : '出勤终审'}}</view>
+      <view class="hero-description">{{role === 'teacher' ? '核对学员名单，登记本课出勤' : role === 'education' ? '核对出勤记录，上传监控截图' : '查看出勤与截图，完成最终确认'}}</view>
+    </view>
+    <view class="hero-count"><text class="hero-number">{{loading ? '—' : totalCount}}</text><text class="hero-count-label">待处理课次</text></view>
+  </view>
+
+  <view class="todo-filters">
+    <view class="filter-title">筛选课次</view>
+    <template is="attendanceFilters" data="{{filterOptions:filterOptions,filterIndexes:filterIndexes,attendanceFilters:attendanceFilters,filterDate:filterDate,showDate:true}}"/>
+  </view>
+
+  <view class="todo-list-heading"><view class="list-title">待处理课程<text class="list-count">{{count}}</text></view><text class="list-caption">{{count === totalCount ? '点击课程开始处理' : '已筛选 · 共 ' + totalCount + ' 课次'}}</text></view>
+  <view class="overdue-tip" wx:if="{{role === 'teacher' && overdueCount}}">{{overdueCount}} 个课次已结束，请及时完成点名</view>
+  <view class="error-card" wx:if="{{error}}"><view>{{error}}</view><button class="retry-button" bindtap="load">重新加载</button></view>
+
+  <view class="todo-card" wx:for="{{items}}" wx:key="rowKey" data-index="{{index}}" bindtap="open" hover-class="todo-card-pressed">
+    <view class="course-heading"><view class="course-name">{{item.courseName || '未命名课程'}}</view><text class="stage-tag {{item.overdue ? 'overdue' : ''}}">{{role === 'teacher' ? (item.overdue ? '已逾期' : '待点名') : role === 'education' ? '待初审' : '待终审'}}</text></view>
+    <view class="course-tags"><text wx:if="{{item.gradeName}}">{{item.gradeName}}</text><text wx:if="{{item.subjectName}}">{{item.subjectName}}</text><text wx:if="{{item.lessonNo}}">第 {{item.lessonNo}} 讲</text></view>
+    <view class="course-teacher" wx:if="{{item.teacherName}}">任课教师 · {{item.teacherName}}</view>
+    <view class="course-date"><text class="date-label">上课日期</text><text>{{item.classDate}}</text><text class="course-time" wx:if="{{item.startTime && item.endTime}}">{{item.startTime}}–{{item.endTime}}</text></view>
+    <view class="course-footer"><view class="expected-count">应到 <text>{{item.expectedCount || 0}}</text> 人</view><view class="course-action">{{role === 'teacher' ? '去点名' : role === 'education' ? '去初审' : '去终审'}}<text class="action-arrow">›</text></view></view>
+  </view>
+
+  <view class="loading-state" wx:if="{{loading}}">正在加载课次…</view>
+  <view class="empty-state" wx:if="{{!loading && !error && !items.length}}"><view class="empty-icon">✓</view><view class="empty-title">{{totalCount ? '没有符合条件的课次' : '暂无待处理课次'}}</view><view class="empty-description">{{totalCount ? '试试调整筛选条件' : '有新的出勤待办时，会显示在这里'}}</view></view>
+</view>

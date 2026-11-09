@@ -1,9 +1,9 @@
-const labels = { parent: '家长', teacher: '教师', education: '教务', admin: '管理员' }
+const labels = { parent: '家长', teacher: '教师', education: '教务', business_admin: '业务管理员', admin: '管理员' }
 function roles() { return getApp().globalData.roles || wx.getStorageSync('roles') || [] }
 function has(role, assigned = roles()) {
-  return ['parent', 'teacher', 'education', 'admin'].includes(role) && assigned.includes(role)
+  return ['parent', 'teacher', 'education', 'business_admin', 'admin'].includes(role) && (assigned.includes(role) || (role === 'admin' && assigned.includes('business_admin')))
 }
-function staff() { return has('admin') || has('education') }
+function staff() { return has('admin') || has('education') || has('business_admin') }
 function can(permission) {
   return (getApp().globalData.permissions || []).some(p => p === '*:*:*' || p === permission)
 }
@@ -12,7 +12,8 @@ function options(assigned = roles()) {
 }
 function key() { const user = getApp().globalData.userInfo || wx.getStorageSync('userInfo') || {}; return `miniappWorkspace:${user.userId || ''}` }
 function selected(assigned = roles()) {
-  const saved = wx.getStorageSync(key())
+  const stored = wx.getStorageSync(key())
+  const saved = stored === 'business_admin' ? 'admin' : stored
   return has(saved, assigned) ? saved : (options(assigned)[0] || {}).key || ''
 }
 function select(role) { if (!has(role)) return false; wx.setStorageSync(key(), role); return true }
@@ -30,7 +31,7 @@ const routePermissions = {
   '/pages/material-upload/material-upload': 'system:material:list'
 }
 function actions(items, role) {
-  return items.filter(item => item.route && (!['admin', 'education'].includes(role) || !routePermissions[item.route] || can(routePermissions[item.route])))
+  return items.filter(item => item.route && (!['admin', 'education', 'business_admin'].includes(role) || !routePermissions[item.route] || can(routePermissions[item.route])))
 }
 function developmentTool() {
   try {

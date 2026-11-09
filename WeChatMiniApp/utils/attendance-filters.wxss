@@ -1,0 +1,5 @@
+.attendance-filter-buttons { display:flex; flex-wrap:wrap; gap:12rpx; padding:20rpx 24rpx; background:#fff; border-radius:16rpx; margin:16rpx 0; }
+.attendance-filter-buttons picker { min-width:0; flex:1 1 40%; }
+.attendance-filter-button { padding:18rpx 16rpx; border-radius:12rpx; background:#f2f5fa; font-size:26rpx; color:#34465e; overflow-wrap:anywhere; }
+.attendance-filter-button.chosen { color:#175eaa; background:#eaf2ff; }
+.attendance-filter-buttons .attendance-filter-reset { margin:0; background:#fff; color:#65758b; font-size:24rpx; }

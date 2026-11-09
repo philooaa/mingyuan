@@ -53,31 +53,4 @@ public interface EduClassSignInMapper
      */
     public int batchInsert(@Param("list") List<EduClassSignIn> list);
 
-    /**
-     * 写入第1位管理员确认（仅当未写入时）
-     */
-    public int updateReview1(@Param("scheduleId") Long scheduleId, @Param("classDate") String classDate,
-            @Param("adminId") Long adminId, @Param("adminName") String adminName, @Param("images") String images);
-
-    /** Archive an old partial review while preserving its original confirmation. */
-    public int completeLegacyReview(@Param("scheduleId") Long scheduleId, @Param("classDate") String classDate,
-            @Param("adminId") Long adminId, @Param("adminName") String adminName, @Param("images") String images);
-
-    /**
-     * 写入第2位管理员确认并置复核完成（仅当未写入时）
-     */
-    public int updateReview2(@Param("scheduleId") Long scheduleId, @Param("classDate") String classDate,
-            @Param("adminId") Long adminId, @Param("adminName") String adminName, @Param("images") String images);
-
-    /**
-     * 更新第1位管理员图片（本人已确认时）
-     */
-    public int updateReview1Images(@Param("scheduleId") Long scheduleId, @Param("classDate") String classDate,
-            @Param("adminId") Long adminId, @Param("adminName") String adminName, @Param("images") String images);
-
-    /**
-     * 更新第2位管理员图片（本人已确认时）
-     */
-    public int updateReview2Images(@Param("scheduleId") Long scheduleId, @Param("classDate") String classDate,
-            @Param("adminId") Long adminId, @Param("adminName") String adminName, @Param("images") String images);
 }

@@ -1,0 +1,9 @@
+<template name="attendanceFilters">
+  <view class="attendance-filter-buttons">
+    <picker wx:if="{{showDate}}" mode="date" value="{{filterDate}}" bindchange="onDateFilter"><view class="attendance-filter-button {{filterDate?'chosen':''}}">{{filterDate || '全部日期'}} ▾</view></picker>
+    <picker range="{{filterOptions.subjectName}}" value="{{filterIndexes.subjectName}}" data-field="subjectName" bindchange="onAttendanceFilter"><view class="attendance-filter-button {{attendanceFilters.subjectName?'chosen':''}}">{{attendanceFilters.subjectName || '全部学科'}} ▾</view></picker>
+    <picker range="{{filterOptions.gradeName}}" value="{{filterIndexes.gradeName}}" data-field="gradeName" bindchange="onAttendanceFilter"><view class="attendance-filter-button {{attendanceFilters.gradeName?'chosen':''}}">{{attendanceFilters.gradeName || '全部年级'}} ▾</view></picker>
+    <picker range="{{filterOptions.teacherName}}" value="{{filterIndexes.teacherName}}" data-field="teacherName" bindchange="onAttendanceFilter"><view class="attendance-filter-button {{attendanceFilters.teacherName?'chosen':''}}">{{attendanceFilters.teacherName || '全部老师'}} ▾</view></picker>
+    <button class="attendance-filter-reset" size="mini" bindtap="resetAttendanceFilters">重置筛选</button>
+  </view>
+</template>

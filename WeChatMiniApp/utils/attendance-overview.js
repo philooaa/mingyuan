@@ -7,4 +7,5 @@ function courses(items){return (items||[]).map(c=>({...c,label:[c.courseClassNam
 function summary(item){return {...item,rowKey:`${item.scheduleId}:${item.classDate}`,reviewText:reviewLabels[String(item.reviewStatus)]||''}}
 function filter(rows,keyword){const k=String(keyword||'').trim();return !k?rows:rows.filter(r=>String(r.studentName||'').includes(k)||String(r.parentPhone||'').includes(k))}
 function mergeLessons(oldRows,newRows){return [...new Map([...oldRows,...newRows].map(r=>[`${r.scheduleId}:${r.classDate}`,r])).values()]}
-module.exports={row,courses,summary,filter,mergeLessons}
+function columns(dates,lessons){const byDate=new Map((lessons||[]).map(l=>[String(l.classDate).slice(0,10),l]));return (dates||[]).map(date=>({date,...(byDate.get(date)||{}),expectedText:byDate.has(date)?String(byDate.get(date).expectedCount):'—'}))}
+module.exports={row,courses,summary,filter,mergeLessons,columns}

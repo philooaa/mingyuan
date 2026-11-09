@@ -202,6 +202,7 @@ function component(name, dependencies = {}) {
     component: null,
     ReferralRewards:{},
     OneToOneManager:{},
+    AttendanceRoster:{},
     ...finance,
     ...dependencies,
   })

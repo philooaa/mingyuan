@@ -21,6 +21,9 @@ public class MiniAppSignSubmitBody
 
     public static class Detail
     {
+        private Long studentId;
+        public Long getStudentId() { return studentId; }
+        public void setStudentId(Long value) { studentId=value; }
         /** 报名记录ID（试听/调课学员为空） */
         private Long enrollmentId;
 

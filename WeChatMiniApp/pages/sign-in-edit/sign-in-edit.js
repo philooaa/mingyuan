@@ -6,6 +6,7 @@ const STATUS_OPTIONS = {
   '2': [{ key: '4', label: '试听到课' }, { key: '3', label: '请假' }],
   '3': [{ key: '5', label: '调课到课' }, { key: '3', label: '请假' }]
 }
+Object.values(STATUS_OPTIONS).forEach(options => options.push({key:'6',label:'未到课'}))
 const STATUS_LABELS = { '1': '到课', '2': '录播', '3': '请假', '4': '试听到课', '5': '调课到课', '6': '未到课' }
 const SOURCE_LABELS = { '1': '报名', '2': '试听', '3': '调课' }
 
@@ -61,11 +62,13 @@ Page({
       const data = detail.data || {}
       const review = data.review || {}
       const details = data.details || []
-      const reviewed = ['1', '2'].includes(String(review.reviewStatus)) || !!review.review1AdminId || !!review.review2AdminId
+      const stage = data.reviewStage || review.reviewStage
+      const reviewed = stage ? !['NEW','RETURNED'].includes(stage) : String(review.reviewStatus) === '1' || !!review.review1AdminId || !!review.review2AdminId
       const approvedLeave = new Set((reviewed ? [] : data.approvedLeaveEnrollmentIds || []).map(String))
       let rows
       if (details.length) {
         rows = details.map((d) => this.decorateRow({
+          studentId: d.studentId,
           enrollmentId: d.enrollmentId,
           studentName: d.studentName,
           sourceType: d.sourceType,
@@ -79,16 +82,18 @@ Page({
         })
         if (!current()) return
         rows = (res.data || []).map((s) => this.decorateRow({
-          enrollmentId: s.enrollment_id,
-          studentName: s.student_name,
-          sourceType: '1',
-          signStatus: approvedLeave.has(String(s.enrollment_id)) ? '3' : '1',
+          studentId: s.studentId || s.student_id,
+          enrollmentId: s.enrollmentId || s.enrollment_id,
+          studentName: s.studentName || s.student_name,
+          sourceType: s.sourceType || ({TRIAL:'2',TRANSFER:'3'}[s.source] || '1'),
+          signStatus: approvedLeave.has(String(s.enrollmentId || s.enrollment_id)) ? '3' : s.source === 'TRIAL' ? '4' : s.source === 'TRANSFER' ? '5' : '1',
           remark: ''
-        }, '1'))
+        }, s.sourceType || ({TRIAL:'2',TRANSFER:'3'}[s.source] || '1')))
       }
       this._loadedToken = token
       this.setData({
         ready: true,
+        submissionVersion: data.submissionVersion || '',
         rows,
         review,
         locked: reviewed,
@@ -152,34 +157,8 @@ Page({
   addTransferred() { this.addStudent('3') },
 
   addStudent(sourceType) {
-    if (!this.canEdit() || !['2', '3'].includes(sourceType)) return
-    const version = this._loadVersion
-    wx.showModal({
-      title: sourceType === '2' ? '添加试听学员' : '添加调课学员',
-      editable: true,
-      placeholderText: '请输入学生姓名',
-      success: (res) => {
-        if (!res.confirm || !this.canEdit() || version !== this._loadVersion) return
-        const name = (res.content || '').trim()
-        if (!name) {
-          wx.showToast({ title: '姓名不能为空', icon: 'none' })
-          return
-        }
-        if (this.data.rows.some((r) => r.studentName === name)) {
-          wx.showToast({ title: '该学生已在名单中', icon: 'none' })
-          return
-        }
-        const row = this.decorateRow({
-          enrollmentId: null,
-          studentName: name,
-          sourceType,
-          signStatus: sourceType === '2' ? '4' : '5',
-          remark: ''
-        }, sourceType)
-        const rows = this.data.rows.concat([row])
-        this.setData({ rows, stats: this.buildStats(rows) })
-      }
-    })
+    if (!this.canEdit()) return
+    wx.showToast({title:'请教务先关联学生档案并设置试听或调课的生效讲次，再刷新点名名单',icon:'none',duration:3000})
   },
 
   removeRow(e) {
@@ -214,7 +193,9 @@ Page({
           scheduleId,
           classDate,
           reviewVersion: this.data.review?.reviewVersion || 0,
+          submissionVersion: this.data.submissionVersion,
           details: rows.map((r) => ({
+            studentId: r.studentId,
             enrollmentId: r.enrollmentId,
             studentName: r.studentName,
             sourceType: r.sourceType,
