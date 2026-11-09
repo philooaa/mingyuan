@@ -43,6 +43,7 @@ public interface IEduClassSignInService
      */
     public List<EduClassSignIn> selectReviewList(String classDate);
     public List<Map<String,Object>> attendanceCourses(String keyword);
+    public List<Map<String,Object>> attendanceCourses(String keyword,String from,String to);
     public Map<String,Object> attendanceOverview(Long scheduleId,String from,String to);
     public Map<String,Object> attendanceStudent(Long scheduleId,String studentKey,boolean allCourses,String from,String to,int pageNum);
 

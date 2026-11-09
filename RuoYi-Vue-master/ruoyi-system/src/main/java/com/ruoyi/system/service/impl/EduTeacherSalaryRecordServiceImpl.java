@@ -30,7 +30,7 @@ import com.ruoyi.system.service.IEduTeacherSalaryRecordService;
  * 教师薪资结算 服务实现
  *
  * 课时口径：
- * - 班课：老师提交签到且该课次实到人数（到课1/试听4/调课5）≥1，计 1 次课，时长取排课时长（默认2小时）
+ * - 班课：终审通过的实际课次计 1 次课，保留原排课课时计价资格（含录播/请假），时长取课次快照
  * - 一对一：按实到学员人次计，每人次 1 次课，时长取排课时长（默认配置时长）
  * - 学段：初一~初三=初中，高一~高三=高中，其余=小学
  *
@@ -71,10 +71,15 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
         checkMonth(salaryMonth);
         List<EduTeacherSalaryRecord> list = computeMonth(salaryMonth);
         // 标注已结算状态
-        for (EduTeacherSalaryRecord r : list)
+        for (int index=0;index<list.size();index++)
         {
+            EduTeacherSalaryRecord r = list.get(index);
             EduTeacherSalaryRecord saved = recordMapper.selectRecordByTeacherMonth(r.getTeacherId(), salaryMonth);
-            if (saved != null)
+            if (saved != null && "1".equals(saved.getConfirmStatus()))
+            {
+                list.set(index,saved); // Settled financial facts are immutable under new attendance rules.
+            }
+            else if (saved != null)
             {
                 r.setRecordId(saved.getRecordId());
                 r.setConfirmStatus(saved.getConfirmStatus());
@@ -189,45 +194,23 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
         {
             configMap.put(c.getTeacherId(), c);
         }
-        // 当月课次：按寒假 / 春季排课的起止日期与上课模式推算，不再依赖考勤记录
-        // （暑假、秋季为历史数据，不参与薪资计算）
+        // Only terminally approved attendance supplies payable occurrences.
         Map<Long, double[]> hoursMap = new HashMap<>();   // [5] 小时
         Map<Long, long[]> countMap = new HashMap<>();     // [5] 节数
         Set<Long> involved = new HashSet<>();
-        YearMonth ym = YearMonth.parse(salaryMonth);
-        LocalDate monthStart = ym.atDay(1);
-        LocalDate monthEnd = ym.atEndOfMonth();
-        for (Map<String, Object> s : recordMapper.selectTermSchedules())
+        for (Map<String, Object> s : recordMapper.selectMonthlySessions(salaryMonth))
         {
             Long teacherId = toLong(s.get("teacherId"));
-            if (teacherId == null)
-            {
-                continue;
-            }
-            LocalDate from = toLocalDate(s.get("startDate"));
-            LocalDate to = toLocalDate(s.get("endDate"));
-            if (from == null || to == null)
-            {
-                continue;
-            }
-            // 排课区间与本月的交集
-            LocalDate begin = from.isAfter(monthStart) ? from : monthStart;
-            LocalDate finish = to.isBefore(monthEnd) ? to : monthEnd;
-            if (begin.isAfter(finish))
-            {
-                continue;
-            }
-            int times = sessionTimes(s, begin, finish);
-            if (times <= 0)
-            {
-                continue;
-            }
+            if (teacherId == null) continue;
+            long attended = toLong(s.get("attendedRows")) == null ? 0 : toLong(s.get("attendedRows"));
+            int times = "2".equals(String.valueOf(s.get("classMode"))) ? Math.toIntExact(attended) : 1;
+            if (times <= 0) continue;
             EduTeacherSalaryConfig cfg = configMap.get(teacherId);
             double defHours = cfg != null && cfg.getClassHoursPerSession() != null
                     ? cfg.getClassHoursPerSession().doubleValue() : 2.0;
             double sessionHours = sessionHours(s.get("startTime"), s.get("endTime"), defHours);
             String classMode = s.get("classMode") == null ? "1" : String.valueOf(s.get("classMode"));
-            String stage = stage(s.get("gradeName"));
+            String stage = String.valueOf(s.get("stage"));
 
             int idx;
             if ("2".equals(classMode))

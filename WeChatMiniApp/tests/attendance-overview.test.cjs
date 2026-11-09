@@ -6,14 +6,14 @@ const grid={course,dates:['2030-10-12','2030-10-19'],rows:[child,{...child,stude
 function harness(request,role='admin'){
  const storage={token:'admin-session',roles:[role]},routes=[];const wx={getStorageSync:k=>storage[k],navigateTo:o=>routes.push(o.url),stopPullDownRefresh(){},showToast(){}}
  const module={exports:{}};vm.runInNewContext(fs.readFileSync(path.join(root,'utils/sign-review.js'),'utf8'),{module,wx,Set,require:id=>id==='./access'?{staff:()=>['admin','education'].some(r=>storage.roles.includes(r))}:{request}})
- let definition;vm.runInNewContext(fs.readFileSync(path.join(root,'pages/sign-review/sign-review.js'),'utf8'),{Page:p=>definition=p,require:id=>id.endsWith('/attendance-overview')?visual:id.endsWith('/sign-review')?module.exports:{request},wx,console})
+ let definition;vm.runInNewContext(fs.readFileSync(path.join(root,'pages/sign-review/sign-review.js'),'utf8'),{Page:p=>definition=p,require:id=>id.endsWith('/attendance-filters')?require('../utils/attendance-filters'):id.endsWith('/attendance-overview')?visual:id.endsWith('/sign-review')?module.exports:{request},wx,console})
  const p={...definition,data:structuredClone(definition.data),_visible:true};p.setData=o=>Object.assign(p.data,o);return {p,storage,routes}
 }
 test('student attendance opens overview by default and full teacher names remain in course options',async()=>{
- const calls=[];const {p}=harness(o=>{calls.push(o);return Promise.resolve({data:o.url.endsWith('/courses')?[course]:grid})});assert.equal(p.data.mode,'overview');await p.loadCourses();assert.match(p.data.courses[0].label,/刘老师全名/);assert.equal(p.data.courseId,'10');assert.equal(p.data.students.length,2);assert.equal(p.data.students[0].studentKey,'S:1');assert.equal(p.data.students[1].studentKey,'S:2');assert.equal(calls[1].data.scheduleId,'10')
+ const calls=[];const {p}=harness(o=>{calls.push(o);return Promise.resolve({data:o.url.endsWith('/courses')?[course]:grid})});assert.equal(p.data.mode,'overview');await p.loadCourses();assert.match(p.data.courses[0].label,/刘老师全名/);assert.equal(p.data.courseId,'');assert.equal(p.data.courseIndex,-1);assert.equal(p.data.students.length,0);assert.equal(calls.length,1);await p.pickCourse({detail:{value:1}});assert.equal(p.data.students.length,2);assert.equal(p.data.students[0].studentKey,'S:1');assert.equal(p.data.students[1].studentKey,'S:2');assert.equal(calls[1].data.scheduleId,'10')
 })
 test('education shares the complete read-only attendance overview while teacher and parent cannot load it',async()=>{
- for(const role of ['education','teacher','parent']){const calls=[];const {p}=harness(o=>{calls.push(o);return Promise.resolve({data:o.url.endsWith('/courses')?[course]:grid})},role);await p.loadCourses();assert.equal(p.data.overviewReady,role==='education');assert.equal(calls.length,role==='education'?2:0)}
+ for(const role of ['education','teacher','parent']){const calls=[];const {p}=harness(o=>{calls.push(o);return Promise.resolve({data:o.url.endsWith('/courses')?[course]:grid})},role);await p.loadCourses();assert.equal(p.data.overviewReady,false);if(role==='education')await p.pickCourse({detail:{value:1}});assert.equal(p.data.overviewReady,role==='education');assert.equal(calls.length,role==='education'?2:0)}
 })
 test('teacher statistics labels do not treat missing attendance as absence or invent a completed review',()=>{
  const r=visual.row(child);assert.equal(r.cells[0].reviewText,'待复核');assert.equal(r.cells[1].text,'—');assert.equal(r.cells[1].reviewText,'');assert.equal(r.phoneHint,'家长尾号 8901');assert.equal(visual.filter([r],'6789').length,1);assert.equal(visual.filter([r],'不同姓名').length,0)
@@ -34,8 +34,44 @@ test('closing student statistics or changing accounts rejects delayed private re
  let finish;const {p}=harness(()=>new Promise(resolve=>finish=resolve));p.data.summaryOpen=true;p.data.summaryStudent=child;p.data.courseId='10';const work=p.loadSummary();p.closeSummary();finish({data:{stats:{attended:9},rows:[{studentName:'旧学生'}],total:1}});await work;assert.equal(p.data.summaryOpen,false);assert.equal(p.data.summaryRows.length,0);assert.equal(p.data.summaryStudent,null)
 })
 test('range filters are explicit and request failure clears previous totals and grid',async()=>{
- const {p}=harness(()=>Promise.reject(Error('日期范围无效')));p.data.courseId='10';p.data.students=[child];p.data.overviewReady=true;await p.loadOverview();assert.equal(p.data.overviewReady,false);assert.equal(p.data.students.length,0);assert.equal(p.data.overviewError,'日期范围无效');const source=fs.readFileSync(path.join(root,'pages/sign-review/sign-review.wxml'),'utf8');assert.match(source,/student-axis/);assert.match(source,/仅展示已有出勤记录的日期/);assert.match(source,/— 未记录/)
+ const {p}=harness(()=>Promise.reject(Error('日期范围无效')));p.data.courseId='10';p.data.students=[child];p.data.overviewReady=true;await p.loadOverview();assert.equal(p.data.overviewReady,false);assert.equal(p.data.students.length,0);assert.equal(p.data.overviewError,'日期范围无效');const source=fs.readFileSync(path.join(root,'pages/sign-review/sign-review.wxml'),'utf8');assert.match(source,/student-axis/);assert.match(source,/展示计划课次及历史记录/);assert.match(source,/— 未记录/)
 })
 test('student pagination deduplicates occurrence rows and stops at the server page boundary',async()=>{
  const a={scheduleId:'10',classDate:'2030-10-12',statusText:'到课'},b={...a,scheduleId:'20'};const rows=visual.mergeLessons([a],[{...a,statusText:'请假'},b]);assert.equal(rows.length,2);assert.equal(rows[0].statusText,'请假');let calls=0;const {p}=harness(()=>{calls++;return Promise.resolve({data:{stats:{},rows:[a],total:31}})});p.data.summaryOpen=true;p.data.summaryStudent=child;p.data.summaryPage=2;await p.loadSummary();assert.equal(p.data.summaryHasMore,false);p.moreSummary();assert.equal(calls,1)
+})
+test('formal totals, unverified categories and planned lecture rosters remain separate',async()=>{
+ const data={...grid,stats:{expectedCount:2,attended:1,leave:1},pendingStats:{expectedCount:3,attended:2,normal:1,trial:1,leave:1,unmarked:4},plannedExpectedCount:9,lessons:[{lessonNo:1,classDate:'2030-10-12',expectedCount:2},{lessonNo:2,classDate:'2030-10-19',expectedCount:7}]}
+ const {p}=harness(()=>Promise.resolve({data}));p.data.courseId='10';await p.loadOverview();assert.equal(p.data.courseStats.attended,1);assert.equal(p.data.coursePendingStats.attended,2);assert.equal(p.data.coursePendingStats.unmarked,4);assert.equal(p.data.plannedExpectedCount,9);assert.deepEqual(plain(p.data.dateColumns.map(c=>c.expectedText)),['2','7']);assert.equal(visual.columns(['2030-10-01'],[])[0].expectedText,'—')
+})
+test('student summary preserves formal and pending person-occurrences independently',async()=>{
+ const {p}=harness(()=>Promise.resolve({data:{stats:{expectedCount:2,attended:1},pendingStats:{expectedCount:1,attended:1,trial:1},total:0,rows:[]}}));p.data.summaryOpen=true;p.data.summaryStudent=child;p.data.courseId='10';await p.loadSummary();assert.equal(p.data.summaryStats.attended,1);assert.equal(p.data.summaryPendingStats.trial,1);p.closeSummary();assert.equal(Object.keys(p.data.summaryPendingStats).length,0)
+})
+
+test('overview category buttons filter course choices and reset restores all courses',async()=>{
+ const courses=[{...course,subjectName:'数学',gradeName:'一年级'},{...course,scheduleId:'20',subjectName:'语文',gradeName:'二年级',teacherName:'王老师'}]
+ const {p}=harness(o=>Promise.resolve({data:o.url.endsWith('/courses')?courses:grid}));await p.loadCourses()
+ await p.onAttendanceFilter({currentTarget:{dataset:{field:'subjectName'}},detail:{value:p.data.filterOptions.subjectName.indexOf('语文')}})
+ assert.equal(p.data.courses.length,1);assert.equal(p.data.courseId,'');await p.pickCourse({detail:{value:1}});assert.equal(p.data.courseId,'20')
+ await p.onAttendanceFilter({currentTarget:{dataset:{field:'gradeName'}},detail:{value:p.data.filterOptions.gradeName.indexOf('一年级')}})
+ assert.equal(p.data.courses.length,0);assert.equal(p.data.overviewReady,false);assert.equal(p.data.students.length,0)
+ await p.resetAttendanceFilters();assert.equal(p.data.courses.length,2);assert.equal(p.data.from,'');assert.equal(p.data.to,'')
+})
+
+test('filter reset and search never select a course or let an old grid reappear',async()=>{
+ let resolveGrid;const calls=[];const {p}=harness(o=>{calls.push(o);return o.url.endsWith('/courses')?Promise.resolve({data:[{...course,subjectName:'数学'}]}):new Promise(resolve=>resolveGrid=resolve)})
+ await p.loadCourses();assert.equal(p.data.courseId,'');assert.equal(p.data.overviewReady,false)
+ const loading=p.pickCourse({detail:{value:1}});assert.equal(p.data.courseId,'10')
+ await p.onAttendanceFilter({currentTarget:{dataset:{field:'subjectName'}},detail:{value:1}})
+ resolveGrid({data:grid});await loading;assert.equal(p.data.courseId,'');assert.equal(p.data.overviewReady,false);assert.equal(p.data.students.length,0)
+ await p.resetAttendanceFilters();assert.equal(p.data.courseId,'');assert.equal(p.data.courseOptions[0].scheduleId,'')
+ await p.loadCourses();assert.equal(p.data.courseId,'');assert.equal(calls.filter(o=>o.url.endsWith('/overview')).length,1)
+})
+
+test('date-only filters request matching courses before any course is selected',async()=>{
+ const calls=[];const {p}=harness(o=>{calls.push(o);return Promise.resolve({data:o.url.endsWith('/courses')?[course]:grid})})
+ await p.loadCourses();await p.changeRange({currentTarget:{dataset:{field:'from'}},detail:{value:'2030-10-12'}})
+ assert.equal(calls.at(-1).url,'/miniapp/admin/sign/courses');assert.equal(calls.at(-1).data.from,'2030-10-12');assert.equal(p.data.courseId,'');assert.equal(p.data.courses.length,1)
+ await p.changeRange({currentTarget:{dataset:{field:'to'}},detail:{value:'2030-10-12'}});assert.equal(calls.at(-1).data.to,'2030-10-12')
+ assert.equal(calls.some(o=>o.url.endsWith('/overview')),false);await p.pickCourse({detail:{value:1}});assert.equal(calls.at(-1).data.from,'2030-10-12')
+ await p.resetRange();assert.equal(calls.at(-1).url,'/miniapp/admin/sign/courses');assert.equal(calls.at(-1).data.from,'');assert.equal(p.data.courseId,'')
 })

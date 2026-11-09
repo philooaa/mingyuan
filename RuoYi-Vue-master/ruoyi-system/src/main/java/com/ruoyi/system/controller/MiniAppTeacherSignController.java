@@ -42,6 +42,7 @@ public class MiniAppTeacherSignController extends BaseController
     @Autowired
     private EduHomeworkMapper homeworkMapper;
     @Autowired private com.ruoyi.system.shop.ShopRepository singleDb;
+    @Autowired private com.ruoyi.system.service.AttendanceLessonRosterService rosterService;
 
     /**
      * 我的排课列表（含最近一次签到汇总）
@@ -61,11 +62,12 @@ public class MiniAppTeacherSignController extends BaseController
     @GetMapping("/students")
     public AjaxResult students(@RequestParam("scheduleId") Long scheduleId,@RequestParam(value="classDate",required=false) String classDate)
     {
-        assertScheduleAccess(scheduleId);
+        assertScheduleAccess(scheduleId,classDate);
         if ("2".equals(scheduleMapper.selectEduCourseScheduleByScheduleId(scheduleId).getClassMode())) {
             if (classDate == null) throw new ServiceException("请选择具体课次日期");
             return success(singleDb.rows("SELECT enrollment_id,student_name,contact_phone FROM edu_enrollment WHERE schedule_id=? AND class_date=? AND enrollment_status='1' AND del_flag='0'",scheduleId,classDate));
         }
+        if (classDate != null) return success(rosterService.teacherRoster(scheduleId,classDate));
         return success(signInService.selectEnrolledStudents(scheduleId));
     }
 
@@ -77,7 +79,7 @@ public class MiniAppTeacherSignController extends BaseController
     public AjaxResult detail(@RequestParam("scheduleId") Long scheduleId,
             @RequestParam("classDate") String classDate)
     {
-        assertScheduleAccess(scheduleId);
+        assertScheduleAccess(scheduleId,classDate);
         return success(signInService.selectDetail(scheduleId, classDate));
     }
 
@@ -92,7 +94,7 @@ public class MiniAppTeacherSignController extends BaseController
         {
             throw new ServiceException("签到内容不能为空");
         }
-        assertScheduleAccess(body.getScheduleId());
+        assertScheduleAccess(body.getScheduleId(),body.getClassDate());
         // A transferred student may remain in an existing historical lesson, never a new lesson of the former class.
         if (body.getDetails() != null)
         {
@@ -116,7 +118,7 @@ public class MiniAppTeacherSignController extends BaseController
         return ajax;
     }
 
-    private void assertScheduleAccess(Long scheduleId)
+    private void assertScheduleAccess(Long scheduleId,String classDate)
     {
         EduCourseSchedule schedule = scheduleId == null ? null
                 : scheduleMapper.selectEduCourseScheduleByScheduleId(scheduleId);
@@ -126,7 +128,9 @@ public class MiniAppTeacherSignController extends BaseController
         }
         Long userId = SecurityUtils.getUserId();
         boolean admin = SecurityUtils.isAdmin(userId) || SecurityUtils.hasRole("admin");
-        if (!admin && !userId.equals(homeworkMapper.selectScheduleTeacher(scheduleId)))
+        var lockedTeacher = classDate==null ? java.util.List.<Map<String,Object>>of() : singleDb.rows("SELECT teacher_id FROM edu_attendance_lesson WHERE schedule_id=? AND class_date=? AND locked=1",scheduleId,classDate);
+        Long actualTeacher = lockedTeacher.isEmpty() || lockedTeacher.get(0).get("teacherId")==null ? homeworkMapper.selectScheduleTeacher(scheduleId) : Long.valueOf(lockedTeacher.get(0).get("teacherId").toString());
+        if (!admin && !userId.equals(actualTeacher))
         {
             throw new ServiceException("只能查看或提交自己负责班级的签到");
         }

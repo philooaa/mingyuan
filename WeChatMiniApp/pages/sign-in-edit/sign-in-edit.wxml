@@ -8,12 +8,12 @@
     <view class="date-label">课次日期</view>
     <view class="date-value">{{classDate}}</view>
     <view class="review-tag {{locked ? 'done' : 'pending'}}" wx:if="{{review}}">
-      {{review.reviewStatus === '1' ? '教务已确认' : (review.reviewStatus === '2' ? '审核异常' : '待教务确认')}}
+      {{review.stageText || (review.reviewStatus === '1' ? '已终审' : review.reviewStatus === '2' ? '已退回' : '待审核')}}
     </view>
   </view>
 
-  <view class="banner half" wx:if="{{review.reviewStatus === '2'}}">审核异常：{{review.reviewReason}}。请联系教务或管理员更正出勤；原始点名记录已保留。</view>
-  <view class="banner done" wx:elif="{{locked}}">该课次已有审核确认记录，点名已锁定，不可修改；旧版半完成记录由教务归档。</view>
+  <view class="banner half" wx:if="{{review.reviewStatus === '2'}}">审核异常：{{review.reviewReason}}。请更正后重新提交，监控截图和两级审核需重新确认。</view>
+  <view class="banner done" wx:elif="{{locked}}">该课次正在审核或已终审，点名已锁定。未终审数据不计入正式统计。</view>
   <view class="detail-reload" bindtap="loadDetail">重新加载当前课次</view>
 
   <view class="stats" wx:if="{{stats && stats.total > 0}}">

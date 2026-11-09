@@ -46,7 +46,7 @@ Page({
       signed,
       lastDateText: signed ? String(item.lastSignDate).slice(0, 10) : '未签到',
       actualText: signed ? `${item.actualCount || 0}/${item.totalCount || 0}人` : '',
-      reviewText: reviewed ? '教务已确认' : (item.reviewStatus === '2' ? '审核异常，请联系教务' : (signed ? '待教务确认' : '')),
+      reviewText: item.stageText || (reviewed ? '已终审 / 历史已确认' : (item.reviewStatus === '2' ? '已退回，请更正后重提' : (signed ? '待教务初审' : ''))),
       reviewClass: reviewed ? 'done' : (signed ? 'pending' : ''),
       room: [item.campusName, item.classroomName].filter(Boolean).join(' · ')
     }

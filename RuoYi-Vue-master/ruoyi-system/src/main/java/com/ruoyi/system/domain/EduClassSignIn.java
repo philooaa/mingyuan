@@ -409,4 +409,20 @@ public class EduClassSignIn extends BaseEntity
     {
         return lastSignDate;
     }
+    private Long studentId;
+    public Long getStudentId() { return studentId; }
+    public void setStudentId(Long value) { studentId=value; }
+    private String reviewStage;
+    private String stageText;
+    private boolean canInitialReview;
+    private boolean canFinalReview;
+    public String getReviewStage() { return reviewStage; }
+    public void setReviewStage(String value) { reviewStage=value; }
+    public String getStageText() { return stageText; }
+    public void setStageText(String value) { stageText=value; }
+    public boolean getCanInitialReview() { return canInitialReview; }
+    public void setCanInitialReview(boolean value) { canInitialReview=value; }
+    public boolean getCanFinalReview() { return canFinalReview; }
+    public void setCanFinalReview(boolean value) { canFinalReview=value; }
+
 }

@@ -27,7 +27,7 @@ public class MiniAppAdminSignController extends BaseController
     @Autowired
     private IEduClassSignInService signInService;
 
-    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education,business_admin')")
     @PostMapping("/reject")
     public AjaxResult reject(@RequestBody MiniAppSignReviewBody body)
     {
@@ -35,7 +35,7 @@ public class MiniAppAdminSignController extends BaseController
             SecurityUtils.getLoginUser().getUser().getNickName()));
     }
 
-    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education,business_admin')")
     @PostMapping("/correct")
     public AjaxResult correct(@RequestBody MiniAppSignReviewBody body)
     {
@@ -43,17 +43,17 @@ public class MiniAppAdminSignController extends BaseController
             SecurityUtils.getLoginUser().getUser().getNickName()));
     }
 
-    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education,business_admin')")
     @GetMapping("/courses")
-    public AjaxResult courses(@RequestParam(defaultValue="") String keyword) { return success(signInService.attendanceCourses(keyword)); }
+    public AjaxResult courses(@RequestParam(defaultValue="") String keyword,@RequestParam(required=false) String from,@RequestParam(required=false) String to) { return success(signInService.attendanceCourses(keyword,from,to)); }
 
-    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education,business_admin')")
     @GetMapping("/overview")
     public AjaxResult overview(@RequestParam Long scheduleId,@RequestParam(required=false) String from,@RequestParam(required=false) String to) {
         return success(signInService.attendanceOverview(scheduleId,from,to));
     }
 
-    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education,business_admin')")
     @GetMapping("/student-summary")
     public AjaxResult student(@RequestParam Long scheduleId,@RequestParam String studentKey,@RequestParam(defaultValue="false") boolean allCourses,@RequestParam(required=false) String from,@RequestParam(required=false) String to,@RequestParam(defaultValue="1") int pageNum) {
         return success(signInService.attendanceStudent(scheduleId,studentKey,allCourses,from,to,pageNum));
@@ -62,7 +62,7 @@ public class MiniAppAdminSignController extends BaseController
     /**
      * 签到列表（按课次聚合，可按日期过滤）
      */
-    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education,business_admin')")
     @GetMapping("/list")
     public AjaxResult list(@RequestParam(value = "classDate", required = false) String classDate)
     {
@@ -73,7 +73,7 @@ public class MiniAppAdminSignController extends BaseController
     /**
      * 某课次的签到明细 + 复核信息
      */
-    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education,business_admin')")
     @GetMapping("/detail")
     public AjaxResult detail(@RequestParam("scheduleId") Long scheduleId,
             @RequestParam("classDate") String classDate)
@@ -82,9 +82,9 @@ public class MiniAppAdminSignController extends BaseController
     }
 
     /**
-     * 一名教务或管理员确认即完成，重复提交不改变原审核事实。
+     * 按当前阶段执行教务初审或业务管理员终审。
      */
-    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @PreAuthorize("@ss.hasAnyRoles('admin,education,business_admin')")
     @PostMapping("/review")
     public AjaxResult review(@RequestBody MiniAppSignReviewBody body)
     {

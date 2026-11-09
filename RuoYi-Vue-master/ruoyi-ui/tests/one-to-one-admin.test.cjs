@@ -13,7 +13,7 @@ function page(api = {}) {
   assert.equal(compiler.compile(sfc.template.content).errors.length, 0)
   const p = new Vue({ ...def, components: {}, propsData: { dims: { teachers: [], grades: [] } }, render: render.render, staticRenderFns: render.staticRenderFns })
   p.$message = { warning() {}, success() {}, error() {} }; p.$confirm = async () => {}; p.$prompt = async () => ({ value: '已与家长沟通' })
-  p.visible = true; p.teacherId = 10; p.date = '2028-10-23'; p.cells = [cell]; p.profile = { teacherSubject: '数学', teacherLevel: 'senior' }
+  p.visible = true; p.teacherId = 10; p.date = '2028-10-23'; p.cells = [cell]; p.profile = { teacherSubject: '数学', teacherLevel: 'senior' }; p.form.unitPrice = 100
   return p
 }
 test('only server-allowed actions are offered; string zero is not true', () => {
@@ -28,7 +28,7 @@ test('publish uses the selected real slot and classroom, not arbitrary client te
   const p = page({ publishSingle: async body => { sent = body } })
   p.refresh = async () => {}; p.pickCell(cell); p.form.gradeName = '五年级'; p.form.courseClassName = '数学提升'; p.form.classroomId = '4'
   await p.save()
-  assert.deepEqual(JSON.parse(JSON.stringify(sent)), { teacherId: 10, classroomId: '4', timeSlot: '8:00-10:00', startDate: '2028-10-23', gradeName: '五年级', courseClassName: '数学提升' })
+  assert.deepEqual(JSON.parse(JSON.stringify(sent)), { teacherId: 10, classroomId: '4', timeSlot: '8:00-10:00', startDate: '2028-10-23', gradeName: '五年级', courseClassName: '数学提升', unitPrice: 100 })
 })
 test('unavailable slot or room cannot be submitted even if old draft fields remain', async () => {
   let writes = 0

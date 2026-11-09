@@ -154,7 +154,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
       一对一：按实到学员人次计费（Java端累加 attendedRows）
     -->
     <select id="selectMonthlySessions" resultType="java.util.HashMap">
-        select s.teacher_id as teacherId,
+        select coalesce(l.teacher_id,s.teacher_id) as teacherId,
                r.schedule_id as scheduleId,
                r.class_date as classDate,
                s.class_mode as classMode,
@@ -163,15 +163,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                  when s.grade_name in ('高一','高二','高三') then 'senior'
                  else 'primary'
                end as stage,
-               s.start_time as startTime,
-               s.end_time as endTime,
+               coalesce(l.start_time,s.start_time) as startTime,
+               coalesce(l.end_time,s.end_time) as endTime,
                count(*) as totalRows,
                sum(case when r.sign_status in ('1','4','5') then 1 else 0 end) as attendedRows
         from edu_class_sign_in r
         inner join edu_course_schedule s on s.schedule_id = r.schedule_id and s.del_flag = '0'
-        where r.del_flag = '0' and r.review_status = '1' and s.teacher_id is not null
+        left join edu_attendance_lesson l on l.schedule_id=r.schedule_id and l.class_date=r.class_date and l.locked=1
+        where r.del_flag = '0' and r.review_status = '1' and coalesce(l.teacher_id,s.teacher_id) is not null
           and date_format(r.class_date, '%Y-%m') = #{salaryMonth}
-        group by s.teacher_id, r.schedule_id, r.class_date, s.class_mode, stage, s.start_time, s.end_time
+        group by coalesce(l.teacher_id,s.teacher_id), r.schedule_id, r.class_date, s.class_mode, stage, coalesce(l.start_time,s.start_time), coalesce(l.end_time,s.end_time)
     </select>
     <!--
       薪资课时来源：寒假 / 春季排课（暑假、秋季为历史数据，不参与薪资计算）。

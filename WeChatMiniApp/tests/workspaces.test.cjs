@@ -100,9 +100,9 @@ test('role menu handles cancellation and rechecks roles revoked by the server', 
 test('student attendance badge rejects late responses after switching workspace with the same token', async () => {
   const finishes = []; let delayed = false
   const h = harness('index', ['admin', 'parent'], ['*:*:*'], o => {
-    if (o.url === '/miniapp/education/sign/list') return delayed
+    if (o.url === '/miniapp/attendance/todos') return delayed
       ? new Promise(resolve => { finishes.push(resolve) })
-      : { data: [{ scheduleId: '1', classDate: '2030-10-15', reviewStatus: '0' }, { scheduleId: '1', classDate: '2030-10-15', reviewStatus: '0' }, { scheduleId: '2', classDate: '2030-10-15', reviewStatus: '2' }] }
+      : { data: {count:2,overdueCount:0,items:[]} }
   })
   h.p.onLoad(); h.p._visible = true; await h.p.applyLoginRole(); await Promise.resolve()
   assert.equal(h.p.data.quickActions.find(a => a.key === 'studentSignReview').badgeText, '2')
@@ -144,7 +144,7 @@ test('multi-role switching keeps the token, refuses an unassigned role and clear
 test('staff menu permissions are respected and a missing role never falls back to parent', async () => {
   const h = harness('index', ['education'], []); h.p.onLoad(); await h.p.applyLoginRole()
   // Attendance review is role-authorized, like the existing miniapp check-in review; finance still requires menu permissions.
-  assert.deepEqual(Array.from(h.p.data.quickActions, a => a.route), ['/pages/sign-review/sign-review', '/pages/admin-schedule/admin-schedule', '/pages/admin-room-assign/admin-room-assign'])
+  assert.deepEqual(Array.from(h.p.data.quickActions, a => a.route), ['/pages/sign-review/sign-review', '/pages/admin-schedule/admin-schedule', '/pages/admin-room-assign/admin-room-assign', '/pages/attendance-roster/attendance-roster'])
   h.state.roles = []; await h.p.applyLoginRole()
   assert.equal(h.p.data.currentRole, ''); assert.equal(h.p.data.roles.length, 0)
   assert.equal(h.calls.some(o => o.url.startsWith('/miniapp/parent')), false)
@@ -323,3 +323,14 @@ test('collection confirmation badge ignores a response after leaving the adminis
   assert.equal(h.p.data.quickActions.find(a=>a.key==='tuitionFinance').badgeText,undefined)
   h.p.onUnload()
 })
+
+for (const assigned of [['admin', 'business_admin', 'education'], ['business_admin', 'education']]) {
+  test(`business administrator uses one complete administrator workspace: ${assigned}`, async () => {
+    const h = harness('index', assigned)
+    h.p.onLoad(); h.p._visible = true; await h.p.applyLoginRole()
+    assert.deepEqual(Array.from(h.p.data.roles, r => r.key), ['admin', 'education'])
+    assert.equal(h.p.data.currentRole, 'admin')
+    assert.ok(h.p.data.quickActions.some(a => a.route === '/pages/admin-tuition/admin-tuition'))
+    h.p.onUnload()
+  })
+}
