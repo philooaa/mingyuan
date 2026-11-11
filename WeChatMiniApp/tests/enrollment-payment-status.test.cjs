@@ -1,0 +1,13 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const { paymentStatus } = require('../utils/enrollment-payment-status')
+test('course billing status is shown without guessing unknown historical records', () => {
+  assert.equal(paymentStatus({billingStatus:'PENDING_PRICE',billingPayStatus:'未支付'}),'待核价')
+  assert.equal(paymentStatus({billingStatus:'OPEN',billingPayStatus:'0'}),'未支付')
+  assert.equal(paymentStatus({billingStatus:'OPEN',billingPayStatus:'1'}),'已支付')
+  assert.equal(paymentStatus({billingStatus:'HISTORY_PENDING',billingPayStatus:'未支付'}),'历史待核验')
+  assert.equal(paymentStatus({payStatus:'未支付'}),'待核对')
+  assert.equal(paymentStatus({settlementMethod:'P'}),'课包结算')
+  assert.equal(paymentStatus({enrollmentStatus:'2',billingPayStatus:'1'}),'已取消')
+  assert.equal(paymentStatus({billingStatus:'CLOSED',billingPayStatus:'2'}),'已退款')
+})

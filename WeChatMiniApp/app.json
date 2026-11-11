@@ -16,6 +16,7 @@
     "pages/admin-tuition-refunds/admin-tuition-refunds",
     "pages/admin-teachers/admin-teachers",
     "pages/admin-students/admin-students",
+    "pages/admin-dashboard/admin-dashboard",
     "pages/admin-classrooms/admin-classrooms",
     "pages/admin-room-assign/admin-room-assign",
     "pages/enrollment/enrollment",

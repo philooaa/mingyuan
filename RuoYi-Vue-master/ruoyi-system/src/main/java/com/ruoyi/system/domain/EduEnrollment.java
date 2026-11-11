@@ -19,6 +19,9 @@ public class EduEnrollment extends BaseEntity
 
     /** 报名ID */
     private Long enrollmentId;
+    private Long studentId;
+    public Long getStudentId() { return studentId; }
+    public void setStudentId(Long value) { studentId = value; }
     private Long lessonAccountId;
     private String studentRequestKey;
     public Long getLessonAccountId() { return lessonAccountId; }
@@ -63,6 +66,15 @@ public class EduEnrollment extends BaseEntity
     /** 支付状态（未支付/已支付/已退款） */
     @Excel(name = "支付状态", readConverterExp = "未支付=未支付,已支付=已支付,已退款=已退款")
     private String payStatus;
+    private String billingStatus;
+    private String billingPayStatus;
+    private String settlementMethod;
+    public String getBillingStatus() { return billingStatus; }
+    public void setBillingStatus(String value) { billingStatus = value; }
+    public String getBillingPayStatus() { return billingPayStatus; }
+    public void setBillingPayStatus(String value) { billingPayStatus = value; }
+    public String getSettlementMethod() { return settlementMethod; }
+    public void setSettlementMethod(String value) { settlementMethod = value; }
 
     /** 取消时间 */
     @JsonFormat(pattern = "yyyy-MM-dd")

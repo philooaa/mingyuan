@@ -9,6 +9,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="classDate" column="class_date" />
         <result property="cancelRequestStatus" column="cancel_request_status" />
         <result property="enrollmentId"    column="enrollment_id"    />
+        <result property="studentId" column="student_id" />
         <result property="enrollmentCode"    column="enrollment_code"    />
         <result property="scheduleId"    column="schedule_id"    />
         <result property="parentId"    column="parent_id"    />
@@ -17,6 +18,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="contactPhone"    column="contact_phone"    />
         <result property="enrollmentStatus"    column="enrollment_status"    />
         <result property="payStatus"    column="pay_status"    />
+        <result property="billingStatus" column="billing_status_view" />
+        <result property="billingPayStatus" column="billing_pay_status_view" />
+        <result property="settlementMethod" column="settlement_method" />
         <result property="cancelTime"    column="cancel_time"    />
         <result property="cancelReason"    column="cancel_reason"    />
         <result property="status"    column="status"    />
@@ -43,13 +47,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectEduEnrollmentVo">
-        select e.lesson_account_id,e.class_date,e.cancel_request_status,e.enrollment_id, e.enrollment_code, e.schedule_id, e.parent_id, e.student_name, e.student_phone, e.contact_phone, e.enrollment_status, e.pay_status, e.cancel_time, e.cancel_reason, e.status, e.del_flag, e.create_by, e.create_time, e.update_by, e.update_time, e.remark,
+        select coalesce(e.student_id, account.student_id) as student_id,e.lesson_account_id,e.class_date,e.cancel_request_status,e.enrollment_id, e.enrollment_code, e.schedule_id, e.parent_id, e.student_name, e.student_phone, e.contact_phone, e.enrollment_status, e.pay_status, e.settlement_method, case when e.bill_type='COURSE_ITEM' then bill.billing_status else e.billing_status end as billing_status_view, case when e.bill_type='COURSE_ITEM' then bill.pay_status else e.pay_status end as billing_pay_status_view, e.cancel_time, e.cancel_reason, e.status, e.del_flag, e.create_by, e.create_time, e.update_by, e.update_time, e.remark,
                s.grade_name, s.subject_name, s.class_type, s.course_year, s.term_name, s.period_name, coalesce(nullif(trim(teacher.user_name), ''), nullif(trim(teacher.nick_name), ''), s.teacher_name) as teacher_name, s.recruit_status, s.course_class_name, parent.phonenumber as parent_phone,
                ifnull(history.attended_lesson_count, 0) as attended_lesson_count,
                ifnull(history.pending_lesson_count, 0) as pending_lesson_count,
                ifnull(history.recorded_lesson_count, 0) as recorded_lesson_count,
                ifnull(history.leave_lesson_count, 0) as leave_lesson_count
         from edu_enrollment e
+        left join edu_student_lesson_account account on account.account_id=e.lesson_account_id and account.parent_id=e.parent_id
+        left join edu_enrollment bill on e.bill_type='COURSE_ITEM' and bill.enrollment_id=e.order_enrollment_id and bill.parent_id=e.parent_id
         left join edu_course_schedule s on e.schedule_id = s.schedule_id
         left join sys_user teacher on teacher.user_id = s.teacher_id
         left join sys_user parent on parent.user_id = e.parent_id

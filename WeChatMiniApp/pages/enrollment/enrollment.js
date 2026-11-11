@@ -133,7 +133,7 @@ Page(childContext.page({
   async loadSchedules() {
     const version = this._scheduleVersion = (this._scheduleVersion || 0) + 1
     // 现有接口返回全部可报名课程，年级／学科／多位教师统一在同一数据集筛选。
-    const [res, single] = await Promise.all([request({ url: '/miniapp/parent/schedules' }), request({ url: '/miniapp/parent/single/lessons' })])
+    const [res, single] = await Promise.all([request({ url: '/miniapp/parent/schedules', data: this.data.scopeAccountId ? { accountId: this.data.scopeAccountId } : {} }), request({ url: '/miniapp/parent/single/lessons' })])
     if (!this.current() || version !== this._scheduleVersion) return
     this._allSchedules = this.decorateSchedules((res.data || []).concat((single.data || []).flatMap(course => (course.lessons || []).map(lesson => ({ ...course, ...lesson, classMode: '2', remainingCount: lesson.canEnroll ? 1 : 0, capacity: 1 })))) ).map(course => ({
       ...course,

@@ -26,7 +26,7 @@ function sameParent(ticket){return !ticket || ticket.owner===owner() && ticket.t
 function url(path){const value=id();return value?path+(path.includes('?')?'&':'?')+'accountId='+encodeURIComponent(value):path}
 function isChildRequest(options){
   const path=options.url.split('?')[0]
-  return /^\/miniapp\/parent\/(?:enrollments|timetable|attendance(?:\/details)?|enroll|enrollment\/[^/]+(?:\/history|\/cancel-request)?|homework(?:\/.*)?|leave(?:\/.*)?|tuition(?:\/.*)?|lesson-packages\/(?:quote|orders(?:\/[^/]+\/cancel)?))$/.test(path)
+  return /^\/miniapp\/parent\/(?:schedules|enrollments|timetable|attendance(?:\/details)?|enroll|enrollment\/[^/]+(?:\/history|\/cancel-request)?|homework(?:\/.*)?|leave(?:\/.*)?|tuition(?:\/.*)?|lesson-packages\/(?:quote|orders(?:\/[^/]+\/cancel)?))$/.test(path)
 }
 function prepare(options){
   if(!owner() || options.parentScope || !isChildRequest(options))return {options,ticket:null}

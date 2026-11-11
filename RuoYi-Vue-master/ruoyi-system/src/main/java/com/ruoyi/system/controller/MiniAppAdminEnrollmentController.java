@@ -23,6 +23,13 @@ public class MiniAppAdminEnrollmentController extends BaseController
     @Autowired private MiniAppAdminEnrollmentMapper viewMapper;
     @Autowired private IEduEnrollmentService enrollmentService;
     @Autowired private com.ruoyi.system.service.EnrollmentTransferService transfers;
+    @Autowired private com.ruoyi.system.shop.ShopRepository db;
+
+    @PreAuthorize("@ss.hasAnyRoles('admin,education') and @ss.hasPermi('system:enrollment:list')")
+    @GetMapping("/student-profiles")
+    public AjaxResult studentProfiles() {
+        return success(db.rows("SELECT st.student_id,st.parent_id,st.student_name,st.student_phone,u.phonenumber parent_phone FROM edu_student st LEFT JOIN sys_user u ON u.user_id=st.parent_id WHERE st.del_flag='0' ORDER BY st.student_id"));
+    }
 
     @GetMapping("/grades")
     public AjaxResult grades() { return success(viewMapper.selectGrades()); }

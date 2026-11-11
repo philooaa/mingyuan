@@ -58,9 +58,10 @@ public class MiniAppParentController extends BaseController
     @GetMapping("/schedules")
     public AjaxResult schedules(@RequestParam(value = "gradeName", required = false) String gradeName,
             @RequestParam(value = "subjectName", required = false) String subjectName,
-            @RequestParam(value = "termName", required = false) String termName)
+            @RequestParam(value = "termName", required = false) String termName,
+            @RequestParam(required = false) Long accountId)
     {
-        return success(miniAppParentService.selectAvailableSchedules(gradeName, subjectName, termName));
+        return success(miniAppParentService.selectAvailableSchedules(gradeName, subjectName, termName, accountId));
     }
 
     @PreAuthorize("@ss.hasAnyRoles('parent')")

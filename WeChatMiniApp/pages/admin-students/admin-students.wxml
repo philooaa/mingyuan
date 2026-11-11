@@ -2,7 +2,9 @@
   <view class="search-bar">
     <input class="search-input" placeholder="搜索学生姓名/手机/班级/科目/教师" value="{{keyword}}" confirm-type="search" bindinput="onKeyword"/>
   </view>
+  <view wx:if="{{canManageAccounts}}" class="account-entry" bindtap="openAccounts">家长与课次账户管理 ›</view>
 
+  <picker class="quarter-picker" range="{{quarterOptions}}" range-key="label" value="{{quarterIndex}}" bindchange="onQuarter"><view>{{quarterOptions[quarterIndex].label}} ▾</view></picker>
   <view class="filter-tabs">
     <text wx:for="{{statusOptions}}" wx:key="value" class="tab {{filterStatus === item.value ? 'tab-active' : ''}}" data-value="{{item.value}}" bindtap="onStatus">{{item.label}}</text>
   </view>
@@ -35,16 +37,17 @@
       <view class="info"><text class="info-k">联系手机</text><text class="info-v">{{detail.contactPhone || '—'}}</text></view>
       <view class="info"><text class="info-k">家长手机</text><text class="info-v">{{detail.parentPhone || '—'}}</text></view>
       <view class="info"><text class="info-k">报名课程</text><text class="info-v">{{detail.courseCount}} 门（在读 {{detail.activeCount}} 门）</text></view>
+      <button wx:if="{{canManageAccounts}}" size="mini" bindtap="openStudentAccount">查看家长与课次账户</button>
 
       <view class="section-title">报名课程</view>
       <view class="course" wx:for="{{detail.courses}}" wx:key="enrollmentId" wx:for-item="c">
         <view class="course-head">
           <text class="course-name">{{c.courseClassName}}</text>
-          <text class="badge {{c.active ? 'ok' : 'gray'}}">{{c.enrollmentStatus}}</text>
+          <text class="badge {{c.paymentStatusText === '已支付' ? 'ok' : 'gray'}}">{{c.paymentStatusText}}</text>
         </view>
         <view class="course-sub">{{c.gradeName}} · {{c.subjectName}}</view>
         <view class="course-sub">季度：{{c.termText}}</view>
-        <view class="course-sub">教师：{{c.teacherName}}　缴费：{{c.payStatus}}</view>
+        <view class="course-sub">教师：{{c.teacherName}}</view>
         <view class="course-sub">报名：{{c.createTime}}　编号：{{c.enrollmentCode}}</view>
         <button size="mini" data-id="{{c.enrollmentId}}" bindtap="openEnrollment">报名详情 / 换课</button>
         <view class="course-sub" wx:if="{{c.remark}}">备注：{{c.remark}}</view>

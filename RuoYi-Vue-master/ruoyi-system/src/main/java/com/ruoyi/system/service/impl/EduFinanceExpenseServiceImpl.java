@@ -35,6 +35,8 @@ public class EduFinanceExpenseServiceImpl implements IEduFinanceExpenseService
     @Override
     public int insertExpense(EduFinanceExpense expense)
     {
+        if (expense.getTitle() == null) expense.setTitle("");
+        if (expense.getDetail() == null) expense.setDetail("");
         expense.setCreateBy(SecurityUtils.getUsername());
         expense.setRegisterBy(SecurityUtils.getLoginUser().getUser().getNickName());
         return expenseMapper.insertExpense(expense);

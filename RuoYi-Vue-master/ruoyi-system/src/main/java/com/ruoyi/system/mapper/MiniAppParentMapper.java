@@ -11,7 +11,8 @@ public interface MiniAppParentMapper
 {
     public List<Map<String, Object>> selectAvailableSchedules(@Param("parentId") Long parentId,
             @Param("gradeName") String gradeName, @Param("subjectName") String subjectName,
-            @Param("termName") String termName);
+            @Param("termName") String termName, @Param("accountId") Long accountId,
+            @Param("studentName") String studentName);
 
     public List<Map<String, Object>> selectParentEnrollments(@Param("parentId") Long parentId);
 
