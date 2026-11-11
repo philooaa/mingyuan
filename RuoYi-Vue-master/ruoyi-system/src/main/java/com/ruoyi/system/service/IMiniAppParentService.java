@@ -9,7 +9,7 @@ import com.ruoyi.common.core.domain.model.MiniAppEnrollmentBody;
  */
 public interface IMiniAppParentService
 {
-    public List<Map<String, Object>> selectAvailableSchedules(String gradeName, String subjectName, String termName);
+    public List<Map<String, Object>> selectAvailableSchedules(String gradeName, String subjectName, String termName, Long accountId);
 
     public List<Map<String, Object>> selectMyEnrollments();
 

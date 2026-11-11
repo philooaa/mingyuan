@@ -102,9 +102,7 @@ export default {
       form: {},
       rules: {
         expenseType: [{ required: true, message: "请选择支出类型", trigger: "change" }],
-        title: [{ required: true, message: "摘要不能为空", trigger: "blur" }],
         amount: [{ required: true, message: "金额不能为空", trigger: "blur" }],
-        detail: [{ required: true, message: "明细不能为空", trigger: "blur" }],
         expenseDate: [{ required: true, message: "请选择支出日期", trigger: "change" }]
       }
     }

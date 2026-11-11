@@ -72,7 +72,7 @@ const roleProfiles = {
       { title: '教室管理', icon: '室', tone: 'cyan', route: '/pages/admin-classrooms/admin-classrooms' },
       { title: '教室分配', icon: '分', tone: 'cyan', route: '/pages/admin-room-assign/admin-room-assign' },
       { title: '学生档案', icon: '档', tone: 'green', route: '/pages/admin-students/admin-students' },
-      { key:'personalAccount', title: '家长与课次账户', icon: '户', tone: 'gold', route: '/pages/admin-transactions/admin-transactions' },
+      { title: '教学数据看板', icon: '数', tone: 'blue', route: '/pages/admin-dashboard/admin-dashboard' },
       { key:'referral', title: '优惠券管理', icon: '券', tone: 'violet', route: '/pages/admin-referral/admin-referral' },
       { title: '教师管理', icon: '师', tone: 'indigo', route: '/pages/admin-teachers/admin-teachers' },
       { key:'tuitionFinance', title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' },

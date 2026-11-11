@@ -21,6 +21,7 @@ function allowed(role) { return role === 'staff' ? staff() : has(role) }
 const routePermissions = {
   '/pages/admin-enrollment/admin-enrollment': 'system:enrollment:list',
   '/pages/admin-students/admin-students': 'system:enrollment:list',
+  '/pages/admin-dashboard/admin-dashboard': 'system:tuition:list',
   '/pages/admin-classrooms/admin-classrooms': 'system:classroom:list',
   '/pages/admin-transactions/admin-transactions': 'edu:transaction:manage',
   '/pages/admin-tuition/admin-tuition': 'system:tuition:list',

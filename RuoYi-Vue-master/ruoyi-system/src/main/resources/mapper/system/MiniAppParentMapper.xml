@@ -30,15 +30,22 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             COALESCE(NULLIF(s.campus_name,''),c.campus_name) as campusName,
             c.classroom_name as classroomName,
             ifnull(s.enrolled_count, 0) as enrolledCount,
-            case when e.enrollment_id is null then 0 else 1 end as enrolled
+            <choose>
+                <when test="accountId != null">
+                    exists(select 1 from edu_enrollment e
+                        where e.schedule_id = s.schedule_id
+                          and e.parent_id = #{parentId}
+                          and (e.lesson_account_id = #{accountId}
+                               or (e.lesson_account_id is null and e.student_name = #{studentName}))
+                          and e.del_flag = '0'
+                          and e.enrollment_status in ('0','1','待确认','已确认','报名成功'))
+                </when>
+                <!-- 未选择孩子时允许进入报名表单，提交时仍按具体孩子校验重复报名。 -->
+                <otherwise>0</otherwise>
+            </choose> as enrolled
         from edu_course_schedule s
         left join sys_user teacher on teacher.user_id = s.teacher_id
         left join edu_classroom c on c.classroom_id = s.classroom_id
-        left join edu_enrollment e
-          on e.schedule_id = s.schedule_id
-         and e.parent_id = #{parentId}
-         and e.del_flag = '0'
-         and e.enrollment_status not in ('2', '已取消')
         <where>
             s.del_flag = '0'
             and s.status = '0'

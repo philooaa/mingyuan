@@ -30,11 +30,14 @@ public class MiniAppParentServiceImpl implements IMiniAppParentService
     private MiniAppParentMapper miniAppParentMapper;
     @Autowired private TuitionService tuition;
     @Autowired private ShopRepository db;
+    @Autowired private com.ruoyi.system.service.ParentAccountService personal;
 
     @Override
-    public List<Map<String, Object>> selectAvailableSchedules(String gradeName, String subjectName, String termName)
+    public List<Map<String, Object>> selectAvailableSchedules(String gradeName, String subjectName, String termName, Long accountId)
     {
-        return miniAppParentMapper.selectAvailableSchedules(SecurityUtils.getUserId(), gradeName, subjectName, termName);
+        // 校验孩子归属，旧报名的姓名兼容也只使用服务端已核实的孩子姓名。
+        String studentName = accountId == null ? null : String.valueOf(personal.ownedChild(accountId).get("studentName"));
+        return miniAppParentMapper.selectAvailableSchedules(SecurityUtils.getUserId(), gradeName, subjectName, termName, accountId, studentName);
     }
 
     @Override

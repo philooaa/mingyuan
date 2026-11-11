@@ -38,7 +38,7 @@ class ScheduleCampusMysqlTest {
                 var saved=schedules.selectEduCourseScheduleByScheduleId(course.getScheduleId());
                 assertEquals("测试校区",saved.getCampusName());assertNull(saved.getClassroomId());
                 var parent=session.getMapper(MiniAppParentMapper.class);
-                assertTrue(parent.selectAvailableSchedules(2L,"初一","数学",null).stream().anyMatch(row->"校区待分配教室班".equals(row.get("courseClassName"))));
+                assertTrue(parent.selectAvailableSchedules(2L,"初一","数学",null,null,null).stream().anyMatch(row->"校区待分配教室班".equals(row.get("courseClassName"))));
                 assertEquals(1,parent.countScheduleAvailable(course.getScheduleId()));
                 assertEquals(1,parent.increaseScheduleEnrollment(course.getScheduleId()));
                 assertEquals(0,parent.increaseScheduleEnrollment(course.getScheduleId()));

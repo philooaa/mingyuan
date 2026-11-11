@@ -12,7 +12,7 @@
     <view class="empty" wx:if="{{!loading && !error && !courses.length}}">暂无本人负责的课程</view>
   </block>
   <block wx:elif="{{mode === 'detail' && enrollment}}">
-    <view class="card"><view class="ui-row"><view class="title">{{enrollment.studentName}}</view><text class="ui-pill ui-pill-muted">{{enrollment.enrollmentText}}</text></view>
+    <view class="card"><view class="ui-row"><view class="title">{{enrollment.studentName}}</view><text class="ui-pill ui-pill-muted">{{enrollment.paymentStatusText}}</text></view>
       <view class="ui-kv"><text>报名联系电话</text><text>{{enrollment.contactPhone || '未提供'}}</text></view><view class="ui-kv"><text>家长账号手机号</text><text>{{enrollment.parentPhone || '未提供'}}</text></view>
       <view class="ui-kv"><text>学生手机号</text><text>{{enrollment.studentPhone || '未提供'}}</text></view><view class="muted" wx:if="{{enrollment.remark}}">备注：{{enrollment.remark}}</view>
     </view>
@@ -26,7 +26,7 @@
     <view class="card" wx:if="{{mode === 'students' && schedule}}"><view class="title">{{schedule.course}}</view><view>{{schedule.time}} · {{schedule.room}}</view><view class="muted">班次 {{scheduleId}}</view></view>
     <view class="muted">{{mode === 'search' ? '本人全部课程搜索结果' : '当前班次学员'}} · 共 {{total}} 条报名</view>
     <view class="card" wx:for="{{students}}" wx:key="enrollmentId" data-id="{{item.enrollmentId}}" bindtap="openStudent">
-      <view class="ui-row"><view class="title">{{item.studentName}}</view><text class="ui-pill ui-pill-muted">{{item.enrollmentText}} ›</text></view>
+      <view class="ui-row"><view class="title">{{item.studentName}}</view><text class="ui-pill ui-pill-muted">{{item.paymentStatusText}} ›</text></view>
       <view>{{item.courseClassName || '未命名课程'}} · 班次 {{item.scheduleId}}</view>
       <view class="muted">报名联系电话：{{item.contactPhone || '未提供'}}</view><view class="muted">家长账号手机号：{{item.parentPhone || '未提供'}}</view>
     </view>

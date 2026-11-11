@@ -1,4 +1,5 @@
 const { request } = require('./request')
+const { paymentStatus } = require('./enrollment-payment-status')
 const root = '/miniapp/admin/enrollment'
 function guard() {
   if ((wx.getStorageSync('roles') || []).some(r => ['admin', 'education'].includes(r))) return true
@@ -12,6 +13,7 @@ function label(value, labels) {
 const { compareGrades } = require('./grade-order')
 function decorateEnrollment(item) {
   return { ...item,
+    paymentStatusText: paymentStatus(item),
     enrollmentText: label(item.enrollmentStatus, { 0: '待确认', 1: '报名成功', 2: '已取消', 3: '老师已拒绝' }),
     payText: label(item.payStatus, { 0: '未支付', 1: '已支付', 2: '已退款' }),
     cancelled: String(item.enrollmentStatus) === '2' || item.enrollmentStatus === '已取消',

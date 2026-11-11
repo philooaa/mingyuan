@@ -1,7 +1,7 @@
 const test = require('node:test'), assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
 
-function harness() {
+function harness(request = async () => ({ data: [] })) {
   let definition
   const storage = { token: 'parent-session', roles: ['parent'] }
   const wx = { getStorageSync: (k) => storage[k], navigateTo() {} }
@@ -10,7 +10,7 @@ function harness() {
     require: (id) => id.includes('course-term-filter') ? require('../utils/course-term-filter')
       : id.includes('child-context') ? require('./helpers/child-context.cjs')(wx)
       : id.includes('personal-account') ? { requestKey: () => '' }
-      : { request: async () => ({ data: [] }) }
+      : { request }
   })
   const p = { ...definition, data: structuredClone(definition.data), _token: storage.token, _unloaded: false, setData(v) { Object.assign(this.data, v) } }
   p.data.subjects = []; p.data.grades = []
@@ -20,6 +20,41 @@ function harness() {
 const course = (extra = {}) => ({
   scheduleId: 1, classMode: '1', classDate: null, enrolledCount: 0, enrolled: 0,
   courseClassName: '幼小衔接语文许叶子', subjectName: '语文', gradeName: '一年级', ...extra
+})
+
+test('课程列表携带当前孩子身份，已报名孩子被拦截而兄弟姐妹可打开报名', async () => {
+  const requests = []
+  const p = harness(async options => {
+    if (options.url !== '/miniapp/parent/schedules') return { data: [] }
+    requests.push(options)
+    return { data: [course({ enrolled: options.data.accountId === '11' ? 1 : 0, enrollLimit: 20, enrolledCount: 1 })] }
+  })
+  p.data.lessonAccounts = [{ accountId: '11', studentName: '甲' }, { accountId: '22', studentName: '乙' }]
+  p.data.scopeAccountId = '11'
+  await p.loadSchedules()
+  assert.equal(requests[0].data.accountId, '11')
+  assert.equal(p.data.schedules[0].canEnroll, false)
+  assert.equal(p.data.schedules[0].statusText, '已报名')
+  p.data.scopeAccountId = '22'
+  await p.loadSchedules()
+  assert.equal(requests[1].data.accountId, '22')
+  assert.equal(p.data.schedules[0].canEnroll, true)
+  p.openEnroll({ currentTarget: { dataset: { key: '1:class' } } })
+  assert.equal(p.data.showSheet, true)
+  assert.equal(p.data.selectedChildId, '22')
+  assert.equal(p.data.form.studentName, '乙')
+})
+
+test('课程查询随孩子上下文切换，拒绝旧孩子的显式查询并使旧响应失效', () => {
+  const store = { roles: ['parent'], userInfo: { userId: 1 }, token: 'parent' }
+  const context = require('./helpers/child-context.cjs')({ getStorageSync: k => store[k], setStorageSync: (k, v) => { store[k] = v } })
+  context.select({ accountId: '11' })
+  const first = context.prepare({ url: '/miniapp/parent/schedules' })
+  assert.equal(first.options.data.accountId, '11')
+  context.select({ accountId: '22' })
+  assert.equal(context.current(first.ticket), false)
+  assert.throws(() => context.prepare({ url: '/miniapp/parent/schedules', data: { accountId: '11' } }), /当前孩子已切换/)
+  assert.equal(context.prepare({ url: '/miniapp/parent/schedules' }).options.data.accountId, '22')
 })
 
 test('未设置报名上限时显示剩余名额充足', () => {

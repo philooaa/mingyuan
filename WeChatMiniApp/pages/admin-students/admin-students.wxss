@@ -1,8 +1,10 @@
 .page{min-height:100vh;background:#f4f6fa;padding-bottom:40rpx}
 .search-bar{padding:24rpx 32rpx 12rpx}
 .search-input{height:72rpx;background:#fff;border-radius:999rpx;padding:0 32rpx;font-size:28rpx}
-.filter-tabs{display:flex;gap:16rpx;padding:8rpx 32rpx 4rpx}
-.tab{padding:8rpx 28rpx;border-radius:999rpx;background:#fff;color:#4a5568;font-size:26rpx}
+.account-entry{margin:8rpx 32rpx;padding:18rpx 24rpx;background:#fff;border-radius:16rpx;color:#2459a8;font-size:26rpx}
+.quarter-picker{margin:8rpx 32rpx;padding:16rpx 24rpx;background:#fff;border-radius:16rpx;font-size:26rpx;color:#4a5568}
+.filter-tabs{display:flex;flex-wrap:wrap;gap:16rpx;padding:8rpx 32rpx 4rpx}
+.tab{padding:8rpx 22rpx;border-radius:999rpx;background:#fff;color:#4a5568;font-size:26rpx}
 .tab-active{background:#2b6de5;color:#fff;font-weight:600}
 .count-bar{padding:12rpx 32rpx 4rpx;font-size:24rpx;color:#8a95a3}
 .tip{padding:120rpx 0;text-align:center;font-size:26rpx;color:#8a95a3}
