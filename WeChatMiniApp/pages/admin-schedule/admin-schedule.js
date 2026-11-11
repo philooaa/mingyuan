@@ -5,7 +5,7 @@ const labels = rows => (rows || []).map(r => ({ value: r.value || r.dictLabel, l
 
 Page({
   data: { loading: false, ready: false, error: '', list: [], total: 0, keyword: '', pageNum: 1, pageSize: 20,
-    formOpen: false, saving: false, recognizing: false, formError: '', form: {}, campusOptions: [], teachers: [], fields: [], classTypes: [], timeSlots: [], singleTimeSlots: [],
+    formOpen: false, saving: false, recognizing: false, formError: '', form: {}, campusOptions: [], teachers: [], fields: [], periods: [], classTypes: [], timeSlots: [], singleTimeSlots: [],
     modes: [{label:'班课',value:'1'},{label:'一对一',value:'2'}],
     patterns:[{label:'每周一次',value:'WEEKLY'},{label:'连上无假期',value:'DAILY'},{label:'上5休1',value:'DAILY_5_1'},{label:'上6休1',value:'DAILY_6_1'},{label:'上5休2',value:'DAILY_5_2'},{label:'上4休1',value:'DAILY_4_1'},{label:'其他（暂不排课）',value:'OTHER'}],
     patternIndex:0, priceOptions:['220','250','280','手动填写'], priceChoice:'',
@@ -28,7 +28,8 @@ Page({
       const d=res.data || {}, teachers=(d.teachers || []).map(t=>({...t,label:t.realName || t.nickName || t.userName,value:String(t.userId)}))
       const fields=[['termName','学期',d.terms],['periodName','期次或上课日',d.periods],['timeSlot','时段',d.timeSlots],['gradeName','年级',d.grades],['subjectName','学科',d.subjects]]
         .map(([key,label,options])=>({key,label,options:labels(options)}))
-      this.setData({classTypes:labels(d.classTypes),timeSlots:labels(d.timeSlots),singleTimeSlots:labels(d.singleTimeSlots),campusOptions:Object.keys(d.classrooms || {}).filter(c=>c!=='未分配校区'),teachers,fields,ready:true})
+      this.setData({periods:labels(d.periods),classTypes:labels(d.classTypes),timeSlots:labels(d.timeSlots),singleTimeSlots:labels(d.singleTimeSlots),campusOptions:Object.keys(d.classrooms || {}).filter(c=>c!=='未分配校区'),teachers,fields,ready:true})
+      if(this.data.formOpen)this.setPeriodOptions()
       await this.loadList(version)
       if(this._editOnLoad && this.current() && version===this._version) { this._editOnLoad=false;await this.edit({currentTarget:{dataset:{id:this._editId}}}) }
     } catch(e) { if(this.current() && version===this._version)this.setData({ready:false,list:[],error:e.message || '排课选项加载失败，请重试'}) }
@@ -48,6 +49,7 @@ Page({
     this._formVersion=(this._formVersion || 0)+1
     this.setSlotOptions('1')
     this.setData({priceChoice:'',form:{campusName:'',courseYear:String(new Date().getFullYear()),courseClassName:'',scheduleCode:'',termName:'',periodName:'',timeSlot:'',startTime:'',endTime:'',gradeName:'',subjectName:'',teacherId:'',teacherLabel:'',classType:'',classMode:'1',classPattern:'WEEKLY',startDate:'',endDate:'',unitPrice:'',enrollLimit:'',recruitStatus:'0',status:'0',remark:''},patternIndex:0,formOpen:true,formError:''})
+    this.setPeriodOptions()
   },
   async edit(e) {
     if(!this.current() || !this.data.ready || this.data.saving)return
@@ -56,12 +58,44 @@ Page({
     try {
       const res=await request({url:root+'/'+id})
       if(!this.current() || version!==this._version)return
-      const f=res.data || {}, teacher=this.data.teachers.find(t=>t.value===String(f.teacherId))
+      const f=res.data || {}
+      if(!f.classPattern)f.classPattern=/^周[一二三四五六日]$/.test(f.periodName || '')?'WEEKLY':'DAILY_5_1'
+      const teacher=this.data.teachers.find(t=>t.value===String(f.teacherId))
       this._automaticCourseName=null
       this._formVersion=(this._formVersion || 0)+1
       this.setSlotOptions(f.classMode)
       this.setData({priceChoice:f.unitPrice == null ? '' : [220,250,280].includes(Number(f.unitPrice)) ? String(Number(f.unitPrice)) : '手动填写',form:{...f,teacherId:String(f.teacherId || ''),teacherLabel:teacher?teacher.label:f.teacherName,startDate:(f.startDate || '').slice(0,10),endDate:(f.endDate || '').slice(0,10)},patternIndex:this.patternIndexOf(f.classPattern),formOpen:true,formError:''})
+      this.setPeriodOptions()
     } catch(e) { if(this.current() && version===this._version)wx.showToast({title:e.message || '课程加载失败',icon:'none'}) }
+  },
+  async editBillingCount() {
+    if(!this.current() || this.data.saving || !this.data.form.scheduleId || this.data.form.classMode==='2')return
+    const id=this.data.form.scheduleId, token=this._token, version=this._formVersion
+    const valid=()=>this.current() && token===this._token && version===this._formVersion
+    this.setData({saving:true,formError:''})
+    try {
+      const r=await request({url:'/system/coursePrice/lesson-count/'+id});if(!valid())return
+      const c=r.data, choice=await wx.showActionSheet({itemList:['手动修改计费课次数','恢复系统自动计算']});if(!valid())return
+      let count=c.systemLessonCount, reason='', mismatch=false
+      const manual=choice.tapIndex===0
+      if(manual) {
+        const entered=await wx.showModal({title:'修改计费课次数',content:'系统计算：'+(c.systemLessonCount==null?'待配置':c.systemLessonCount+'次')+'；当前计费：'+(c.lessonCount || '待配置')+'次。请输入整数课次数。',editable:true,placeholderText:'请输入计费课次数',confirmText:'下一步'})
+        if(!entered.confirm || !valid())return
+        const value=String(entered.content || '').trim()
+        if(!/^\d+$/.test(value) || Number(value)<1 || Number(value)>3661)throw new Error('课次数须为1至3661的整数')
+        count=Number(value);mismatch=count!==c.systemLessonCount
+        if(mismatch) {
+          const note=await wx.showModal({title:'填写修改原因',editable:true,placeholderText:'与系统计算不一致，需填写原因',confirmText:'下一步'})
+          if(!note.confirm || !valid())return
+          reason=String(note.content || '').trim();if(!reason || reason.length>255)throw new Error('请填写255字以内的修改原因')
+        }
+      } else if(count==null)throw new Error('排课日期或规则未配置完整，无法自动计算')
+      const confirmed=await wx.showModal({title:mismatch?'课次数不一致提醒':'确认计费课次数',content:(mismatch?'系统计算为'+(c.systemLessonCount==null?'待配置':c.systemLessonCount+'次')+'，手动填写为'+count+'次。':'计费课次数将采用'+count+'次。')+'仅影响后续定价，不改变已有订单金额，也不改变实际排课。',confirmText:'确认保存'})
+      if(!confirmed.confirm || !valid())return
+      await request({url:'/system/coursePrice/lesson-count/'+id,method:'PUT',data:{mode:manual?'MANUAL':'AUTO',lessonCount:manual?count:null,reason,confirmMismatch:mismatch,version:c.lessonCountVersion}})
+      if(valid())wx.showToast({title:'计费课次数已更新',icon:'success'})
+    } catch(e) {if(valid() && !String(e.errMsg || '').includes('cancel'))this.setData({formError:e.message || '课次数修改失败，请重试'})}
+    finally {if(this._alive && token===this._token)this.setData({saving:false})}
   },
   async remove(e) {
     if(!this.current() || !this.data.ready || this.data.loading || this.data.saving)return
@@ -120,6 +154,13 @@ Page({
     const options=mode==='2'?this.data.singleTimeSlots:this.data.timeSlots
     this.setData({fields:this.data.fields.map(f=>f.key==='timeSlot'?{...f,options}:f)})
   },
+  setPeriodOptions(clearInvalid=false) {
+    const weekly=this.data.form.classPattern==='WEEKLY'
+    const options=this.data.periods.filter(p=>/^周[一二三四五六日]$/.test(p.value)===weekly)
+    const change={fields:this.data.fields.map(f=>f.key==='periodName'?{...f,label:weekly?'上课星期':'期次',options}:f)}
+    if(clearInvalid && !options.some(p=>p.value===this.data.form.periodName))change['form.periodName']=''
+    this.setData(change)
+  },
   /** 上课模式在 patterns 里的下标，找不到时退回「每周一次」 */
   patternIndexOf(value) {
     const i=this.data.patterns.findIndex(p=>p.value===value)
@@ -139,11 +180,14 @@ Page({
       }
     }
     if(key==='classPattern') change.patternIndex=Number(e.detail.value)
+    if(key==='classMode' && row.value==='2') {change['form.classPattern']='WEEKLY';change.patternIndex=0;change['form.periodName']=''}
     if(key==='timeSlot') {
       const times=row.value.split(/[-–—]/).map(t=>t.trim())
       if(times.length===2) {change['form.startTime']=times[0].length===4?'0'+times[0]+':00':times[0]+':00';change['form.endTime']=times[1].length===4?'0'+times[1]+':00':times[1]+':00'}
     }
     this.setData(change)
+    if(key==='classPattern' || key==='classMode')this.setPeriodOptions(true)
+    if(key==='classMode' && row.value==='2' && this.data.form.startDate)this.date({currentTarget:{dataset:{key:'startDate'}},detail:{value:this.data.form.startDate}})
     if(['gradeName','subjectName','classType'].includes(key))this.autoCourseName()
   },
   date(e) {
@@ -155,7 +199,9 @@ Page({
     if(!this.current() || !this.data.ready || this.data.saving)return
     const f=this.data.form
     if (!f.scheduleId && (!/^\d+(\.\d{1,2})?$/.test(String(f.unitPrice).trim()) || Number(f.unitPrice) <= 0)) { this.setData({formError:'课时单价须大于0且最多保留两位小数'}); return }
-    for(const [key,label] of [['campusName','校区'],['termName','学期'],['periodName','期次或上课日'],['timeSlot','时段'],['gradeName','年级'],['subjectName','学科'],['teacherId','教师'],['courseClassName','课程名称']]) {
+    if(f.classPattern==='WEEKLY' && !/^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:f.classMode==='2'?'请选择一对一上课日期':'请选择上课星期'});return}
+    if(f.classPattern!=='WEEKLY' && /^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:'请选择期次'});return}
+    for(const [key,label] of [['campusName','校区'],['termName','学期'],['periodName',f.classPattern==='WEEKLY'?'上课星期':'期次'],['timeSlot','时段'],['gradeName','年级'],['subjectName','学科'],['teacherId','教师'],['courseClassName','课程名称']]) {
       if(!String(f[key] || '').trim()) {this.setData({formError:'请填写或选择'+label});return}
     }
     const scheduleCode=f.scheduleCode || ('SCH'+Date.now().toString(36)+Math.random().toString(36).slice(2,12))

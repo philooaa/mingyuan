@@ -30,6 +30,7 @@ public class ScheduleCrudTest {
         principal(21, "admin", "teacher"); db = new FakeDb(); current = course(); current.setScheduleId(10L);
         service = new EduCourseScheduleServiceImpl();
         inject(service, "db", db);
+        inject(service, "coursePrices", new CoursePriceService(db) { @Override public void syncSchedulePricing(long id) {} });
         var availability = new ScheduleAvailabilityService(); inject(availability,"db",db); inject(service,"availability",availability);
         inject(service, "singleService", new OneToOneEnrollmentService() { @Override public String subject(Long id) { return "数学"; } });
         inject(service, "parentMapper", proxy(MiniAppParentMapper.class, (p,m,a) -> List.of()));
@@ -39,7 +40,7 @@ public class ScheduleCrudTest {
                     if (m.getName().equals("lockSchedule") && db.enrollmentArrivesOnLock) db.activeEnrollments = 1;
                     if (Long.valueOf(10).equals(a[0])) return current;
                     EduCourseSchedule foreign = course(); foreign.setScheduleId(20L); foreign.setTeacherId(22L); return foreign;
-                case "insertEduCourseSchedule": case "updateEduCourseSchedule": captured = (EduCourseSchedule)a[0]; return 1;
+                case "insertEduCourseSchedule": case "updateEduCourseSchedule": captured = (EduCourseSchedule)a[0]; if(m.getName().equals("insertEduCourseSchedule")) captured.setScheduleId(30L); return 1;
                 case "deleteEduCourseScheduleByScheduleIds": deleted = (Long[])a[0]; return deleted.length;
                 case "selectEduCourseScheduleList": case "selectTimetableGrid": captured = (EduCourseSchedule)a[0]; return List.of();
                 default: throw new AssertionError(m.getName());
@@ -65,6 +66,7 @@ public class ScheduleCrudTest {
     }
     @Test void simpleDraftUsesOneDateFixedSlotAndRealClassroom() {
         var draft = new com.ruoyi.system.domain.TeacherOneToOneDraft();
+        draft.unitPrice=new java.math.BigDecimal("100.00");
         draft.classroomId=1L; draft.gradeName = "一年级"; draft.courseClassName = " 一对一数学 ";
         draft.startDate = LocalDate.parse("2026-12-28"); draft.timeSlot="8:00-10:00";
         var slot=new ScheduleAvailabilityService.Slot("8:00-10:00",LocalTime.of(8,0),LocalTime.of(10,0));
@@ -235,7 +237,7 @@ public class ScheduleCrudTest {
         assertEquals(List.of("teacher:21"),db.locks);
     }
     static EduCourseSchedule course() {
-        var s = new EduCourseSchedule(); s.setTeacherId(21L); s.setClassroomId(1L); s.setCampusName("万达"); s.setScheduleCode("TEST"); s.setCourseYear(2026L);
+        var s = new EduCourseSchedule(); s.setUnitPrice(new java.math.BigDecimal("100.00")); s.setTeacherId(21L); s.setClassroomId(1L); s.setCampusName("万达"); s.setScheduleCode("TEST"); s.setCourseYear(2026L);
         s.setTermName("秋季"); s.setPeriodName("周六"); s.setTimeSlot("8:00-10:00"); s.setGradeName("一年级"); s.setSubjectName("数学"); s.setCourseClassName("班次");
         s.setClassMode("2"); s.setStatus("0"); s.setRecruitStatus("0"); s.setDelFlag("0");
         s.setStartTime(LocalTime.of(8,0)); s.setEndTime(LocalTime.of(10,0));

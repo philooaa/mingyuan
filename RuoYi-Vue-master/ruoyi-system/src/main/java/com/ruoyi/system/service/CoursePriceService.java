@@ -6,6 +6,8 @@ import com.ruoyi.system.finance.FinanceRules;
 import com.ruoyi.system.shop.ShopRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 课程总价 = 每节单价 × 本期课次数量。
  *
  * <p>课次数量 {@code lesson_count} 与 {@link ScheduleCalendar} 的展开口径一致；
- * 停课、调课只改变上课日期，不改变课次总数，因此定价时使用基准日历。
+ * 自动计费按当前排课日历计算，手动覆盖仅改变后续课程定价，不改历史订单。
  */
 @Service
 public class CoursePriceService {
@@ -77,13 +79,15 @@ public class CoursePriceService {
         var rows =
                 db.rows(
                         "SELECT s.schedule_id,s.course_class_name,s.grade_name,s.subject_name,s.term_name,s.period_name,"
-                                + "s.class_mode,s.lesson_count,s.unit_price,s.tuition_price,"
+                                + "s.class_mode,s.lesson_count,s.lesson_count_override,s.lesson_count_override_reason,s.unit_price,s.tuition_price,"
+                                + "s.start_date,s.end_date,s.class_pattern,"
                                 + "COALESCE(NULLIF(s.campus_name,''),c.campus_name) campus_name "
                                 + "FROM edu_course_schedule s LEFT JOIN edu_classroom c ON c.classroom_id=s.classroom_id"
                                 + where
                                 + " ORDER BY s.grade_name,s.subject_name,s.term_name,s.period_name,s.schedule_id"
                                 + " LIMIT ? OFFSET ?",
                         pageArgs.toArray());
+        rows.forEach(this::decorateLessonCount);
         return FinanceRules.values("rows", rows, "total", total == null ? 0 : total);
     }
 
@@ -175,29 +179,93 @@ public class CoursePriceService {
         return FinanceRules.values("gradeName", grade, "unitPrice", price.toPlainString(), "updated", 0);
     }
 
-    /** 重新推算还没有课次数的课程（新建排课后首次定价时使用）。 */
+    /** Auto courses follow the current calendar; explicit overrides survive later repricing. */
     private void refreshLessonCount(String grade, String subject) {
-        String sql =
-                "SELECT schedule_id,start_date,end_date,class_pattern,period_name FROM edu_course_schedule"
-                        + " WHERE del_flag='0' AND (lesson_count IS NULL OR lesson_count=0) AND grade_name=?";
-        List<Object> args = new ArrayList<>();
-        args.add(grade);
-        if (!subject.isBlank()) {
-            sql += " AND subject_name=?";
-            args.add(subject);
+        String sql="SELECT schedule_id FROM edu_course_schedule WHERE del_flag='0' AND grade_name=?";
+        List<Object> args=new ArrayList<>(); args.add(grade);
+        if (!subject.isBlank()) { sql+=" AND subject_name=?"; args.add(subject); }
+        for (var row:db.rows(sql,args.toArray())) syncSchedulePricing(Long.parseLong(row.get("scheduleId").toString()));
+    }
+
+    public static Integer systemLessonCount(Map<String,Object> row, List<Map<String,Object>> adjustments) {
+        String pattern=text(row.get("classPattern")), period=text(row.get("periodName"));
+        if (pattern.isBlank() && ScheduleCalendar.weekday(period)>0) pattern=ScheduleCalendar.WEEKLY;
+        var dates=ScheduleCalendar.dates(ScheduleCalendar.date(row.get("startDate")),
+            ScheduleCalendar.date(row.get("endDate")),pattern,period,adjustments);
+        return dates.isEmpty()?null:dates.size();
+    }
+
+    public static Integer billingLessonCount(Map<String,Object> row,Integer calculated) {
+        if (row.get("lessonCountOverride")!=null) return Integer.valueOf(row.get("lessonCountOverride").toString());
+        if (calculated!=null) return calculated;
+        Object saved=row.get("lessonCount");
+        return saved!=null && Integer.parseInt(saved.toString())>0?Integer.valueOf(saved.toString()):null;
+    }
+
+    public static void validateCountChange(Integer chosen,Integer calculated,Map<String,Object> body) {
+        FinanceRules.require(chosen!=null && chosen>0 && chosen<=3661,"计费课次数须为1至3661的整数");
+        if (!Objects.equals(chosen,calculated)) {
+            FinanceRules.require(Boolean.TRUE.equals(body.get("confirmMismatch")),"计费课次数与系统计算不一致，请确认后保存");
+            String reason=FinanceRules.str(body,"reason");
+            FinanceRules.require(!reason.isBlank() && reason.length()<=255,"请填写255字以内的修改原因");
         }
-        for (var row : db.rows(sql, args.toArray())) {
-            long scheduleId = Long.parseLong(String.valueOf(row.get("scheduleId")));
-            SortedSet<LocalDate> dates =
-                    ScheduleCalendar.dates(
-                            ScheduleCalendar.date(row.get("startDate")),
-                            ScheduleCalendar.date(row.get("endDate")),
-                            text(row.get("classPattern")),
-                            text(row.get("periodName")),
-                            adjustments(scheduleId));
-            int count = dates.isEmpty() ? 1 : dates.size();
-            db.jdbc().update("UPDATE edu_course_schedule SET lesson_count=? WHERE schedule_id=?", count, scheduleId);
+    }
+
+    private Map<String,Object> decorateLessonCount(Map<String,Object> row) {
+        long id=Long.parseLong(row.get("scheduleId").toString());
+        Integer calculated=systemLessonCount(row,adjustments(id));
+        try {
+            StringJoiner version=new StringJoiner("|");
+            for(String key:List.of("scheduleId","startDate","endDate","classPattern","periodName","lessonCountOverride","lessonCount","unitPrice","tuitionPrice"))
+                version.add(Objects.toString(row.get(key),""));
+            version.add(Objects.toString(calculated,""));
+            row.put("lessonCountVersion",HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(version.toString().getBytes(StandardCharsets.UTF_8))));
+        } catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+        row.put("systemLessonCount",calculated);
+        row.put("lessonCount",billingLessonCount(row,calculated));
+        row.put("manualLessonCount",row.get("lessonCountOverride")!=null);
+        return row;
+    }
+
+    private Map<String,Object> countRow(long id,boolean lock) {
+        return db.one("SELECT schedule_id,course_class_name,class_mode,start_date,end_date,class_pattern,period_name,"
+            +"lesson_count,lesson_count_override,lesson_count_override_reason,unit_price,tuition_price FROM edu_course_schedule "
+            +"WHERE schedule_id=? AND del_flag='0'"+(lock?" FOR UPDATE":""),id);
+    }
+
+    public Map<String,Object> lessonCount(long id) { return decorateLessonCount(countRow(id,false)); }
+
+    @Transactional(rollbackFor=Exception.class)
+    public Map<String,Object> updateLessonCount(long id,Map<String,Object> body) {
+        FinanceRules.require(SecurityUtils.isAdmin() || SecurityUtils.hasRole("admin") || SecurityUtils.hasRole("business_admin") || SecurityUtils.hasRole("education"),"仅教务和管理员可修改计费课次数");
+        var row=decorateLessonCount(countRow(id,true));
+        FinanceRules.require(!"2".equals(text(row.get("classMode"))),"一对一课次按预约管理，请修改班课计费课次数");
+        FinanceRules.require(Objects.equals(row.get("lessonCountVersion"),body.get("version")),"课程信息已变化，请重新打开后确认");
+        Integer calculated=(Integer)row.get("systemLessonCount"), chosen;
+        boolean automatic="AUTO".equals(FinanceRules.str(body,"mode"));
+        FinanceRules.require(automatic || "MANUAL".equals(FinanceRules.str(body,"mode")),"请选择自动或手动计费方式");
+        if(automatic) {
+            FinanceRules.require(calculated!=null,"排课日期或规则不完整，暂时无法恢复自动计算"); chosen=calculated;
+        } else {
+            try { chosen=Integer.valueOf(FinanceRules.str(body,"lessonCount")); }
+            catch(NumberFormatException e) { throw new ServiceException("计费课次数须为整数"); }
+            validateCountChange(chosen,calculated,body);
         }
+        String reason=automatic?null:FinanceRules.str(body,"reason");
+        FinanceRules.require(reason==null || reason.length()<=255,"修改原因不能超过255字");
+        db.jdbc().update("UPDATE edu_course_schedule SET lesson_count_override=?,lesson_count_override_reason=?,lesson_count=?,"
+            +"tuition_price=CASE WHEN unit_price>0 THEN ROUND(unit_price*?,2) ELSE tuition_price END,update_by=?,update_time=NOW() WHERE schedule_id=?",
+            automatic?null:chosen,reason,chosen,chosen,SecurityUtils.getUsername(),id);
+        return lessonCount(id);
+    }
+
+    /** Update only course defaults; enrollment/payment/receipt snapshots are deliberately untouched. */
+    public void syncSchedulePricing(long id) {
+        var row=countRow(id,true);
+        if("2".equals(text(row.get("classMode")))) return;
+        Integer chosen=billingLessonCount(row,systemLessonCount(row,adjustments(id)));
+        if(chosen==null) return;
+        db.jdbc().update("UPDATE edu_course_schedule SET lesson_count=?,tuition_price=CASE WHEN unit_price>0 THEN ROUND(unit_price*?,2) ELSE tuition_price END WHERE schedule_id=?",chosen,chosen,id);
     }
 
     /** 与 RoomAssignService 同一口径：日期级调课记录展开后再叠加本课自己的单条记录。 */

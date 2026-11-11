@@ -633,10 +633,7 @@ export default {
     availablePeriods() {
       const term = this.queryParams.termName
       const fixed = (term === '春季' || term === '秋季')
-        ? [
-            { value: '周六', label: '周六' },
-            { value: '周日', label: '周日' }
-          ]
+        ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map(value => ({ value, label: value }))
         : [
             { value: '一期', label: '一期' },
             { value: '二期', label: '二期' },
@@ -1073,7 +1070,7 @@ export default {
       let msg = `新增 ${d.inserted || 0} 条，覆盖更新 ${d.updated || 0} 条，跳过 ${d.skipped || 0} 条。`
       if (d.restored) msg += `\n其中 ${d.restored} 条原先因「教师未绑定」被停用的排课，本次已匹配到教师并恢复为正常，课表上可以直接看到。`
       if (d.incomplete) msg += `\n其中 ${d.incomplete} 条为格式未识别：已按原文保留（学期/期次/时段/年级/科目用「未识别xx」占位），课表上用红色感叹号标出，请核对后修正。`
-      if (d.dated) msg += `\n已为 ${d.dated} 条排课写入上课日期与递推模式（寒暑假可选 连上无假期 / 上5休1 / 上6休1 / 上5休2，春季/秋季=每周周六或周日）。`
+      if (d.dated) msg += `\n已为 ${d.dated} 条排课写入上课日期与递推模式（寒暑假可选 连上无假期 / 上5休1 / 上6休1 / 上5休2，春季/秋季=每周固定星期（周一至周日））。`
       if (d.undated) {
         const terms = (d.undatedTerms || []).filter(Boolean)
         msg += `\n${d.undated} 条未写入日期，仍保持「待排」${terms.length ? '（涉及：' + terms.join('、') + '）' : ''}：请确认已在导入时按「学期 / 期次」填写起止日期；若学期/期次写法无法判定上课模式，可在课表中编辑该排课补充起止日期。`

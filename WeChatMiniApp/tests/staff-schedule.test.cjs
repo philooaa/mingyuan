@@ -10,11 +10,12 @@ function setup(roles=['education'],send,confirm=true) {
     if(options.url.endsWith('/list'))return {rows:[],total:0}
     return {data:1}
   }
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../pages/admin-schedule/admin-schedule.js'),'utf8'),{Page:p=>definition=p,wx:{getStorageSync:key=>storage[key],showToast(){},showModal:async()=>({confirm}),stopPullDownRefresh(){}},require:()=>({request})})
+  const wxApi={getStorageSync:key=>storage[key],showToast(){},showModal:async()=>({confirm}),stopPullDownRefresh(){}}
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../pages/admin-schedule/admin-schedule.js'),'utf8'),{Page:p=>definition=p,wx:wxApi,require:()=>({request})})
   const p={...definition,data:structuredClone(definition.data)}
   p.setData=change=>{for(const [key,value]of Object.entries(change)){const keys=key.split('.');let obj=p.data;while(keys.length>1)obj=obj[keys.shift()];obj[keys[0]]=value}}
   p.onLoad();p._visible=true
-  return {p,storage,requests}
+  return {p,storage,requests,wx:wxApi}
 }
 test('only education or administrator accounts can load the planning page',async()=>{
   for(const roles of [['education'],['admin'],['business_admin','teacher']]) {
@@ -115,4 +116,53 @@ test('class-only 90 minute slots fill times and are cleared when switching to on
   assert.deepEqual(Array.from(p.data.fields.find(f=>f.key==='timeSlot').options,s=>s.value),['8:00-10:00'])
   p.choose({currentTarget:{dataset:{key:'classMode'}},detail:{value:0}})
   assert.equal(p.data.fields.find(f=>f.key==='timeSlot').options.length,2)
+})
+
+const weekdays=['周一','周二','周三','周四','周五','周六','周日']
+const periodSetup=()=>setup(['education'],o=>o.url.endsWith('/options')?{data:{periods:['一期','二期','三期',...weekdays].map(value=>({value,label:value}))}}:undefined)
+const choosePattern=(p,value)=>p.choose({currentTarget:{dataset:{key:'classPattern'}},detail:{value}})
+test('period field follows the class pattern and clears incompatible selections',async()=>{
+  const {p}=periodSetup();await p.load();p.add()
+  const field=()=>p.data.fields.find(f=>f.key==='periodName')
+  assert.equal(field().label,'上课星期');assert.deepEqual(Array.from(field().options,r=>r.value),weekdays)
+  p.data.form.periodName='周三';choosePattern(p,2)
+  assert.equal(p.data.form.periodName,'');assert.equal(field().label,'期次')
+  assert.deepEqual(Array.from(field().options,r=>r.value),['一期','二期','三期'])
+  p.data.form.periodName='二期';choosePattern(p,6)
+  assert.equal(p.data.form.periodName,'二期');choosePattern(p,0)
+  assert.equal(p.data.form.periodName,'')
+})
+test('editing a daily course opens with period options without erasing its saved period',async()=>{
+  const {p}=setup(['education'],o=>o.url.endsWith('/options')?{data:{periods:['一期','周一'].map(value=>({value,label:value}))}}:o.url.endsWith('/12')?{data:{scheduleId:12,classMode:'1',classPattern:'DAILY_5_1',periodName:'一期'}}:undefined)
+  await p.load();await p.edit({currentTarget:{dataset:{id:'12'}}})
+  assert.equal(p.data.form.periodName,'一期');assert.equal(p.data.fields.find(f=>f.key==='periodName').label,'期次')
+})
+test('switching to one-to-one derives its weekday from the date instead of keeping a period',async()=>{
+  const {p}=periodSetup();await p.load();p.add();choosePattern(p,1)
+  Object.assign(p.data.form,{periodName:'二期',startDate:'2026-11-11',endDate:'2026-12-30'})
+  p.choose({currentTarget:{dataset:{key:'classMode'}},detail:{value:1}})
+  assert.equal(p.data.form.classPattern,'WEEKLY');assert.equal(p.data.form.periodName,'周三')
+  assert.equal(p.data.form.endDate,'2026-11-11');assert.equal(p.data.patternIndex,0)
+})
+test('weekly course cannot save an incompatible period',async()=>{
+  const {p,requests}=periodSetup();await p.load();p.add()
+  Object.assign(p.data.form,{periodName:'一期',unitPrice:'100'})
+  await p.save();assert.equal(p.data.formError,'请选择上课星期')
+  assert.ok(!requests.some(r=>r.method==='POST'))
+})
+
+test('staff billing count mismatch requires a reason and final confirmation',async()=>{
+  const {p,requests,wx}=setup(['education'],o=>o.url==='/system/coursePrice/lesson-count/12' && !o.method?{data:{systemLessonCount:14,lessonCount:14,lessonCountVersion:'fresh'}}:undefined)
+  await p.load();p.add();Object.assign(p.data.form,{scheduleId:12,classMode:'1'})
+  wx.showActionSheet=async()=>({tapIndex:0})
+  const replies=[{confirm:true,content:'12'},{confirm:true,content:'少计费两讲'},{confirm:true}]
+  wx.showModal=async()=>replies.shift()
+  await p.editBillingCount()
+  const sent=requests.find(r=>r.method==='PUT');assert.equal(sent.data.lessonCount,12);assert.equal(sent.data.confirmMismatch,true);assert.equal(sent.data.version,'fresh');assert.equal(p.data.saving,false)
+})
+test('canceling billing count confirmation never sends a mutation',async()=>{
+  const {p,requests,wx}=setup(['education'],o=>o.url==='/system/coursePrice/lesson-count/12' && !o.method?{data:{systemLessonCount:14,lessonCount:12,lessonCountVersion:'fresh'}}:undefined)
+  await p.load();p.add();Object.assign(p.data.form,{scheduleId:12,classMode:'1'})
+  wx.showActionSheet=async()=>({tapIndex:1});wx.showModal=async()=>({confirm:false})
+  await p.editBillingCount();assert.ok(!requests.some(r=>r.method==='PUT'));assert.equal(p.data.saving,false)
 })

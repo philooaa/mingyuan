@@ -110,12 +110,23 @@ public class MiniAppTeacherCourseController extends BaseController
 
     @GetMapping("/students")
     public TableDataInfo students(@RequestParam(required = false) Long scheduleId,
-                                 @RequestParam(defaultValue = "") String keyword)
+                                 @RequestParam(defaultValue = "") String keyword,
+                                 @RequestParam(required = false) Integer courseYear,
+                                 @RequestParam(defaultValue = "") String termName,
+                                 @RequestParam(defaultValue = "") String gradeName,
+                                 @RequestParam(defaultValue = "") String campusName,
+                                 @RequestParam(defaultValue = "") String courseStatus)
     {
         if (scheduleId != null) ownSchedule(scheduleId);
+        if (!List.of("", "0", "1").contains(courseStatus)) throw new ServiceException("课程状态无效");
         EduEnrollment query = query();
         query.setScheduleId(scheduleId);
         query.getParams().put("adminKeyword", keyword.trim());
+        query.getParams().put("adminYear", courseYear);
+        query.getParams().put("adminTerm", termName.trim());
+        query.getParams().put("adminGrade", gradeName.trim());
+        query.getParams().put("adminCampus", campusName.trim());
+        query.getParams().put("adminCourseStatus", courseStatus);
         startPage();
         return getDataTable(enrollmentService.selectEduEnrollmentList(query));
     }

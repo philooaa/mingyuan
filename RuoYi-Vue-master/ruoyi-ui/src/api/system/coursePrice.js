@@ -29,3 +29,10 @@ export function updatePriceRule(data) {
 export function applyPriceRule(data) {
   return request({ url: '/system/coursePrice/rule/apply', method: 'put', data })
 }
+
+export function getCourseLessonCount(id) {
+  return request({ url: '/system/coursePrice/lesson-count/' + id, method: 'get' })
+}
+export function updateCourseLessonCount(id, data) {
+  return request({ url: '/system/coursePrice/lesson-count/' + id, method: 'put', data })
+}

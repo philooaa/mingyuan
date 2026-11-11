@@ -28,8 +28,8 @@ Page(childContext.page({
     termIndex: 0,
     selectedSchedule: null,
     cart: [], cartCount: 0, cartTotal: '0.00', cartMode: false,
-    orderDoneOpen: false, advisorWechat: 'myedu666888', advisorQrImage: '/images/course-advisor-wechat.png',
-    lessonAccounts: [], creditAccount:null, lessonAccountOptions: [], lessonAccountIndex:0, selectedChildId:null, newChild:true, childMissing:false, settlementMethod:'C', accountsError:'', accountsLoading:false,
+    orderDoneOpen: false, orderDoneKind: 'CLASS', advisorWechat: 'myedu666888', advisorQrImage: '/images/course-advisor-wechat.png',
+    lessonAccounts: [], creditAccount:null, lessonAccountOptions: [], lessonAccountIndex:0, selectedChildId:null, newChild:true, childMissing:false, bookingMethod:'C', settlementMethod:'C', accountsError:'', accountsLoading:false,
     form: {
       studentName: '',
       contactPhone: ''
@@ -111,11 +111,17 @@ Page(childContext.page({
     if(!account || !/^[1-9]\d*$/.test(String(account.accountId)) || this.data.scopeAccountId && String(account.accountId)!==this.data.scopeAccountId) return
     wx.navigateTo({url:'/pages/lesson-packages/lesson-packages?accountId='+encodeURIComponent(account.accountId)})
   },
+  chooseBookingMethod(e) {
+    if(!this.current() || this.data.courseTypeIndex!==1 || this.data.submitting || this.data.showSheet)return
+    const method=e.currentTarget.dataset.method
+    if(!['C','P'].includes(method))return
+    this.setData({bookingMethod:method,settlementMethod:method})
+  },
   chooseSettlement(e) {
     if(!this.current() || this.data.submitting || !this.data.selectedSchedule || !this.data.selectedSchedule.classDate) return
     const method=e.currentTarget.dataset.method
     if(!['C','P'].includes(method)) return
-    this.setData({settlementMethod:method})
+    this.setData({settlementMethod:method,bookingMethod:method})
   },
   chooseLessonAccount(e) {
     if(this.data.submitting || this.data.scopeAccountId) return
@@ -489,7 +495,7 @@ Page(childContext.page({
     this.setData({
       selectedSchedule: schedule,
       cartMode: false,
-      settlementMethod:'C',lessonAccountIndex:selected?this.data.lessonAccounts.indexOf(selected):this.data.lessonAccounts.length,selectedChildId:this.data.scopeAccountId||(selected?selected.accountId:null),newChild:!this.data.scopeAccountId&&!selected,childMissing:!!this.data.scopeAccountId&&!selected,
+      settlementMethod:schedule.classDate?this.data.bookingMethod:'C',lessonAccountIndex:selected?this.data.lessonAccounts.indexOf(selected):this.data.lessonAccounts.length,selectedChildId:this.data.scopeAccountId||(selected?selected.accountId:null),newChild:!this.data.scopeAccountId&&!selected,childMissing:!!this.data.scopeAccountId&&!selected,
       showSheet: true,
       form: {
         studentName:selected?selected.studentName:'',
@@ -557,10 +563,11 @@ Page(childContext.page({
       })
       if (!this.current()) return
       if(typeof getCurrentPages==='function')getCurrentPages().forEach(p=>{p._scheduleDirty=true})
-      wx.showToast({ title: selectedSchedule.classDate ? '已提交，待老师确认' : '报名成功', icon: 'success' })
+      if(!selectedSchedule.classDate)wx.showToast({ title: '报名成功', icon: 'success' })
       this.setData({
         selectedSchedule: null,
-        showSheet: false
+        showSheet: false,
+        ...(selectedSchedule.classDate ? {orderDoneOpen:true,orderDoneKind:packageMode?'SINGLE_PACKAGE':'SINGLE_CASH'} : {})
       })
       await this.loadPage()
     } catch (error) {
@@ -598,7 +605,7 @@ Page(childContext.page({
       })
       if (!this.current()) return
       if (typeof getCurrentPages === 'function') getCurrentPages().forEach(p => { p._scheduleDirty = true })
-      this.setData({ cart: [], cartMode: false, showSheet: false, selectedSchedule: null, orderDoneOpen: true })
+      this.setData({ cart: [], cartMode: false, showSheet: false, selectedSchedule: null, orderDoneOpen: true, orderDoneKind: 'CLASS' })
       wx.setStorageSync('enrollCart', [])
       this.refreshCartSummary()
       await this.loadPage()

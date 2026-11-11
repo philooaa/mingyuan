@@ -280,12 +280,12 @@ export default {
     }
   },
   computed: {
-    // 期次随学期联动：暑假/寒假为一二三期，春季/秋季为周六周日
+    // 期次随学期联动：暑假/寒假为一二三期，春季/秋季为周一至周日
     availablePeriods() {
       if (this.batchForm.termName === '暑假' || this.batchForm.termName === '寒假') {
         return ['一期', '二期', '三期']
       }
-      return ['周六', '周日']
+      return ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
     }
   },
   created() {

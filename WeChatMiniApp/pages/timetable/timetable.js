@@ -223,7 +223,7 @@ Page(childContext.page({
 
     let pattern = item.classPattern
     if (!pattern) {
-      if (item.periodName === '周六' || item.periodName === '周日') {
+      if (['周一','周二','周三','周四','周五','周六','周日'].includes(item.periodName)) {
         pattern = 'WEEKLY'
       } else {
         pattern = 'DAILY_5_1'

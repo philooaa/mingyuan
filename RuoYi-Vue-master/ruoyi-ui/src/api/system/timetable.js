@@ -5,6 +5,13 @@ export function getTimetableDimensions() {
   return request({
     url: '/system/courseTimetable/dimensions',
     method: 'get'
+  }).then(response => {
+    // 日期后缀用于定位不同日期的排课，仅简化显示名称，保留筛选值。
+    if (response.data && response.data.terms) {
+      response.data.terms = response.data.terms.map(term => /^一对一\d{4}-\d{2}-\d{2}$/.test(term.value)
+        ? { ...term, label: '一对一', extra: '' } : term)
+    }
+    return response
   })
 }
 

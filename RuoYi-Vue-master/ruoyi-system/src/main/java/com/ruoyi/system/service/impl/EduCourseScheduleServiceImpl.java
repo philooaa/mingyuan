@@ -28,6 +28,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     @Autowired private com.ruoyi.system.service.OneToOneEnrollmentService singleService;
     @Autowired private com.ruoyi.system.service.ScheduleAvailabilityService availability;
     @Autowired private com.ruoyi.system.service.ISysConfigService configService;
+    @Autowired private com.ruoyi.system.service.CoursePriceService coursePrices;
 
     private boolean teacherOnly() {
         return SecurityUtils.hasRole("teacher") && !planningStaff();
@@ -96,7 +97,9 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         checkConflicts(schedule);
         schedule.setCreateBy(SecurityUtils.getUsername());
         schedule.setCreateTime(DateUtils.getNowDate());
-        return eduCourseScheduleMapper.insertEduCourseSchedule(schedule);
+        int changed=eduCourseScheduleMapper.insertEduCourseSchedule(schedule);
+        if(changed>0 && !"2".equals(schedule.getClassMode())) coursePrices.syncSchedulePricing(schedule.getScheduleId());
+        return changed;
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -156,7 +159,9 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         input.setEnrolledCount(null); input.setDelFlag(null); input.setScheduleCode(null);
         input.setCreateBy(null); input.setCreateTime(null);
         input.setUpdateBy(SecurityUtils.getUsername()); input.setUpdateTime(DateUtils.getNowDate());
-        return eduCourseScheduleMapper.updateEduCourseSchedule(input);
+        int changed=eduCourseScheduleMapper.updateEduCourseSchedule(input);
+        if(changed>0 && !"2".equals(effective.getClassMode())) coursePrices.syncSchedulePricing(input.getScheduleId());
+        return changed;
     }
 
     @Override @Transactional(rollbackFor = Exception.class)

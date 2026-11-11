@@ -248,9 +248,10 @@
               <el-select v-model="form.termName" filterable placeholder="请选择学期" style="width:100%"><el-option v-for="item in dims.terms" :key="item.value" :label="item.label" :value="item.value" /></el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="24">
-            <el-form-item label="期次或上课日" prop="periodName">
-              <el-select v-model="form.periodName" filterable placeholder="请选择期次或上课日" style="width:100%"><el-option v-for="item in periodOptions(form.termName)" :key="item.value" :label="item.label" :value="item.value" /></el-select>
+          <el-col :span="24"><el-form-item label="上课模式"><el-select v-model="form.classPattern" @change="onClassPatternChange" :disabled="form.classMode === '2'"><el-option label="每周一次（周一至周日）" value="WEEKLY" /><el-option label="连上无假期（每天上课）" value="DAILY" /><el-option label="上5天休1天" value="DAILY_5_1" /><el-option label="上6天休1天" value="DAILY_6_1" /><el-option label="上5天休2天" value="DAILY_5_2" /><el-option label="上4天休1天" value="DAILY_4_1" /><el-option label="其他（暂不排课）" value="OTHER" /></el-select></el-form-item></el-col>
+          <el-col :span="24" v-if="form.classMode !== '2'">
+            <el-form-item :label="form.classPattern === 'WEEKLY' ? '上课星期' : '期次'" prop="periodName">
+              <el-select v-model="form.periodName" filterable :placeholder="form.classPattern === 'WEEKLY' ? '请选择上课星期' : '请选择期次'" style="width:100%"><el-option v-for="item in formPeriodOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -341,9 +342,10 @@
               <el-input v-model="form.sourceCol" placeholder="请输入来源列" />
             </el-form-item>
           </el-col>
+          <el-col :span="24" v-if="form.scheduleId && form.classMode !== '2'"><el-form-item label="计费课次数"><el-button type="text" @click="openLessonCountEditor">查看／修改计费课次数</el-button><div style="color:#909399">按已保存的排课计算；如修改了日期或规则，请先保存课程。教务和管理员可调整，不改变已有订单。</div></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="开课日期"><el-date-picker v-model="form.startDate" type="date" value-format="yyyy-MM-dd" placeholder="待配置" /></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="结课日期"><el-date-picker v-model="form.endDate" type="date" value-format="yyyy-MM-dd" placeholder="待配置" /></el-form-item></el-col>
-          <el-col :span="24"><el-form-item label="上课模式"><el-select v-model="form.classPattern" clearable><el-option label="每周一次（周六／周日）" value="WEEKLY" /><el-option label="连上无假期（每天上课）" value="DAILY" /><el-option label="上5天休1天" value="DAILY_5_1" /><el-option label="上6天休1天" value="DAILY_6_1" /><el-option label="上5天休2天" value="DAILY_5_2" /><el-option label="上4天休1天" value="DAILY_4_1" /><el-option label="其他（暂不排课）" value="OTHER" /></el-select></el-form-item></el-col>
+
           <el-col :span="24"><el-form-item label="招生状态"><el-select v-model="form.recruitStatus"><el-option label="可报名" value="0" /><el-option label="停招" value="1" /><el-option label="满班" value="2" /></el-select></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="排课状态"><el-select v-model="form.status"><el-option label="正常" value="0" /><el-option label="停用" value="1" /></el-select></el-form-item></el-col>
           <el-col :span="24">
@@ -359,6 +361,7 @@
       </div>
     </el-dialog>
     <OneToOneManager ref="oneToOne" :dims="dims" @changed="getList" />
+    <course-lesson-count-editor ref="lessonCounts" />
   </div>
 </template>
 
@@ -366,12 +369,14 @@
 import { listSchedule, getSchedule, delSchedule, addSchedule, updateSchedule } from "@/api/system/schedule"
 import { getTimetableDimensions } from "@/api/system/timetable"
 import OneToOneManager from './OneToOneManager.vue'
+import CourseLessonCountEditor from '@/components/CourseLessonCountEditor'
 import { recognizeAndFill } from '@/utils/course-name-recognition'
+import { classPeriodOptions, isWeekday } from '@/utils/class-period'
 import { updateAutomaticCourseName } from '@/utils/auto-course-name'
 
 export default {
   name: "Schedule",
-  components: { OneToOneManager },
+  components: { OneToOneManager, CourseLessonCountEditor },
   data() {
     return {
       // 遮罩层
@@ -437,7 +442,7 @@ export default {
           { required: true, message: "学期不能为空", trigger: "blur" }
         ],
         periodName: [
-          { required: true, message: "期次或上课日不能为空", trigger: "blur" }
+          { validator: (rule, value, callback) => value && (this.form.classMode === '2' || isWeekday(value) === (this.form.classPattern === 'WEEKLY')) ? callback() : callback(new Error(this.form.classPattern === 'WEEKLY' ? '请选择上课星期' : '请选择期次')), trigger: 'change' }
         ],
         timeSlot: [
           { required: true, message: "时段不能为空", trigger: "blur" }
@@ -455,6 +460,7 @@ export default {
     }
   },
   computed: {
+    formPeriodOptions() { return classPeriodOptions(this.dims, this.form) },
     formTimeSlotOptions() {
       return this.form.classMode === '2' ? (this.dims.singleTimeSlots || []) : this.timeSlotOptions
     },
@@ -464,7 +470,9 @@ export default {
     }
   },
   watch: {
+    'form.startDate'() { this.syncSingleDay() },
     'form.classMode'(mode) {
+      this.syncSingleDay()
       if (mode === '2' && !(this.dims.singleTimeSlots || []).some(s => s.value === this.form.timeSlot)) {
         this.form.timeSlot = ''; this.form.startTime = null; this.form.endTime = null
       }
@@ -475,6 +483,23 @@ export default {
     getTimetableDimensions().then(response => { this.dims = response.data || this.dims }).catch(() => {})
   },
   methods: {
+    async openLessonCountEditor() {
+      await this.$nextTick()
+      const editor=this.$refs.lessonCounts
+      if (!editor) { this.$modal.msgError('计费课次数编辑器尚未加载，请刷新页面后重试'); return }
+      await editor.openLessonCount(this.form)
+    },
+    onClassPatternChange() {
+      if (!this.formPeriodOptions.some(item => item.value === this.form.periodName)) this.form.periodName = null
+      this.$nextTick(() => this.$refs.form && this.$refs.form.clearValidate('periodName'))
+    },
+    syncSingleDay() {
+      if (this.form.classMode !== '2') return
+      this.form.classPattern = 'WEEKLY'
+      const date = String(this.form.startDate || '').slice(0,10)
+      this.form.periodName = date ? ['周日','周一','周二','周三','周四','周五','周六'][new Date(date.replace(/-/g,'/')+' 12:00:00').getDay()] : null
+      this.form.endDate = this.form.startDate
+    },
     autoCourseName() { updateAutomaticCourseName(this) },
     choosePrice(value) { this.form.unitPrice = value === 'custom' ? null : value },
     recognizeName() { return recognizeAndFill(this) },
@@ -517,7 +542,7 @@ export default {
         timeSlot: null,
         startTime: null,
         endTime: null,
-        startDate: null, endDate: null, classPattern: null,
+        startDate: null, endDate: null, classPattern: 'WEEKLY',
         gradeName: null,
         subjectName: null,
         teacherName: null,
@@ -571,6 +596,7 @@ export default {
       getSchedule(scheduleId).then(response => {
         if (response.data.classMode === '2' && this.dims.isAdmin) { this.openSingle(response.data, 'courses'); return }
         this.form = response.data
+        if (!this.form.classPattern) this.form.classPattern = isWeekday(this.form.periodName) ? 'WEEKLY' : 'DAILY_5_1'
         this.priceChoice = this.form.unitPrice == null ? null : [220,250,280].includes(Number(this.form.unitPrice)) ? Number(this.form.unitPrice) : 'custom'
         this.form.courseYear = this.form.courseYear == null ? null : String(this.form.courseYear)
         this.open = true

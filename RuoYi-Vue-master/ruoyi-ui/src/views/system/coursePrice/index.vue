@@ -121,7 +121,15 @@
         <el-table-column label="学期 / 期次" width="140">
           <template slot-scope="scope">{{ scope.row.termName }} · {{ scope.row.periodName }}</template>
         </el-table-column>
-        <el-table-column label="课次数" prop="lessonCount" width="80" align="center" />
+        <el-table-column label="系统课次数" width="100" align="center"><template slot-scope="scope">{{ scope.row.systemLessonCount == null ? '待配置' : scope.row.systemLessonCount }}</template></el-table-column>
+        <el-table-column label="计费课次数" width="160" align="center">
+          <template slot-scope="scope">
+            <div class="lesson-count-cell">
+              <span class="lesson-count-value">{{ scope.row.lessonCount == null ? '待配置' : scope.row.lessonCount }}</span>
+              <el-button v-if="canEditLessonCount && scope.row.classMode !== '2'" class="lesson-count-edit" size="mini" @click="$refs.lessonCounts.openLessonCount(scope.row)">修改</el-button>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="当前单价" width="100" align="right">
           <template slot-scope="scope">{{ money(scope.row.unitPrice) }}</template>
         </el-table-column>
@@ -141,10 +149,12 @@
         @pagination="handlePreview"
       />
     </el-card>
+    <course-lesson-count-editor ref="lessonCounts" @saved="handlePreview" />
   </div>
 </template>
 
 <script>
+import CourseLessonCountEditor from '@/components/CourseLessonCountEditor'
 import {
   listPriceRules,
   getPriceDims,
@@ -155,6 +165,7 @@ import {
 
 export default {
   name: 'CoursePrice',
+  components: { CourseLessonCountEditor },
   data() {
     return {
       rules: [],
@@ -170,6 +181,9 @@ export default {
       pageSize: 20,
       saving: false,
     }
+  },
+  computed: {
+    canEditLessonCount() { return (this.$store.getters.roles || []).some(role => ['admin','business_admin','education'].includes(role)) },
   },
   created() {
     this.loadDims()
@@ -306,5 +320,30 @@ export default {
 .muted {
   color: #909399;
   font-size: 12px;
+}
+.lesson-count-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.lesson-count-value {
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #303133;
+}
+.lesson-count-edit {
+  padding: 4px 8px;
+  line-height: 18px;
+  color: #606266;
+  border-color: #dcdfe6;
+  background: #fff;
+}
+.lesson-count-edit:hover,
+.lesson-count-edit:focus {
+  color: #303133;
+  border-color: #909399;
+  background: #f5f7fa;
 }
 </style>

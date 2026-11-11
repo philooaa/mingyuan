@@ -6,7 +6,7 @@ const vm = require('node:vm')
 
 const root = path.resolve(__dirname, '..')
 
-function harness() {
+function harness(respond) {
   let definition
   const storage = { token: 'parent-session', roles: ['parent'] }
   const calls = [], modals = [], toasts = [], copied = [], previews = []
@@ -24,7 +24,7 @@ function harness() {
     require: (id) => id.includes('course-term-filter') ? require('../utils/course-term-filter')
       : id.includes('child-context') ? require('./helpers/child-context.cjs')(wx)
       : id.includes('personal-account') ? { requestKey: () => 'key-1' }
-      : { request: async (o) => { calls.push(o); return { data: { enrollmentId: '1' } } } }
+      : { request: async (o) => { calls.push(o); if(respond)await respond(o,storage); return { data: { enrollmentId: '1' } } } }
   })
   const p = { ...definition, data: structuredClone(definition.data), _token: storage.token, _unloaded: false }
   p.setData = (patch) => Object.assign(p.data, patch)
@@ -105,4 +105,26 @@ test('下单失败不弹窗，只提示错误', async () => {
   assert.equal(q.data.orderDoneOpen, false)
   assert.equal(modals.length, 0)
   assert.match(toasts.at(-1).title, /课程已满/)
+})
+
+function singleBooking(p,method) {
+  p.data.selectedSchedule={scheduleId:'9',classDate:'2030-10-07'}
+  p.data.showSheet=true;p.data.settlementMethod=method
+  if(method==='P') {p.data.lessonAccounts=[{accountId:'11',availableCredits:5}];p.data.selectedChildId='11';p.data.newChild=false}
+}
+test('both single booking methods show the appropriate success notice',async()=>{
+  for(const [method,kind] of [['C','SINGLE_CASH'],['P','SINGLE_PACKAGE']]) {
+    const {p,calls,modals}=harness();singleBooking(p,method);await p.submitEnroll()
+    assert.equal(calls[0].url,'/miniapp/parent/enroll');assert.equal(calls[0].data.settlementMethod,method)
+    assert.equal(p.data.orderDoneOpen,true);assert.equal(p.data.orderDoneKind,kind);assert.equal(p.data.showSheet,false);assert.equal(modals.length,0)
+  }
+})
+test('failed or stale single booking responses never open the notice',async()=>{
+  for(const respond of [async()=>{throw new Error('预约已满')},async(o,storage)=>{storage.token='another-parent'}]) {
+    const {p}=harness(respond);singleBooking(p,'C');await p.submitEnroll();assert.equal(p.data.orderDoneOpen,false)
+  }
+})
+test('a later class order resets the prior package notice',async()=>{
+  const {p}=harness();singleBooking(p,'P');await p.submitEnroll();p.closeOrderDone();await p.submitCart()
+  assert.equal(p.data.orderDoneOpen,true);assert.equal(p.data.orderDoneKind,'CLASS')
 })
