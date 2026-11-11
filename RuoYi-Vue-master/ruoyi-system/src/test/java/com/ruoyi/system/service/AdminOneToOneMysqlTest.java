@@ -40,7 +40,7 @@ class AdminOneToOneMysqlTest {
         var availability=new ScheduleAvailabilityService();LessonCreditMysqlTest.inject(availability,"db",db);
         var profiles=new EduTeacherProfileService();LessonCreditMysqlTest.inject(profiles,"db",db);LessonCreditMysqlTest.inject(service,"teacherProfiles",profiles);
         LessonCreditMysqlTest.inject(service,"parent",session.getMapper(MiniAppParentMapper.class));
-        var courses=new com.ruoyi.system.service.impl.EduCourseScheduleServiceImpl();LessonCreditMysqlTest.inject(courses,"db",db);
+        var courses=new com.ruoyi.system.service.impl.EduCourseScheduleServiceImpl();LessonCreditMysqlTest.inject(courses,"db",db);LessonCreditMysqlTest.inject(courses,"coursePrices",new CoursePriceService(db) { @Override public void syncSchedulePricing(long id) {} });
         LessonCreditMysqlTest.inject(courses,"singleService",service);LessonCreditMysqlTest.inject(courses,"availability",availability);
         LessonCreditMysqlTest.inject(courses,"eduCourseScheduleMapper",session.getMapper(EduCourseScheduleMapper.class));LessonCreditMysqlTest.inject(courses,"parentMapper",session.getMapper(MiniAppParentMapper.class));
         LessonCreditMysqlTest.inject(courses,"configService",ScheduleCrudTest.proxy(ISysConfigService.class,(p,m,a)->"true"));

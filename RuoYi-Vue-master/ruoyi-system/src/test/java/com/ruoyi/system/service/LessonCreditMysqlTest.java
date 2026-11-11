@@ -38,7 +38,7 @@ public class LessonCreditMysqlTest {
         availability=new ScheduleAvailabilityService();inject(availability,"db",db);
         single=new OneToOneEnrollmentService();inject(single,"db",db);inject(single,"credits",credits);inject(single,"teacherProfiles",profiles);
         inject(single,"schedules",session.getMapper(EduCourseScheduleMapper.class));inject(single,"parent",session.getMapper(MiniAppParentMapper.class));inject(single,"enrollments",session.getMapper(EduEnrollmentMapper.class));
-        courses=new EduCourseScheduleServiceImpl();inject(courses,"db",db);inject(courses,"availability",availability);inject(courses,"singleService",single);inject(courses,"eduCourseScheduleMapper",session.getMapper(EduCourseScheduleMapper.class));inject(courses,"parentMapper",session.getMapper(MiniAppParentMapper.class));
+        courses=new EduCourseScheduleServiceImpl();inject(courses,"db",db);inject(courses,"coursePrices",new CoursePriceService(db) { @Override public void syncSchedulePricing(long id) {} });inject(courses,"availability",availability);inject(courses,"singleService",single);inject(courses,"eduCourseScheduleMapper",session.getMapper(EduCourseScheduleMapper.class));inject(courses,"parentMapper",session.getMapper(MiniAppParentMapper.class));
         var financeRoot=java.nio.file.Files.createTempDirectory("mingyuan-finance-test-");
         new com.ruoyi.common.config.RuoYiConfig().setProfile(financeRoot.resolve("public").toString());
         var storage=new com.ruoyi.system.finance.FinancePrivateStorage(financeRoot.resolve("private").toString());

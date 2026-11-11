@@ -31,7 +31,7 @@ function expandCourse(course) {
   if (!start || !end) return { dates: [], reason: '排课起止日期待配置' }
   if (start > end) return { dates: [], reason: '排课起止日期顺序异常' }
   if ((end - start) / 86400000 > 3660) return { dates: [], reason: '排课日期跨度异常，请核对' }
-  const pattern = course.classPattern || (['周六', '周日'].includes(course.periodName) ? 'WEEKLY' : '')
+  const pattern = course.classPattern || (DAY_NAMES.includes(course.periodName) ? 'WEEKLY' : '')
   // 「其他（暂不排课）」不展开任何上课日
   if (pattern === 'OTHER') return { dates: [], reason: PATTERN_LABELS.OTHER }
   if (pattern === 'WEEKLY' && !DAY_NAMES.includes(course.periodName)) return { dates: [], reason: '每周上课的星期待确认' }

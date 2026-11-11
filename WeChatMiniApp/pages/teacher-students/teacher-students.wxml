@@ -1,6 +1,12 @@
 <view class="page">
   <view class="title">班级学员</view>
   <view class="muted">查看本人班级，查找学员与上课记录</view>
+  <view class="filters" wx:if="{{mode === 'courses' || mode === 'search'}}">
+    <view class="filter-grid">
+      <picker wx:for="{{filterFields}}" wx:key="key" range="{{item.options}}" range-key="label" value="{{item.index}}" data-key="{{item.key}}" bindchange="changeFilter"><view class="filter-picker"><text>{{item.options[item.index].label}}</text><text class="filter-arrow">▾</text></view></picker>
+      <view class="filter-reset" bindtap="resetFilters">重置筛选</view>
+    </view>
+  </view>
   <view class="search"><input value="{{keyword}}" bindinput="inputKeyword" bindconfirm="search" confirm-type="search" placeholder="学生姓名 / 家长电话"/><button size="mini" bindtap="search">搜索</button></view>
   <view class="back" wx:if="{{mode !== 'courses'}}" bindtap="showCourses">返回我的课程 ›</view>
   <view class="empty" wx:if="{{error}}">{{error}}</view>
@@ -9,7 +15,7 @@
       <view class="ui-row"><view class="title">{{item.course}}</view><text class="ui-link">›</text></view><view class="ui-time">{{item.time}}</view><view class="muted">{{item.gradeName}} · {{item.room}}</view>
       <view class="muted">{{item.courseYear}} {{item.termName}} · 班次 {{item.scheduleId}} · {{item.status === '1' ? '已停用' : '正常'}}</view>
     </view>
-    <view class="empty" wx:if="{{!loading && !error && !courses.length}}">暂无本人负责的课程</view>
+    <view class="empty" wx:if="{{!loading && !error && !courses.length}}">暂无符合筛选条件的课程</view>
   </block>
   <block wx:elif="{{mode === 'detail' && enrollment}}">
     <view class="card"><view class="ui-row"><view class="title">{{enrollment.studentName}}</view><text class="ui-pill ui-pill-muted">{{enrollment.paymentStatusText}}</text></view>

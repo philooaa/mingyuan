@@ -76,6 +76,17 @@ public class EduCoursePriceController extends BaseController {
         return success(prices.applyRule(body, SecurityUtils.getUserId()));
     }
 
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @GetMapping("/lesson-count/{id}")
+    public AjaxResult lessonCount(@PathVariable long id) { return success(prices.lessonCount(id)); }
+
+    @PreAuthorize("@ss.hasAnyRoles('admin,education')")
+    @Log(title="班课计费课次数修改",businessType=BusinessType.UPDATE)
+    @PutMapping("/lesson-count/{id}")
+    public AjaxResult updateLessonCount(@PathVariable long id,@RequestBody Map<String,Object> body) {
+        return success(prices.updateLessonCount(id,body));
+    }
+
     /** 定价规则快照，供财务核价页面展示「按规则应为」。 */
     @PreAuthorize("@ss.hasPermi('system:coursePrice:query')")
     @GetMapping("/grade/{gradeName}")

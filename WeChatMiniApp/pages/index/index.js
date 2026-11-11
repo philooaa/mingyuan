@@ -145,7 +145,7 @@ function computeNextDate(item) {
 
   let pattern = item.classPattern
   if (!pattern) {
-    pattern = (item.periodName === '周六' || item.periodName === '周日') ? 'WEEKLY' : 'DAILY_5_1'
+    pattern = ['周一','周二','周三','周四','周五','周六','周日'].includes(item.periodName) ? 'WEEKLY' : 'DAILY_5_1'
   }
   let dates = []
   if (pattern === 'WEEKLY') {

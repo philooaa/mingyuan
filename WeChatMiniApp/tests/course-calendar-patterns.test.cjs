@@ -61,3 +61,15 @@ test('cancel and move adjustments still apply on new patterns', () => {
   assert.ok(!dates.includes('2026-01-02'))
   assert.ok(!dates.includes('2026-01-03'))
 })
+
+for (const [offset, weekday] of ['周一','周二','周三','周四','周五'].entries()) {
+  test(`weekly ${weekday} expands on the chosen weekday, including legacy courses`, () => {
+    const expected = [2 + offset, 9 + offset, 16 + offset, 23 + offset]
+      .map(day => `2026-03-${String(day).padStart(2, '0')}`)
+    for (const pattern of ['WEEKLY', null]) {
+      const { dates, reason } = calendar.expandCourse(course(pattern, '2026-03-02', '2026-03-29', weekday))
+      assert.equal(reason, '')
+      assert.deepEqual(dates, expected)
+    }
+  })
+}

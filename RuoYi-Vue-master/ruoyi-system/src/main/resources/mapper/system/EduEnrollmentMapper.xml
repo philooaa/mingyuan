@@ -96,6 +96,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="params.adminMode != null and params.adminMode != ''">and s.class_mode = #{params.adminMode}</if>
             <if test="params.adminYear != null">and s.course_year = #{params.adminYear}</if>
             <if test="params.adminTerm != null and params.adminTerm != ''">and s.term_name = #{params.adminTerm}</if>
+            <if test="params.adminCampus != null and params.adminCampus != ''">
+                and coalesce(nullif(trim(s.campus_name), ''), (select trim(campus_name) from edu_classroom where classroom_id=s.classroom_id)) = #{params.adminCampus}
+            </if>
+            <if test="params.adminCourseStatus != null and params.adminCourseStatus != ''">and s.status = #{params.adminCourseStatus}</if>
             <if test="params.adminPeriod != null and params.adminPeriod != ''">and s.period_name = #{params.adminPeriod}</if>
             <if test="params.adminTeacher != null and params.adminTeacher != ''">and (s.teacher_name like concat('%',#{params.adminTeacher},'%') or teacher.user_name like concat('%',#{params.adminTeacher},'%') or teacher.nick_name like concat('%',#{params.adminTeacher},'%'))</if>
             <if test="enrollmentCode != null  and enrollmentCode != ''"> and e.enrollment_code = #{enrollmentCode}</if>

@@ -13,10 +13,31 @@
         <span class="dim-label">归属：</span>
         <el-tag size="small">{{ form.termName || '—' }}</el-tag>
         <el-tag size="small" type="success">{{ form.periodName || '—' }}</el-tag>
-        <span class="dim-tip">学期 / 期次 跟随课表筛选条件，如需调整请在课表页切换</span>
+        <span class="dim-tip">学期跟随课表筛选条件；上课模式及星期或期次可在下方修改</span>
       </div>
 
       <el-row :gutter="16">
+        <el-col :span="12">
+          <el-form-item label="上课模式" prop="classPattern">
+            <el-select v-model="form.classPattern" @change="onClassPatternChange" :disabled="form.classMode === '2'" placeholder="请选择上课模式" style="width:100%">
+              <el-option label="每周一次" value="WEEKLY" />
+              <el-option label="连上无假期（每天上课）" value="DAILY" />
+              <el-option label="上5天休1天" value="DAILY_5_1" />
+              <el-option label="上6天休1天" value="DAILY_6_1" />
+              <el-option label="上5天休2天" value="DAILY_5_2" />
+              <el-option label="上4天休1天" value="DAILY_4_1" />
+              <el-option label="其他（暂不排课）" value="OTHER" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="12" v-if="form.classMode !== '2'">
+          <el-form-item :label="form.classPattern === 'WEEKLY' ? '上课星期' : '期次'" prop="periodName">
+            <el-select v-model="form.periodName" placeholder="请选择" style="width:100%">
+              <el-option v-for="item in formPeriodOptions" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </el-form-item>
+        </el-col>
+
         <!-- ★ 教室 / 时段：可编辑，保存后课表上的课程移动到新位置 -->
         <el-col :span="12">
           <el-form-item label="教室" prop="classroomId">
@@ -98,19 +119,7 @@
           </el-form-item>
         </el-col>
 
-        <el-col :span="12">
-          <el-form-item label="上课模式" prop="classPattern">
-            <el-select v-model="form.classPattern" placeholder="请选择上课模式" style="width:100%">
-              <el-option label="每周一次" value="WEEKLY" />
-              <el-option label="连上无假期（每天上课）" value="DAILY" />
-              <el-option label="上5天休1天" value="DAILY_5_1" />
-              <el-option label="上6天休1天" value="DAILY_6_1" />
-              <el-option label="上5天休2天" value="DAILY_5_2" />
-              <el-option label="上4天休1天" value="DAILY_4_1" />
-              <el-option label="其他（暂不排课）" value="OTHER" />
-            </el-select>
-          </el-form-item>
-        </el-col>
+
         <el-col :span="12">
           <el-form-item label="授课形式">
             <el-select v-model="form.classMode" :disabled="!form.scheduleId && dims.isTeacher && !dims.isAdmin" style="width:100%">
@@ -166,6 +175,7 @@
 <script>
 import { addTimetableSchedule, updateTimetableSchedule, getTimetableSchedule } from '@/api/system/timetable'
 import { recognizeAndFill } from '@/utils/course-name-recognition'
+import { classPeriodOptions, isWeekday } from '@/utils/class-period'
 import { updateAutomaticCourseName } from '@/utils/auto-course-name'
 
 export default {
@@ -183,6 +193,7 @@ export default {
       detailError: false,
       form: this.buildEmptyForm(),
       rules: {
+        periodName: [{ validator: (rule, value, callback) => value && (this.form.classMode === '2' || isWeekday(value) === (this.form.classPattern === 'WEEKLY')) ? callback() : callback(new Error(this.form.classPattern === 'WEEKLY' ? '请选择上课星期' : '请选择期次')), trigger: 'change' }],
         gradeName:    [{ required: true, message: '请选择年级', trigger: 'change' }],
         subjectName:  [{ required: true, message: '请选择科目', trigger: 'change' }],
         teacherId:    [{ required: true, message: '请选择/填写教师', trigger: 'change' }],
@@ -193,6 +204,7 @@ export default {
     }
   },
   computed: {
+    formPeriodOptions() { return classPeriodOptions(this.dims, this.form) },
     /** 时段下拉 = 字典时段 ∪ 当前值（兼容导入进来的非标准时段，如「周六 09:00-11:00」） */
     timeSlotOptions() {
       const dict = ((this.form.classMode === '2' ? this.dims.singleTimeSlots : this.dims.timeSlots) || []).map(t => t.value).filter(Boolean)
@@ -202,13 +214,26 @@ export default {
     }
   },
   watch: {
+    'form.startDate'() { this.syncSingleDay() },
     'form.classMode'(mode) {
+      this.syncSingleDay()
       if (mode === '2' && !this.timeSlotOptions.includes(this.form.timeSlot)) {
         this.form.timeSlot = ''; this.form.startTime = null; this.form.endTime = null
       }
     }
   },
   methods: {
+    onClassPatternChange() {
+      if (!this.formPeriodOptions.some(item => item.value === this.form.periodName)) this.form.periodName = ''
+      this.$nextTick(() => this.$refs.form && this.$refs.form.clearValidate('periodName'))
+    },
+    syncSingleDay() {
+      if (this.form.classMode !== '2') return
+      this.form.classPattern = 'WEEKLY'
+      const date = String(this.form.startDate || '').slice(0,10)
+      this.form.periodName = date ? ['周日','周一','周二','周三','周四','周五','周六'][new Date(date.replace(/-/g,'/')+' 12:00:00').getDay()] : ''
+      this.form.endDate = this.form.startDate
+    },
     autoCourseName() { updateAutomaticCourseName(this) },
     recognizeName() { return recognizeAndFill(this) },
     // 教师下拉标签：真名优先；真名与昵称不同时把昵称作为别名附在后面
@@ -261,7 +286,7 @@ export default {
       }
       this.form.mode = (this.preset && this.preset.mode) || 'add'
       if (this.form.mode === 'add') {
-        this.form.classPattern = ['周六', '周日'].includes(this.form.periodName) ? 'WEEKLY' : 'DAILY_5_1'
+        this.form.classPattern = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'].includes(this.form.periodName) ? 'WEEKLY' : 'DAILY_5_1'
       }
       this.syncClassroomMeta()
       if (this.form.mode === 'edit' && this.form.scheduleId) {
@@ -277,6 +302,7 @@ export default {
       try {
         const res = await getTimetableSchedule(id)
         Object.assign(this.form, res.data || {})
+        if (!this.form.classPattern) this.form.classPattern = isWeekday(this.form.periodName) ? 'WEEKLY' : 'DAILY_5_1'
         this.syncClassroomMeta()
       } catch (e) { this.detailError = true } finally { this.detailLoading = false }
     },

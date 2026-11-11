@@ -7,8 +7,9 @@ const subjects = ['语文', '数学', '英语', '政治', '历史', '地理', '�
 function render(name, extra = {}) {
   const sfc = compiler.parseComponent(fs.readFileSync(path.join(root, name, 'index.vue'), 'utf8'))
   const script = sfc.script.content.replace(/^import\s+['"][^'"]+['"];?\s*$/gm, '').replace(/^import\s+[\s\S]*?\sfrom\s+['"][^'"]+['"];?[ \t]*$/gm, '').replace('export default', 'definition =')
-  const context = { definition: null, passwordRule: {}, Treeselect: {}, TreePanel: {}, ExcelImportDialog: {}, UserViewDrawer: {}, ReferralRewards: {}, OneToOneManager: {}, money: v => v, label: v => v, statusType: () => '', clearInterval() {}, getToken: () => 'test-token', process: { env: {} } }
-  vm.runInNewContext(script, context)
+  const context = { definition: null, passwordRule: {}, Treeselect: {}, TreePanel: {}, ExcelImportDialog: {}, UserViewDrawer: {}, ReferralRewards: {}, OneToOneManager: {}, CourseLessonCountEditor: {}, money: v => v, label: v => v, statusType: () => '', clearInterval() {}, getToken: () => 'test-token', process: { env: {} } }
+  const periods = fs.readFileSync(path.join(__dirname, '../src/utils/class-period.js'), 'utf8').replace(/^export /gm, '')
+  vm.runInNewContext(periods + '\n' + script, context)
   const definition = context.definition
   const dictionary = { type: { edu_subject: subjects.map((label, i) => ({ label, value: 'subject-' + i })), edu_grade: [{ label: '五年级', value: 'g5' }], sys_normal_disable: [], sys_user_sex: [] } }
   const compiled = compiler.compileToFunctions(sfc.template.content)

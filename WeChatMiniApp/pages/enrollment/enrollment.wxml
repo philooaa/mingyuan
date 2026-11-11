@@ -8,7 +8,16 @@
     <view class="course-type-tab {{courseTypeIndex === index ? 'selected' : ''}}" wx:for="{{courseTypeOptions}}" wx:key="*this" data-index="{{index}}" bindtap="chooseCourseType">{{item === '班课' ? '班课报名' : '一对一预约'}}</view>
   </view>
 
-  <view class="booking-wallet" wx:if="{{courseTypeIndex === 1}}">
+  <view class="booking-method" wx:if="{{courseTypeIndex === 1}}">
+    <view class="booking-method-title">报名方式</view>
+    <view class="booking-method-options">
+      <view class="booking-method-option {{bookingMethod === 'C' ? 'selected' : ''}}" bindtap="chooseBookingMethod" data-method="C"><view class="booking-method-name">单次报名</view><view class="booking-method-tip">按本次课程付费</view></view>
+      <view class="booking-method-option {{bookingMethod === 'P' ? 'selected' : ''}}" bindtap="chooseBookingMethod" data-method="P"><view class="booking-method-name">课包报名</view><view class="booking-method-tip">使用孩子的课次余额</view></view>
+    </view>
+    <view class="booking-method-note" wx:if="{{bookingMethod === 'C'}}">无需先购买课包，选择老师和日期后提交本次报名。</view>
+  </view>
+
+  <view class="booking-wallet" wx:if="{{courseTypeIndex === 1 && bookingMethod === 'P'}}">
     <view class="wallet-heading"><view><view class="wallet-eyebrow">我的一对一课包</view><view class="wallet-child">{{creditAccount ? creditAccount.studentName + ' ' + creditAccount.gradeName : '孩子专属课次账户'}}</view></view><view class="wallet-mark">1 : 1</view></view>
     <view class="wallet-state" wx:if="{{accountsLoading}}">正在同步课次余额…</view>
     <view class="wallet-state wallet-error" wx:elif="{{accountsError}}" bindtap="loadLessonAccounts">{{accountsError}} · 点击重试</view>
@@ -50,7 +59,7 @@
   <view class="section">
     <view class="section-title">{{courseTypeIndex === 1 ? '可报名一对一课程' : '可报名班课'}}</view>
     <view class="meta">{{sortHint}}</view>
-    <view class="meta" wx:if="{{courseTypeIndex === 1}}">先选择课程，再展开选择日期；每次报名一节2小时课程，由老师确认。</view>
+    <view class="meta" wx:if="{{courseTypeIndex === 1}}">{{bookingMethod === 'P' ? '课包报名' : '单次报名'}}：先选课程，再选日期；每次报名一节2小时课程，由老师确认。</view>
     <view class="empty" wx:if="{{showScheduleEmpty}}">{{courseTypeIndex === 1 ? '暂无符合条件的一对一课程' : '暂无符合条件的班课'}}</view>
     <view wx:for="{{courseGroups}}" wx:for-item="group" wx:key="key" class="course-group">
       <view class="course-group-title">{{group.label}} · {{group.courses.length}} {{courseTypeIndex === 1 ? '门课程' : '个班次'}}</view>
@@ -161,8 +170,18 @@
 
   <view class="order-done-mask" wx:if="{{orderDoneOpen}}" catchtap="closeOrderDone">
     <view class="order-done" catchtap="noop">
-      <view class="order-done-title">订单已提交</view>
-      <view class="order-done-text">扫码联系课程服务老师交费或48小时内课程服务老师联系您缴费。</view>
+      <block wx:if="{{orderDoneKind === 'SINGLE_CASH'}}">
+        <view class="order-done-title">一对一报名已提交</view>
+        <view class="order-done-text">请等待老师确认本次课程。确认后可扫码联系课程服务老师办理缴费。</view>
+      </block>
+      <block wx:elif="{{orderDoneKind === 'SINGLE_PACKAGE'}}">
+        <view class="order-done-title">一对一课包报名已提交</view>
+        <view class="order-done-text">请等待老师确认本次课程。课次按现有课包规则处理，无需为本次预约重复缴费。如有疑问，可扫码联系课程服务老师。</view>
+      </block>
+      <block wx:else>
+        <view class="order-done-title">订单已提交</view>
+        <view class="order-done-text">扫码联系课程服务老师交费或48小时内课程服务老师联系您缴费。</view>
+      </block>
       <image class="order-done-qr" src="{{advisorQrImage}}" mode="widthFix" show-menu-by-longpress="{{true}}" bindtap="previewAdvisorQr" />
       <view class="order-done-wechat-row">
         <text class="order-done-wechat" selectable="{{true}}">课程服务老师微信号：{{advisorWechat}}</text>
