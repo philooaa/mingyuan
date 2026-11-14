@@ -116,7 +116,7 @@ public class AttendanceLessonRosterMysqlTest {
         db.jdbc().update("INSERT INTO sys_dict_data VALUES ('edu_grade','一年级','1','0')");
         db.jdbc().execute("CREATE TABLE edu_student_lesson_account(account_id BIGINT PRIMARY KEY AUTO_INCREMENT,student_id BIGINT UNIQUE,parent_id BIGINT,student_name VARCHAR(30),grade_name VARCHAR(20),request_key VARCHAR(100),create_by VARCHAR(64),create_time DATETIME)");
         db.jdbc().update("UPDATE sys_user SET phonenumber='13800000000' WHERE user_id=30");
-        db.jdbc().update("INSERT INTO edu_course_schedule(schedule_id,course_class_name,course_year,term_name,period_name,class_pattern,start_date,end_date,teacher_id,class_mode) VALUES(3,'补录测试',?,'秋季','周一','DAILY',?,?,10,'1')", date.getYear(), date.toString(), date.plusDays(5).toString());
+        db.jdbc().update("INSERT INTO edu_course_schedule(schedule_id,course_class_name,course_year,term_name,period_name,class_pattern,start_date,end_date,teacher_id,class_mode) VALUES(3,'补录测试',?,'秋季','周一','DAILY',?,?,10,'1')", today.minusDays(10).getYear(), today.minusDays(10).toString(), today.minusDays(5).toString());
         principal(20,"education");
         var offlineLessons = tx(() -> service.lessons(3));
         long offlineFirst = id(offlineLessons.get(0),"lessonId"), offlineThird = id(offlineLessons.get(2),"lessonId");
@@ -135,6 +135,13 @@ public class AttendanceLessonRosterMysqlTest {
         });
         assertEquals(30L,id(db.one("SELECT parent_id FROM edu_student WHERE student_id=?",studentId),"parentId"));
         assertEquals(30L,id(db.one("SELECT parent_id FROM edu_student_lesson_account WHERE student_id=?",studentId),"parentId"));
+        tx(() -> {
+            service.remove(tx(() -> service.roster(3, offlineThird)).stream()
+                    .filter(row -> id(row,"studentId")==studentId).map(row -> id(row,"membershipId"))
+                    .findFirst().orElseThrow(), new AttendanceLessonRosterService.RemovalRequest(3L,3,"修正历史名单"));
+            return null;
+        });
+        assertTrue(tx(() -> service.roster(3, offlineThird)).stream().noneMatch(row -> id(row,"studentId")==studentId));
         assertEquals(financeBefore, db.rows("SELECT * FROM edu_enrollment ORDER BY enrollment_id"));
         System.out.println("PASS: stable lesson identity, effective insertion/removal, locked snapshot and teacher, same-name IDs, unpaid roster-only membership, immutable finance and role checks");
     }

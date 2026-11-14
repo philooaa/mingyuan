@@ -1,3 +1,4 @@
+const {compareGrades}=require('../../utils/grade-order')
 const {request,base,range}=require('../../utils/attendance-workflow')
 const courseFilters=[{field:'teacherName',label:'全部老师'},{field:'gradeName',label:'全部年级'},{field:'subjectName',label:'全部科目'}]
 Page({
@@ -5,7 +6,11 @@ Page({
  onPullDownRefresh(){return this.loadCourses().finally(()=>wx.stopPullDownRefresh())},
  onShow(){this._active=true;this._token=wx.getStorageSync('token');this.loadCourses()},onHide(){this._active=false},onUnload(){this._active=false},current(){return this._active&&this._token===wx.getStorageSync('token')},
  async run(action){if(this.data.busy)return;this.setData({busy:true,error:''});try{await action()}catch(e){if(this.current())this.setData({error:e.message||'操作失败'})}finally{if(this.current())this.setData({busy:false})}},
- loadCourses(){return this.run(async()=>{const r=await request({url:base+'/courses'});if(!this.current())return;const courses=(r.data||[]).map(c=>({...c,label:[c.courseName,this.courseTerm(c)].filter(Boolean).join(' · ')}));this.setData({allCourses:courses,courseFilters:courseFilters.map(filter=>({...filter,index:0,options:[filter.label,...new Set(courses.map(course=>course[filter.field]).filter(Boolean))]})),terms:['全部年份 / 学期',...new Set(courses.map(c=>this.courseTerm(c)).filter(Boolean))],termIndex:0,courseQuery:''});this.filterCourses()})},
+ loadCourses(){return this.run(async()=>{const r=await request({url:base+'/courses'});if(!this.current())return;const courses=(r.data||[]).map(c=>({...c,label:[c.courseName,this.courseTerm(c)].filter(Boolean).join(' · ')}));this.setData({allCourses:courses,courseFilters:courseFilters.map(filter=>{
+  const options=[...new Set(courses.map(course=>course[filter.field]).filter(Boolean))]
+  if(filter.field==='gradeName')options.sort(compareGrades)
+  return {...filter,index:0,options:[filter.label,...options]}
+ }),terms:['全部年份 / 学期',...new Set(courses.map(c=>this.courseTerm(c)).filter(Boolean))],termIndex:0,courseQuery:''});this.filterCourses()})},
  courseTerm(course){return [course.year,course.termName].filter(Boolean).join(' ')},
  filterCourses(){
   const {allCourses,termIndex,terms,courseQuery,courseFilters}=this.data

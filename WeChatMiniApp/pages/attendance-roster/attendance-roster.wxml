@@ -38,6 +38,9 @@
     <picker range="{{lessons}}" range-key="label" value="{{lessonIndex}}" bindchange="pickLesson" disabled="{{busy || !lessons.length}}">
       <view class="field picker">{{lessons[lessonIndex].label || '请选择课次'}} <text>▾</text></view>
     </picker>
+    <view class="subtitle" wx:if="{{lessons[lessonIndex].classDate}}">
+      上课时间 {{lessons[lessonIndex].startTime && lessons[lessonIndex].endTime ? lessons[lessonIndex].startTime + '–' + lessons[lessonIndex].endTime : '待配置'}}
+    </view>
     <input wx:if="{{lessons[lessonIndex].classDate && lessons[lessonIndex].locked != 1 && lessons[lessonIndex].cancelled != 1}}"
       class="field" placeholder="输入学生姓名" maxlength="30" value="{{offlineName}}" bindinput="inputOfflineName" disabled="{{busy}}"/>
     <button class="primary" bindtap="addOffline" disabled="{{busy || !offlineName || !lessons[lessonIndex].classDate || lessons[lessonIndex].locked == 1 || lessons[lessonIndex].cancelled == 1}}">补录学员</button>

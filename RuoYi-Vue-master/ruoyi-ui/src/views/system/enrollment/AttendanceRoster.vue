@@ -52,6 +52,10 @@
           </el-select>
         </el-form-item>
         <el-button type="primary" :disabled="busy || !canAddOffline" @click="addOffline">补录学员</el-button>
+        <div v-if="selectedLesson && selectedLesson.classDate" class="roster-class-time">
+          上课时间 {{ selectedLesson.startTime && selectedLesson.endTime
+            ? selectedLesson.startTime + '–' + selectedLesson.endTime : '待配置' }}
+        </div>
       </el-form>
       <el-table :data="rows">
         <el-table-column label="学生" prop="studentName"/>
@@ -106,7 +110,9 @@
 import {rosterCourses,rosterLessons,rosterStudents,rosterList,rosterAdd,rosterRemove,rosterAddOffline,rosterBindParent,rosterPendingParents} from '@/api/system/attendanceRoster'
 import {getToken} from '@/utils/auth'
 export default {
-  name:'AttendanceRoster',data(){return {visible:false,pendingVisible:false,pendingRows:[],pendingQuery:'',removalVisible:false,removalRow:null,removalLesson:null,removalReason:'',courseQuery:'',termFilter:'',courseFilterValues:{teacherName:'',gradeName:'',subjectName:''},busy:false,error:'',courses:[],lessons:[],students:[],rows:[],lessonId:null,form:{scheduleId:'',studentId:'',enrollmentId:'',startLesson:1,endLesson:'',source:'OFFLINE',paymentStatus:'UNPAID',reason:''}}},
+  name:'AttendanceRoster',
+  dicts:['edu_grade'],
+  data(){return {visible:false,pendingVisible:false,pendingRows:[],pendingQuery:'',removalVisible:false,removalRow:null,removalLesson:null,removalReason:'',courseQuery:'',termFilter:'',courseFilterValues:{teacherName:'',gradeName:'',subjectName:''},busy:false,error:'',courses:[],lessons:[],students:[],rows:[],lessonId:null,form:{scheduleId:'',studentId:'',enrollmentId:'',startLesson:1,endLesson:'',source:'OFFLINE',paymentStatus:'UNPAID',reason:''}}},
   computed:{
     filteredPending(){
       const query=this.pendingQuery.toLowerCase()
@@ -115,9 +121,8 @@ export default {
     },
     removalLessons(){
       if(!this.removalRow)return []
-      const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date())
       const lastLocked=this.lessons.reduce((last,lesson)=>Number(lesson.locked)?Math.max(last,Number(lesson.lessonNo)):last,0)
-      return this.lessons.filter(lesson=>lesson.classDate>=today && !Number(lesson.cancelled)
+      return this.lessons.filter(lesson=>lesson.classDate && !Number(lesson.cancelled)
         && Number(lesson.lessonNo)>lastLocked && Number(lesson.lessonNo)>=Number(this.removalRow.startLesson||1)
         && (this.removalRow.endLesson==null||Number(lesson.lessonNo)<=Number(this.removalRow.endLesson)))
     },
@@ -127,7 +132,15 @@ export default {
         {field:'teacherName',label:'老师姓名'},
         {field:'gradeName',label:'年级'},
         {field:'subjectName',label:'科目'}
-      ].map(filter=>({...filter,options:[...new Set(this.courses.map(course=>course[filter.field]).filter(Boolean))]}))
+      ].map(filter=>{
+        const options=[...new Set(this.courses.map(course=>course[filter.field]).filter(Boolean))]
+        if(filter.field==='gradeName'){
+          const gradeRanks=new Map((this.dict.type.edu_grade||[]).map(({label},index)=>[label,index]))
+          options.sort((a,b)=>(gradeRanks.get(a) ?? Infinity)-(gradeRanks.get(b) ?? Infinity)
+            || a.localeCompare(b,'zh-CN'))
+        }
+        return {...filter,options}
+      })
     },
     filteredCourses(){
       const query=this.courseQuery.toLowerCase()
@@ -238,6 +251,7 @@ export default {
 
 <style scoped>
 .pending-detail { color: #65758b; font-size: 12px; }
+.roster-class-time { padding-bottom: 12px; color: #65758b; font-size: 14px; }
 .roster-filters { padding: 16px 16px 0; background: #f5f7fa; border-radius: 6px; }
 .el-table { margin: 12px 0 20px; }
 </style>

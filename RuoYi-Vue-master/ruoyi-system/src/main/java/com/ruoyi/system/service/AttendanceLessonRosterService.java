@@ -189,7 +189,7 @@ public class AttendanceLessonRosterService {
     private Map<String,Object> numbered(long schedule,int no) { return db.one("SELECT * FROM edu_attendance_lesson WHERE schedule_id=? AND lesson_no=?",schedule,no); }
     private void mutableFrom(long schedule,int no) {
         var l=numbered(schedule,no);require(!yes(l.get("cancelled")),"请选择有效课次");
-        LocalDate day=ScheduleCalendar.date(l.get("classDate"));require(day!=null&&!day.isBefore(LocalDate.now(ZoneId.of("Asia/Shanghai"))),"名单变更只能从当前或未来课次生效");
+        require(ScheduleCalendar.date(l.get("classDate"))!=null,"请选择有效课次");
         require(db.rows("SELECT lesson_id FROM edu_attendance_lesson l WHERE schedule_id=? AND lesson_no>=? AND (locked=1 OR EXISTS(SELECT 1 FROM edu_class_sign_in r WHERE r.schedule_id=l.schedule_id AND r.class_date=l.class_date AND r.del_flag='0'))",schedule,no).isEmpty(),"生效范围包含已提交课次，请选择更后的讲次");
     }
     @Transactional public long add(MembershipRequest input) {
