@@ -1,1 +1,79 @@
-<view class="page"><view class="title">按讲次维护课程学员</view><view>新增学生请先建立档案；加入名单不会产生收费记录。已锁定课次保留历史快照。</view><view class="error">{{error}}</view><picker range="{{courses}}" range-key="courseName" value="{{courseIndex}}" bindchange="pickCourse" disabled="{{busy}}"><view class="card">{{courses[courseIndex].courseName || '请选择课程'}} · {{courses[courseIndex].year}} {{courses[courseIndex].termName}} ›</view></picker><picker range="{{lessons}}" range-key="label" value="{{lessonIndex}}" bindchange="pickLesson" disabled="{{busy}}"><view class="card">{{lessons[lessonIndex].label || '无有效课次，请先完善排课'}} ›</view></picker><view class="card" wx:for="{{rows}}" wx:key="studentId"><view>{{item.studentName}} · 档案 {{item.studentId}} · 报名 {{item.enrollmentId || '无'}}</view><view>第 {{item.startLesson || 1}} 至 {{item.endLesson || '末'}} 讲 · {{item.paymentStatus}}</view><button size="mini" data-index="{{index}}" bindtap="remove" disabled="{{busy}}">按生效讲次移出</button></view><view class="title">关联学生档案</view><input placeholder="搜索姓名或手机号" data-field="keyword" bindinput="input" value="{{keyword}}"/><button bindtap="search" disabled="{{busy}}">搜索学生</button><picker range="{{students}}" range-key="label" value="{{studentIndex}}" bindchange="pickStudent"><view class="card">{{students[studentIndex].label || '选择学生档案'}} ›</view></picker><input placeholder="关联报名编号（正常报名必填）" data-field="enrollmentId" bindinput="input" value="{{form.enrollmentId}}"/><input type="number" placeholder="开始讲次" data-field="startLesson" bindinput="input" value="{{form.startLesson}}"/><view wx:for="{{lessons}}" wx:key="lessonId" wx:if="{{item.lessonNo == form.startLesson}}">起始日期核对：{{item.classDate}}</view><input type="number" placeholder="结束讲次（可空）" data-field="endLesson" bindinput="input" value="{{form.endLesson}}"/><picker range="{{sources}}" value="{{sourceIndex}}" bindchange="pickSource"><view class="card">来源：{{sources[sourceIndex]}}</view></picker><picker range="{{payments}}" value="{{paymentIndex}}" bindchange="pickPayment"><view class="card">收费：{{payments[paymentIndex]}}</view></picker><input placeholder="增减名单原因（移出也必填）" data-field="reason" bindinput="input" value="{{form.reason}}"/><button bindtap="add" loading="{{busy}}" disabled="{{busy || !lessons.length}}">保存学员生效范围</button></view>
+<view class="page">
+  <view class="title">{{showPending ? '待绑定学员' : '补录学员'}}</view>
+  <button class="secondary pending-entry" bindtap="togglePending" disabled="{{busy}}">{{showPending ? '返回补录学员' : '查看待绑定学员'}}</button>
+  <view class="error" wx:if="{{error}}">{{error}}</view>
+  <block wx:if="{{showPending}}">
+    <view class="panel">
+      <input class="field" placeholder="搜索学生姓名或课程" value="{{pendingQuery}}" bindinput="searchPending"/>
+    </view>
+    <view class="panel empty" wx:if="{{!filteredPending.length}}">{{busy ? '加载中' : '暂无匹配的待绑定学员'}}</view>
+    <view class="panel student" wx:for="{{filteredPending}}" wx:key="studentId">
+      <view class="student-name">{{item.studentName}}</view>
+      <view wx:for="{{item.courses}}" wx:for-item="course" wx:key="scheduleId" class="pending-course">
+        <view>{{course.courseName}}</view>
+        <view class="subtitle">{{course.courseYear}} {{course.termName}} {{course.periodName}} · {{course.teacherName}} · 第{{course.startLesson}}讲起</view>
+        <view class="subtitle" wx:if="{{course.startTime && course.endTime}}">{{course.startTime}}–{{course.endTime}}</view>
+      </view>
+      <view class="student-actions">
+        <button class="secondary" size="mini" data-index="{{index}}" bindtap="bindParent" disabled="{{busy}}">绑定家长</button>
+      </view>
+    </view>
+  </block>
+  <block wx:else>
+  <view class="subtitle">选择班级和开始点名的课次</view>
+  <view class="panel filters">
+    <input class="field" placeholder="搜索课程名称、年份或学期" value="{{courseQuery}}" bindinput="searchCourse" disabled="{{busy}}"/>
+    <picker range="{{terms}}" value="{{termIndex}}" bindchange="pickTerm" disabled="{{busy}}">
+      <view class="field picker">{{terms[termIndex]}} <text>▾</text></view>
+    </picker>
+    <view class="course-filter-grid">
+      <picker wx:for="{{courseFilters}}" wx:key="field" range="{{item.options}}" value="{{item.index}}"
+        data-index="{{index}}" bindchange="pickCourseFilter" disabled="{{busy}}">
+        <view class="field picker"><text class="filter-value">{{item.options[item.index]}}</text><text>▾</text></view>
+      </picker>
+    </view>
+    <picker range="{{courses}}" range-key="label" value="{{courseIndex < 0 ? 0 : courseIndex}}" bindchange="pickCourse" disabled="{{busy || !courses.length}}">
+      <view class="field picker">{{courses[courseIndex].label || (courses.length ? '请选择班级' : '没有匹配的班级')}} <text>▾</text></view>
+    </picker>
+    <picker range="{{lessons}}" range-key="label" value="{{lessonIndex}}" bindchange="pickLesson" disabled="{{busy || !lessons.length}}">
+      <view class="field picker">{{lessons[lessonIndex].label || '请选择课次'}} <text>▾</text></view>
+    </picker>
+    <input wx:if="{{lessons[lessonIndex].classDate && lessons[lessonIndex].locked != 1 && lessons[lessonIndex].cancelled != 1}}"
+      class="field" placeholder="输入学生姓名" maxlength="30" value="{{offlineName}}" bindinput="inputOfflineName" disabled="{{busy}}"/>
+    <button class="primary" bindtap="addOffline" disabled="{{busy || !offlineName || !lessons[lessonIndex].classDate || lessons[lessonIndex].locked == 1 || lessons[lessonIndex].cancelled == 1}}">补录学员</button>
+  </view>
+  <view class="section-title" wx:if="{{lessons.length}}">课次名单（{{rows.length}} 人）</view>
+  <view class="panel empty" wx:if="{{lessons.length && !rows.length && !busy}}">该课次暂无学员</view>
+  <view class="panel student" wx:for="{{rows}}" wx:key="studentId">
+    <view class="student-name">{{item.studentName}} <text class="pending" wx:if="{{item.paymentStatus === 'UNKNOWN' && !item.parentId}}">待绑定</text></view>
+    <view class="subtitle">档案 {{item.studentId}} · 第 {{item.startLesson || 1}} 至 {{item.endLesson || '末'}} 讲</view>
+    <view class="student-actions">
+      <button wx:if="{{item.membershipId && item.source === 'OFFLINE' && !item.parentId}}" class="secondary" size="mini"
+        data-index="{{index}}" bindtap="bindParent" disabled="{{busy}}">绑定家长</button>
+      <button class="secondary" size="mini" data-index="{{index}}" bindtap="remove" disabled="{{busy}}">按讲次移出</button>
+    </view>
+  </view>
+  <view class="panel existing" wx:if="{{lessons.length}}">
+    <button class="secondary" bindtap="toggleExisting">{{showExisting ? '收起已有档案' : '关联已有学生档案'}}</button>
+    <view wx:if="{{showExisting}}" class="existing-fields">
+      <input placeholder="搜索姓名或手机号" data-field="keyword" bindinput="input" value="{{keyword}}"/>
+      <button bindtap="search" disabled="{{busy}}" class="secondary">搜索学生</button>
+      <picker range="{{students}}" range-key="label" value="{{studentIndex}}" bindchange="pickStudent">
+      <view class="card">{{students[studentIndex].label || '选择学生档案'}} ›</view>
+      </picker>
+      <input placeholder="关联报名编号（正常报名必填）" data-field="enrollmentId" bindinput="input" value="{{form.enrollmentId}}"/>
+      <input type="number" placeholder="开始讲次" data-field="startLesson" bindinput="input" value="{{form.startLesson}}"/>
+      <view wx:for="{{lessons}}" wx:key="lessonId" wx:if="{{item.lessonNo == form.startLesson}}">起始日期核对：{{item.classDate}}</view>
+      <input type="number" placeholder="结束讲次（可空）" data-field="endLesson" bindinput="input" value="{{form.endLesson}}"/>
+      <picker range="{{sources}}" value="{{sourceIndex}}" bindchange="pickSource">
+      <view class="card">来源：{{sources[sourceIndex]}}</view>
+      </picker>
+      <picker range="{{payments}}" value="{{paymentIndex}}" bindchange="pickPayment">
+      <view class="card">收费：{{payments[paymentIndex]}}</view>
+      </picker>
+      <input placeholder="增减名单原因（移出也必填）" data-field="reason" bindinput="input" value="{{form.reason}}"/>
+      <button bindtap="add" loading="{{busy}}" disabled="{{busy || !lessons.length}}" class="primary">保存学员生效范围</button>
+    </view>
+  </view>
+  </block>
+</view>

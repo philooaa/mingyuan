@@ -1,0 +1,1 @@
+ALTER TABLE edu_student MODIFY COLUMN parent_id BIGINT NULL;

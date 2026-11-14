@@ -16,6 +16,23 @@ public class MiniAppAttendanceRosterController extends BaseController {
     @GetMapping("/miniapp/staff/attendance/summary") public AjaxResult summary(@RequestParam long scheduleId,@RequestParam(required=false) String from,@RequestParam(required=false) String to){return success(roster.summary(scheduleId,from,to));}
     @GetMapping("/miniapp/staff/attendance/roster") public AjaxResult roster(@RequestParam long scheduleId,@RequestParam long lessonId){return success(roster.roster(scheduleId,lessonId));}
     @PostMapping("/miniapp/staff/attendance/roster") public AjaxResult add(@RequestBody AttendanceLessonRosterService.MembershipRequest input){return success(roster.add(input));}
+    @PostMapping("/miniapp/staff/attendance/roster/offline")
+    public AjaxResult addOffline(@RequestBody AttendanceLessonRosterService.OfflineStudentRequest input) {
+        return success(roster.addOfflineStudent(input));
+    }
+
+    @GetMapping("/miniapp/staff/attendance/students/pending-parent")
+    public AjaxResult pendingParentBindings() {
+        return success(roster.pendingParentBindings());
+    }
+
+    @PutMapping("/miniapp/staff/attendance/students/{studentId}/parent")
+    public AjaxResult bindParent(@PathVariable long studentId,
+                               @RequestBody AttendanceLessonRosterService.ParentBindingRequest input) {
+        roster.bindOfflineStudent(studentId, input);
+        return success();
+    }
+
     @PutMapping("/miniapp/staff/attendance/roster/{id}") public AjaxResult remove(@PathVariable long id,@RequestBody AttendanceLessonRosterService.RemovalRequest input){roster.remove(id,input);return success();}
     @PutMapping("/miniapp/staff/attendance/roster/enrollment/{id}") public AjaxResult removeEnrollment(@PathVariable long id,@RequestBody AttendanceLessonRosterService.RemovalRequest input){roster.removeEnrollment(id,input);return success();}
     @GetMapping("/miniapp/attendance/todos") public AjaxResult todos(@RequestParam String role){return success(roster.todos(role));}

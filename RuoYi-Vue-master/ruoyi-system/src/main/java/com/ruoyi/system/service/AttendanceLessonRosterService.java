@@ -32,14 +32,14 @@ public class AttendanceLessonRosterService {
     private Map<String,Object> course(long schedule) { return db.one("SELECT * FROM edu_course_schedule WHERE schedule_id=? AND del_flag='0'",schedule); }
     public List<Map<String,Object>> courses(String keyword) {
         staff();String like="%"+text(keyword)+"%";
-        return db.rows("SELECT schedule_id,course_class_name course_name,course_year year,term_name FROM edu_course_schedule WHERE del_flag='0' AND COALESCE(class_mode,'1')<>'2' AND course_class_name LIKE ? ORDER BY course_year DESC,schedule_id DESC",like);
+        return db.rows("SELECT c.schedule_id,c.course_class_name course_name,c.course_year year,c.term_name,c.grade_name,c.subject_name,COALESCE(NULLIF(TRIM(u.nick_name),''),u.user_name) teacher_name FROM edu_course_schedule c LEFT JOIN sys_user u ON u.user_id=c.teacher_id WHERE c.del_flag='0' AND COALESCE(c.class_mode,'1')<>'2' AND c.course_class_name LIKE ? ORDER BY c.course_year DESC,c.schedule_id DESC",like);
     }
     public List<Map<String,Object>> students(String keyword) {
         staff();
         String key=text(keyword).trim();require(key.length()<=100,"搜索内容过长");
         // A bounded, minimal picker: no account, credit or payment data.
         String like="%"+key+"%";
-        return db.rows("SELECT st.student_id,st.student_name,u.phonenumber contact_phone FROM edu_student st JOIN sys_user u ON u.user_id=st.parent_id WHERE st.del_flag='0' AND u.del_flag='0' AND (st.student_name LIKE ? OR u.phonenumber LIKE ?) ORDER BY st.student_id DESC LIMIT 50",like,like);
+        return db.rows("SELECT st.student_id,st.student_name,st.parent_id,u.phonenumber contact_phone FROM edu_student st LEFT JOIN sys_user u ON u.user_id=st.parent_id WHERE st.del_flag='0' AND (st.parent_id IS NULL OR u.del_flag='0') AND (st.student_name LIKE ? OR u.phonenumber LIKE ?) ORDER BY st.student_id DESC LIMIT 50",like,like);
     }
     /** Called inside a transaction; locking the course serializes materialization and roster edits. */
     private List<Map<String,Object>> sync(long schedule) {
@@ -95,7 +95,7 @@ public class AttendanceLessonRosterService {
         // Legacy registrations without an explicit range retain their original eligibility.
         var legacy=db.rows("SELECT e.enrollment_id,e.student_id,e.student_name,e.contact_phone,1 start_lesson,NULL end_lesson,'ENROLLED' source,'ENROLLMENT' payment_status,NULL membership_id FROM edu_enrollment e WHERE e.schedule_id=? AND e.del_flag='0' AND e.enrollment_status IN ('0','1','待确认','已确认','报名成功') AND (e.class_date IS NULL OR e.class_date=?) AND NOT EXISTS(SELECT 1 FROM edu_attendance_membership m WHERE m.schedule_id=e.schedule_id AND (m.enrollment_id=e.enrollment_id OR (e.student_id IS NOT NULL AND m.student_id=e.student_id))) ORDER BY e.enrollment_id",schedule,lesson.get("classDate"));
         var result=new ArrayList<Map<String,Object>>(legacy);
-        result.addAll(db.rows("SELECT m.membership_id,m.student_id,m.enrollment_id,st.student_name,u.phonenumber contact_phone,m.start_lesson,m.end_lesson,m.source,m.payment_status FROM edu_attendance_membership m JOIN edu_student st ON st.student_id=m.student_id LEFT JOIN sys_user u ON u.user_id=st.parent_id WHERE m.schedule_id=? AND m.start_lesson<=? AND (m.end_lesson IS NULL OR m.end_lesson>=?) ORDER BY m.membership_id",schedule,no,no));
+        result.addAll(db.rows("SELECT m.membership_id,m.student_id,m.enrollment_id,st.student_name,st.parent_id,u.phonenumber contact_phone,m.start_lesson,m.end_lesson,m.source,m.payment_status FROM edu_attendance_membership m JOIN edu_student st ON st.student_id=m.student_id LEFT JOIN sys_user u ON u.user_id=st.parent_id WHERE m.schedule_id=? AND m.start_lesson<=? AND (m.end_lesson IS NULL OR m.end_lesson>=?) ORDER BY m.membership_id",schedule,no,no));
         return result;
     }
     @Transactional public List<Map<String,Object>> teacherRoster(Long schedule,String date) {
@@ -103,6 +103,87 @@ public class AttendanceLessonRosterService {
         return rosterFor(lesson);
     }
     public record MembershipRequest(Long scheduleId,Long studentId,Long enrollmentId,Integer startLesson,Integer endLesson,String source,String paymentStatus,String reason) {}
+    public List<Map<String,Object>> pendingParentBindings() {
+        staff();
+        var rows = db.rows("SELECT st.student_id,st.student_name,m.schedule_id,m.course_year,m.term_name,"
+                + "m.start_lesson,m.end_lesson,c.course_class_name course_name,c.period_name,"
+                + "TIME_FORMAT(c.start_time,'%H:%i') start_time,TIME_FORMAT(c.end_time,'%H:%i') end_time,"
+                + "COALESCE(NULLIF(TRIM(u.nick_name),''),u.user_name) teacher_name "
+                + "FROM edu_student st JOIN edu_attendance_membership m ON m.student_id=st.student_id "
+                + "JOIN edu_course_schedule c ON c.schedule_id=m.schedule_id "
+                + "LEFT JOIN sys_user u ON u.user_id=c.teacher_id "
+                + "WHERE st.parent_id IS NULL AND st.del_flag='0' AND m.source='OFFLINE' "
+                + "AND (m.end_lesson IS NULL OR m.end_lesson>=m.start_lesson) "
+                + "ORDER BY st.student_id DESC,m.membership_id");
+        var students = new LinkedHashMap<Object,Map<String,Object>>();
+        var courses = new LinkedHashMap<Object,List<Map<String,Object>>>();
+        for (var row : rows) {
+            Object studentId = row.get("studentId");
+            var studentCourses = courses.computeIfAbsent(studentId, key -> new ArrayList<>());
+            students.putIfAbsent(studentId, Map.of("studentId",studentId,
+                    "studentName",row.get("studentName"),"courses",studentCourses));
+            row.remove("studentId");
+            row.remove("studentName");
+            studentCourses.add(row);
+        }
+        return new ArrayList<>(students.values());
+    }
+
+    public record OfflineStudentRequest(Long scheduleId, String studentName, Integer startLesson) {}
+    public record ParentBindingRequest(String phone) {}
+
+    @Transactional
+    public Map<String, Long> addOfflineStudent(OfflineStudentRequest input) {
+        staff();
+        require(input != null && input.scheduleId() != null && input.startLesson() != null,
+                "请选择课程及起始讲次");
+        String name = text(input.studentName()).strip();
+        require(!name.isEmpty() && name.length() <= 30, "请输入30字以内的学生姓名");
+        long schedule = input.scheduleId();
+        db.one("SELECT schedule_id FROM edu_course_schedule WHERE schedule_id=? AND del_flag='0' AND COALESCE(class_mode,'1')<>'2' FOR UPDATE", schedule);
+        require(db.rows("SELECT m.membership_id FROM edu_attendance_membership m JOIN edu_student st "
+                + "ON st.student_id=m.student_id WHERE m.schedule_id=? AND st.student_name=?", schedule, name).isEmpty()
+                && db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND student_name=? "
+                + "AND del_flag='0' AND enrollment_status IN ('0','1','待确认','已确认','报名成功')", schedule, name).isEmpty(),
+                "本班已有同名学员，请先核对名单和学生档案");
+        long student = db.insert("edu_student", Map.of("student_name", name, "create_by", SecurityUtils.getUsername()));
+        long membership = add(new MembershipRequest(schedule, student, null, input.startLesson(), null,
+                "OFFLINE", "UNKNOWN", "补录线下在读学员"));
+        return Map.of("studentId", student, "membershipId", membership);
+    }
+
+    @Transactional
+    public void bindOfflineStudent(long studentId, ParentBindingRequest input) {
+        staff();
+        String phone = input == null ? "" : text(input.phone()).strip();
+        require(phone.matches("1[3-9][0-9]{9}"), "请输入家长已注册的11位手机号");
+        var student = db.one("SELECT student_id,parent_id,student_name FROM edu_student WHERE student_id=? "
+                + "AND del_flag='0' FOR UPDATE", studentId);
+        require(student.get("parentId") == null, "该学员已有绑定账号");
+        var parents = db.rows("SELECT u.user_id FROM sys_user u WHERE u.phonenumber=? AND u.status='0' "
+                + "AND u.del_flag='0' AND EXISTS (SELECT 1 FROM sys_user_role ur JOIN sys_role r "
+                + "ON r.role_id=ur.role_id WHERE ur.user_id=u.user_id AND r.role_key='parent' "
+                + "AND r.status='0' AND r.del_flag='0') FOR UPDATE", phone);
+        require(parents.size() == 1, "手机号须对应唯一可用的家长账号");
+        Object parent = parents.get(0).get("userId");
+        require(db.rows("SELECT student_id FROM edu_student WHERE parent_id=? AND student_name="
+                + "(SELECT student_name FROM edu_student WHERE student_id=?) AND del_flag='0'",
+                parent, studentId).isEmpty(), "该家长已有同名孩子档案，请先核对");
+        var membership = db.one("SELECT c.grade_name FROM edu_attendance_membership m "
+                + "JOIN edu_course_schedule c ON c.schedule_id=m.schedule_id "
+                + "WHERE m.student_id=? AND m.source='OFFLINE' ORDER BY m.membership_id LIMIT 1", studentId);
+        String grade = text(membership.get("gradeName"));
+        var grades = db.rows("SELECT dict_value FROM sys_dict_data WHERE dict_type='edu_grade' "
+                + "AND dict_label=? AND status='0'", grade);
+        require(grades.size() == 1, "请先完善补录班次的年级");
+        String actor = SecurityUtils.getUsername();
+        db.jdbc().update("UPDATE edu_student SET parent_id=?,grade_code=?,update_by=?,update_time=CURRENT_TIMESTAMP(3) "
+                + "WHERE student_id=? AND parent_id IS NULL", parent, grades.get(0).get("dictValue"), actor, studentId);
+        db.insert("edu_student_lesson_account", Map.of("parent_id", parent, "student_id", studentId,
+                "student_name", student.get("studentName"), "grade_name", grade, "request_key", "OFFLINE:" + studentId,
+                "create_by", actor, "create_time", LocalDateTime.now(ZoneId.of("Asia/Shanghai"))));
+    }
+
     public record RemovalRequest(Long scheduleId,Integer effectiveLesson,String reason) {}
     private String reason(String value){require(value!=null&&!value.isBlank()&&value.length()<=255,"请填写255字以内的名单变更原因");return value.trim();}
     private Map<String,Object> numbered(long schedule,int no) { return db.one("SELECT * FROM edu_attendance_lesson WHERE schedule_id=? AND lesson_no=?",schedule,no); }
@@ -123,7 +204,7 @@ public class AttendanceLessonRosterService {
             require(found.size()==1,"请选择唯一有效报名；线下或试听请选择相应来源");enrollment=id(found.get(0).get("enrollmentId"));
         }
         if(enrollment!=null)require(!db.rows("SELECT enrollment_id FROM edu_enrollment WHERE enrollment_id=? AND schedule_id=? AND student_id=? AND parent_id=? AND del_flag='0' AND enrollment_status IN ('0','1','待确认','已确认','报名成功')",enrollment,schedule,input.studentId(),student.get("parentId")).isEmpty(),"报名与课程或学生不匹配");
-        require(enrollment!=null?"ENROLLMENT".equals(input.paymentStatus()):Set.of("UNPAID","HISTORICAL").contains(text(input.paymentStatus())),"请明确收费状态；名单录入不会生成缴费记录");
+        require(enrollment!=null?"ENROLLMENT".equals(input.paymentStatus()):Set.of("UNPAID","HISTORICAL","UNKNOWN").contains(text(input.paymentStatus())),"请明确收费状态；名单录入不会生成缴费记录");
         require(db.rows("SELECT membership_id FROM edu_attendance_membership WHERE schedule_id=? AND student_id=?",schedule,input.studentId()).isEmpty(),"该学生已有生效范围，请先核对名单");
         var c=course(schedule);var values=new LinkedHashMap<String,Object>();values.put("schedule_id",schedule);values.put("student_id",input.studentId());values.put("enrollment_id",enrollment);values.put("course_year",quarter.get("courseYear"));values.put("term_name",quarter.get("termName"));values.put("start_lesson",input.startLesson());values.put("end_lesson",input.endLesson());values.put("source",input.source());values.put("payment_status",input.paymentStatus());values.put("reason",input.reason());values.put("operator_id",SecurityUtils.getUserId());long membership=db.insert("edu_attendance_membership",values);audit(membership,"ADD",null,values,input.reason());return membership;
     }

@@ -97,8 +97,8 @@ roleProfiles.education = {
   stats: [], actions: roleProfiles.admin.actions.filter(a => ['课程报名', '排课管理', '教室管理', '教室分配', '学生档案', '收费财务', '退费管理', '学生出勤'].includes(a.title)), agendaTitle: '教务工作说明', schedule: []
 }
 
-roleProfiles.education.actions.push({title:'课程学员名单',icon:'班',tone:'green',route:'/pages/attendance-roster/attendance-roster'})
-roleProfiles.admin.actions.push({title:'课程学员名单',icon:'班',tone:'green',route:'/pages/attendance-roster/attendance-roster'})
+roleProfiles.education.actions.push({title:'补录学员',icon:'班',tone:'green',route:'/pages/attendance-roster/attendance-roster'})
+roleProfiles.admin.actions.push({title:'补录学员',icon:'班',tone:'green',route:'/pages/attendance-roster/attendance-roster'})
 
 function normalizeRole(roleKey) {
   return roleProfiles[roleKey] ? roleKey : 'parent'
