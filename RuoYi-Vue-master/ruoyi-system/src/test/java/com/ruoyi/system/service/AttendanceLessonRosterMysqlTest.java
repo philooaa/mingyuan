@@ -31,7 +31,7 @@ public class AttendanceLessonRosterMysqlTest {
         db.jdbc().execute("CREATE TABLE sys_role(role_id BIGINT PRIMARY KEY,role_key VARCHAR(30),status CHAR(1) DEFAULT '0',del_flag CHAR(1) DEFAULT '0')");
         db.jdbc().execute("CREATE TABLE sys_user_role(user_id BIGINT,role_id BIGINT)");
         db.jdbc().execute("CREATE TABLE edu_course_schedule(schedule_id BIGINT PRIMARY KEY,course_class_name VARCHAR(100),grade_name VARCHAR(64) DEFAULT '一年级',subject_name VARCHAR(64) DEFAULT '数学',course_year INT,term_name VARCHAR(64),period_name VARCHAR(30),class_pattern VARCHAR(30),start_date DATE,end_date DATE,start_time TIME,end_time TIME,teacher_id BIGINT,class_mode CHAR(1),status CHAR(1) DEFAULT '0',del_flag CHAR(1) DEFAULT '0')");
-        db.jdbc().execute("CREATE TABLE edu_student(student_id BIGINT PRIMARY KEY,parent_id BIGINT,student_name VARCHAR(64),del_flag CHAR(1) DEFAULT '0')");
+        db.jdbc().execute("CREATE TABLE edu_student(student_id BIGINT PRIMARY KEY AUTO_INCREMENT,parent_id BIGINT,student_name VARCHAR(64),grade_code VARCHAR(30),create_by VARCHAR(64),update_by VARCHAR(64),update_time DATETIME,del_flag CHAR(1) DEFAULT '0')");
         db.jdbc().execute("CREATE TABLE edu_enrollment(enrollment_id BIGINT PRIMARY KEY,schedule_id BIGINT,student_id BIGINT,parent_id BIGINT,student_name VARCHAR(64),contact_phone VARCHAR(20),class_date DATE,enrollment_status CHAR(1) DEFAULT '1',del_flag CHAR(1) DEFAULT '0')");
         db.jdbc().execute("CREATE TABLE edu_schedule_adjustment(adjustment_id BIGINT PRIMARY KEY AUTO_INCREMENT,schedule_id BIGINT,term_name VARCHAR(64),period_name VARCHAR(64),original_date DATE,adjusted_date DATE,reason VARCHAR(255))");
         db.jdbc().execute("CREATE TABLE edu_class_sign_in(sign_in_id BIGINT PRIMARY KEY AUTO_INCREMENT,schedule_id BIGINT,class_date DATE,student_id BIGINT,enrollment_id BIGINT,student_name VARCHAR(64),source_type CHAR(1),review_stage VARCHAR(24),review_status CHAR(1) DEFAULT '0',del_flag CHAR(1) DEFAULT '0')");
@@ -112,6 +112,30 @@ public class AttendanceLessonRosterMysqlTest {
         principal(40,"business_admin");assertEquals(1,tx(()->service.todos("admin")).get("count"));assertThrows(ServiceException.class,()->tx(()->service.todos("education")));
         assertFalse(service.courses("").isEmpty());
         db.jdbc().update("UPDATE sys_role SET status='1' WHERE role_key='business_admin'");assertThrows(ServiceException.class,()->tx(()->service.todos("admin")));
+        db.jdbc().execute("CREATE TABLE sys_dict_data(dict_type VARCHAR(30),dict_label VARCHAR(30),dict_value VARCHAR(30),status CHAR(1))");
+        db.jdbc().update("INSERT INTO sys_dict_data VALUES ('edu_grade','一年级','1','0')");
+        db.jdbc().execute("CREATE TABLE edu_student_lesson_account(account_id BIGINT PRIMARY KEY AUTO_INCREMENT,student_id BIGINT UNIQUE,parent_id BIGINT,student_name VARCHAR(30),grade_name VARCHAR(20),request_key VARCHAR(100),create_by VARCHAR(64),create_time DATETIME)");
+        db.jdbc().update("UPDATE sys_user SET phonenumber='13800000000' WHERE user_id=30");
+        db.jdbc().update("INSERT INTO edu_course_schedule(schedule_id,course_class_name,course_year,term_name,period_name,class_pattern,start_date,end_date,teacher_id,class_mode) VALUES(3,'补录测试',?,'秋季','周一','DAILY',?,?,10,'1')", date.getYear(), date.toString(), date.plusDays(5).toString());
+        principal(20,"education");
+        var offlineLessons = tx(() -> service.lessons(3));
+        long offlineFirst = id(offlineLessons.get(0),"lessonId"), offlineThird = id(offlineLessons.get(2),"lessonId");
+        var offlineDraft = new AttendanceLessonRosterService.OfflineStudentRequest(3L,"仅姓名学生",3);
+        principal(teacher,"teacher");
+        assertThrows(ServiceException.class, () -> tx(() -> service.addOfflineStudent(offlineDraft)));
+        principal(20,"education");
+        long studentId = tx(() -> service.addOfflineStudent(offlineDraft)).get("studentId");
+        assertThrows(ServiceException.class, () -> tx(() -> service.addOfflineStudent(offlineDraft)));
+        assertTrue(tx(() -> service.roster(3, offlineFirst)).stream().noneMatch(row -> id(row,"studentId")==studentId));
+        assertTrue(tx(() -> service.roster(3, offlineThird)).stream().anyMatch(row -> id(row,"studentId")==studentId));
+        assertNull(db.one("SELECT parent_id FROM edu_student WHERE student_id=?",studentId).get("parentId"));
+        tx(() -> {
+            service.bindOfflineStudent(studentId, new AttendanceLessonRosterService.ParentBindingRequest("13800000000"));
+            return null;
+        });
+        assertEquals(30L,id(db.one("SELECT parent_id FROM edu_student WHERE student_id=?",studentId),"parentId"));
+        assertEquals(30L,id(db.one("SELECT parent_id FROM edu_student_lesson_account WHERE student_id=?",studentId),"parentId"));
+        assertEquals(financeBefore, db.rows("SELECT * FROM edu_enrollment ORDER BY enrollment_id"));
         System.out.println("PASS: stable lesson identity, effective insertion/removal, locked snapshot and teacher, same-name IDs, unpaid roster-only membership, immutable finance and role checks");
     }
 }
