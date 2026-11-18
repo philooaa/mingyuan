@@ -41,10 +41,11 @@ export function addTimetableSchedule(data) {
   })
 }
 
-export function updateTimetableSchedule(data) {
+export function updateTimetableSchedule(data, force = false) {
   return request({
     url: '/system/courseTimetable',
     method: 'put',
+    params: { force },
     data
   })
 }

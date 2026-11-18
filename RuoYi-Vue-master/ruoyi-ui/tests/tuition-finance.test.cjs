@@ -6,6 +6,34 @@ const vm = require('node:vm')
 const root = path.resolve(__dirname, '..')
 let finance = {}
 
+test('parent bill view keeps exact family and child scope, including unlinked history', async () => {
+ const calls=[]
+ const p=component('tuition',{
+  listTuition: async q=>{calls.push({...q});return {rows:[],total:0}},
+  getTuitionSummary: async()=>({data:{}}),
+  listBillChildren: async()=>({data:{children:[{accountId:'9007199254740993',studentName:'同名'}]}})
+ })
+ p.openParent({parentId:'9007199254740994',parentName:'家长'})
+ await new Promise(r=>setImmediate(r))
+ assert.equal(calls[0].parentId,'9007199254740994')
+ p.selectChild('9007199254740993');await new Promise(r=>setImmediate(r))
+ assert.equal(calls.at(-1).accountId,'9007199254740993');assert.equal(calls.at(-1).parentId,'9007199254740994')
+ p.selectChild('unlinked');await new Promise(r=>setImmediate(r))
+ assert.equal(calls.at(-1).unlinkedOnly,'true');assert.equal(calls.at(-1).accountId,undefined)
+ await p.resetQuery();assert.equal(calls.at(-1).parentId,'9007199254740994');assert.equal(calls.at(-1).unlinkedOnly,undefined)
+})
+
+test('late parent bill response cannot overwrite the new family', async () => {
+ let finish
+ const p=component('tuition',{
+  listTuition: q=>q.parentId==='1'?new Promise(r=>{finish=r}):Promise.resolve({rows:[{enrollmentId:'new'}],total:1}),
+  getTuitionSummary: async()=>({data:{}}),listBillChildren: async()=>({data:{children:[]}})
+ })
+ p.openParent({parentId:'1'});p.openParent({parentId:'2'})
+ await new Promise(r=>setImmediate(r));finish({rows:[{enrollmentId:'old'}],total:1});await new Promise(r=>setImmediate(r))
+ assert.equal(p.rows[0].enrollmentId,'new')
+})
+
 test('credit packages cannot be repriced and collection always retains the parent coupon',async()=>{
  assert.equal(finance.canPrice({billType:'CREDIT_PACKAGE',billingStatus:'OPEN',payments:[]}),false)
  const ids=[];const p=component('tuition',{quoteTuition:async(id,coupon)=>{ids.push(coupon);return{data:{payableAmount:'7000.00',coupons:[],userCouponId:'88'}}}})

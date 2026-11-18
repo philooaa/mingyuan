@@ -1,5 +1,34 @@
 <template>
   <div class="app-container">
+    <div class="finance-actions">
+      <el-button size="small" :type="viewMode === 'bills' && !selectedParent ? 'primary' : ''" @click="showBills">全部账单</el-button>
+      <el-button size="small" :type="viewMode === 'parents' || selectedParent ? 'primary' : ''" @click="showParents">按家长查看</el-button>
+    </div>
+    <div v-if="viewMode === 'parents'">
+      <el-form :inline="true" size="small" @submit.native.prevent>
+        <el-form-item label="搜索家长或孩子"><el-input v-model="parentQuery.keyword" clearable placeholder="姓名或手机号" @keyup.enter.native="searchParents" /></el-form-item>
+        <el-form-item><el-button type="primary" @click="searchParents">搜索</el-button></el-form-item>
+      </el-form>
+      <el-alert v-if="parentError" :title="parentError" type="error" :closable="false" />
+      <el-table v-loading="parentLoading" :data="parents" empty-text="暂无家长">
+        <el-table-column label="家长" prop="parentName" min-width="150" />
+        <el-table-column label="家长账号 ID" prop="parentId" min-width="150" />
+        <el-table-column label="手机号" prop="parentPhone" min-width="150" />
+        <el-table-column label="操作" width="130"><template slot-scope="s"><el-button type="text" @click="openParent(s.row)">查看账单</el-button></template></el-table-column>
+      </el-table>
+      <pagination v-show="parentTotal > 0" :total="parentTotal" :page.sync="parentQuery.pageNum" :limit.sync="parentQuery.pageSize" @pagination="loadParents" />
+    </div>
+    <div v-show="viewMode === 'bills'">
+    <div v-if="selectedParent" class="finance-actions">
+      <el-button size="small" icon="el-icon-back" @click="showParents">返回家长列表</el-button>
+      <strong>{{ selectedParent.parentName || '家长' }}（ID：{{ selectedParent.parentId }}）的账单</strong>
+      <el-select v-model="childChoice" size="small" placeholder="全部孩子" @change="selectChild">
+        <el-option label="全部孩子" value="all" />
+        <el-option v-for="child in children" :key="child.accountId" :label="(child.studentName || '姓名待核对') + '（孩子账户 ID：' + child.accountId + '）'" :value="String(child.accountId)" />
+        <el-option label="未关联孩子的历史账单" value="unlinked" />
+      </el-select>
+      <span v-if="childrenError" class="child-error">{{ childrenError }} <el-button type="text" @click="loadChildren(selectedParent)">重试</el-button></span>
+    </div>
     <el-alert
       title="真实与模拟账单分别查询。历史金额待核验时不计作欠费或实收；课程收费仅登记线下实际收款，不提供课程在线支付。"
       type="info"
@@ -23,7 +52,7 @@
       <el-form-item label="学生">
         <el-input v-model="queryParams.studentName" clearable @keyup.enter.native="handleQuery" />
       </el-form-item>
-      <el-form-item label="家长ID">
+      <el-form-item v-if="!selectedParent" label="家长ID">
         <el-input v-model="queryParams.parentId" clearable />
       </el-form-item>
       <el-form-item label="校区">
@@ -89,7 +118,7 @@
     <el-alert v-if="listError" :title="listError" type="error" :closable="false" />
     <el-table v-loading="loading" :data="rows">
       <el-table-column label="报名号" prop="enrollmentCode" min-width="145" />
-      <el-table-column label="学生" prop="studentName" width="100" />
+      <el-table-column label="学生" min-width="160"><template slot-scope="s">{{ s.row.studentName || '姓名待核对' }}<br /><span class="child-caption">{{ s.row.lessonAccountId ? '孩子账户 ID：' + s.row.lessonAccountId : '未关联孩子，待核对' }}</span></template></el-table-column>
       <el-table-column label="家长" prop="parentName" width="100" />
       <el-table-column label="课程／课包" prop="courseClassName" min-width="160" />
       <el-table-column label="校区" prop="campusName" width="90" />
@@ -137,6 +166,7 @@
       :limit.sync="queryParams.pageSize"
       @pagination="getList"
     />
+    </div>
     <el-dialog title="课程收费详情" :visible.sync="detailOpen" width="1100px" append-to-body>
       <div v-loading="detailLoading">
         <el-alert v-if="detailError" :title="detailError" type="error" :closable="false" />
@@ -494,7 +524,7 @@
           <el-form-item v-else-if="quote && quote.payableAmount !== '0.00'" label="收款渠道">
             <el-select v-model="form.channel">
               <el-option
-                v-for="c in ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE']"
+                v-for="c in ['CASH', 'ALIPAY_OFFLINE', 'WECHAT_OFFLINE', 'BANK_TRANSFER']"
                 :key="c"
                 :value="c"
                 :label="label(c)"
@@ -563,6 +593,8 @@
 <script>
 import {
   listTuition,
+  listBillParents,
+  listBillChildren,
   getTuitionSummary,
   getTuition,
   quoteTuition,
@@ -597,6 +629,8 @@ export default {
   data() {
     return {
       loading: false,
+      viewMode: 'bills', selectedParent: null, parents: [], parentTotal: 0, parentLoading: false, parentError: '', parentSequence: 0,
+      parentQuery: { pageNum: 1, pageSize: 10, keyword: '' }, children: [], childChoice: 'all', childrenError: '', childrenSequence: 0, listSequence: 0,
       listError: '',
       rows: [],
       total: 0,
@@ -691,19 +725,49 @@ export default {
     canPrice,
     canClosePayment,
     async getList() {
+      const sequence = ++this.listSequence
       this.loading = true
       this.listError = ''
       try {
         const [r] = await Promise.all([listTuition(this.queryParams), this.getSummary()])
+        if (sequence !== this.listSequence) return
         this.rows = r.rows || []
         this.total = r.total || 0
       } catch (e) {
+        if (sequence !== this.listSequence) return
         this.rows = []
         this.total = 0
         this.listError = e.message || '台账查询失败'
       } finally {
-        this.loading = false
+        if (sequence === this.listSequence) this.loading = false
       }
+    },
+    async loadParents() {
+      const sequence = ++this.parentSequence
+      this.parentLoading = true; this.parentError = ''
+      try { const r = await listBillParents(this.parentQuery); if (sequence === this.parentSequence) { this.parents = r.rows || []; this.parentTotal = r.total || 0 } }
+      catch (e) { if (sequence === this.parentSequence) { this.parents = []; this.parentTotal = 0; this.parentError = e.message || '家长列表加载失败' } }
+      finally { if (sequence === this.parentSequence) this.parentLoading = false }
+    },
+    searchParents() { this.parentQuery.pageNum = 1; this.loadParents() },
+    showParents() { this.listSequence++; this.childrenSequence++; this.viewMode = 'parents'; this.selectedParent = null; this.loadParents() },
+    showBills() { this.childrenSequence++; this.selectedParent = null; this.childChoice = 'all'; this.queryParams = { pageNum: 1, pageSize: 10, financeMode: 'REAL' }; this.viewMode = 'bills'; this.getList() },
+    openParent(parent) {
+      this.selectedParent = parent; this.children = []; this.childrenError = ''; this.childChoice = 'all'
+      this.queryParams = { pageNum: 1, pageSize: 10, financeMode: 'REAL', parentId: String(parent.parentId) }
+      this.viewMode = 'bills'; this.loadChildren(parent); this.getList()
+    },
+    async loadChildren(parent) {
+      const sequence = ++this.childrenSequence
+      this.childrenError = ''
+      try { const r = await listBillChildren(parent.parentId); if (sequence === this.childrenSequence && this.selectedParent === parent) this.children = (r.data || {}).children || [] }
+      catch (e) { if (sequence === this.childrenSequence && this.selectedParent === parent) { this.children = []; this.childrenError = e.message || '孩子列表加载失败' } }
+    },
+    selectChild(value) {
+      delete this.queryParams.accountId; delete this.queryParams.unlinkedOnly
+      if (value === 'unlinked') this.queryParams.unlinkedOnly = 'true'
+      else if (value !== 'all') this.queryParams.accountId = value
+      this.queryParams.pageNum = 1; this.getList()
     },
     async getSummary() {
       const sequence = ++this.summaryRequest
@@ -721,7 +785,8 @@ export default {
       return this.getList()
     },
     resetQuery() {
-      this.queryParams = { pageNum: 1, pageSize: 10, financeMode: 'REAL' }
+      this.childChoice = 'all'
+      this.queryParams = { pageNum: 1, pageSize: 10, financeMode: 'REAL', ...(this.selectedParent ? { parentId: String(this.selectedParent.parentId) } : {}) }
       return this.getList()
     },
     handleExport() {
@@ -975,6 +1040,8 @@ export default {
 }
 </script>
 <style scoped>
+.child-caption { color: #909399; font-size: 12px; }
+.child-error { color: #c0392b; margin-left: 12px; }
 .finance-actions {
   margin: 16px 0;
 }

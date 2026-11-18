@@ -434,7 +434,7 @@ public class AttendanceLessonRosterService {
         var roles=roles();if("admin".equals(role)&&!roles.contains("admin")&&roles.contains("business_admin"))role="business_admin";require(Set.of("teacher","education","business_admin","admin").contains(role),"请选择有效身份");require(roles.contains("admin")||roles.contains(role),"当前身份无权查看待办");
         var items=new ArrayList<Map<String,Object>>();var now=LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
         var candidates=new ArrayList<Map<String,Object>>();
-        var courses=db.rows("SELECT schedule_id,status,course_class_name course_name,course_year year,term_name,grade_name FROM edu_course_schedule WHERE del_flag='0' AND COALESCE(class_mode,'1')<>'2'"+("teacher".equals(role)?" AND teacher_id=?":""),"teacher".equals(role)?new Object[]{SecurityUtils.getUserId()}:new Object[]{});
+        var courses=db.rows("SELECT schedule_id,status,course_class_name course_name,course_year year,term_name,grade_name FROM edu_course_schedule WHERE del_flag='0' AND COALESCE(class_mode,'1')<>'2'"+("teacher".equals(role)?" AND (teacher_id=? OR EXISTS(SELECT 1 FROM edu_attendance_lesson owned WHERE owned.schedule_id=edu_course_schedule.schedule_id AND owned.locked=1 AND owned.teacher_id=?))":""),"teacher".equals(role)?new Object[]{SecurityUtils.getUserId(),SecurityUtils.getUserId()}:new Object[]{});
         for(var c:courses)for(var l:sync(id(c.get("scheduleId")))) { l.put("scheduleStatus",c.get("status"));candidates.add(l); }
         // Existing sheets, including pre-migration dates and single lessons, remain actionable.
         String teacherFilter="teacher".equals(role)?" AND COALESCE(l.teacher_id,c.teacher_id)=?":"";
@@ -473,15 +473,12 @@ public class AttendanceLessonRosterService {
         }
         items.sort(Comparator.comparing(r->text(r.get("classDate"))));return Map.of("courses","teacher".equals(role)&&allTeacherLessons?db.rows("SELECT schedule_id,course_class_name course_name,"
                 +"course_year year,term_name,grade_name FROM edu_course_schedule "
-                +"WHERE teacher_id=? AND del_flag='0' ORDER BY course_year DESC,schedule_id DESC",SecurityUtils.getUserId()):List.of(),"count",items.size(),"overdueCount",items.stream().filter(r->Boolean.TRUE.equals(r.get("overdue"))).count(),"items",items);
+                +"WHERE del_flag='0' AND (teacher_id=? OR EXISTS(SELECT 1 FROM edu_attendance_lesson owned WHERE owned.schedule_id=edu_course_schedule.schedule_id AND owned.locked=1 AND owned.teacher_id=?)) ORDER BY course_year DESC,schedule_id DESC",SecurityUtils.getUserId(),SecurityUtils.getUserId()):List.of(),"count",items.size(),"overdueCount",items.stream().filter(r->Boolean.TRUE.equals(r.get("overdue"))).count(),"items",items);
     }
     @Transactional
     public Map<String,Object> teacherLesson(long schedule, long lessonId) {
         var assigned=roles();
         require(assigned.contains("teacher")||assigned.contains("admin"),"仅任课教师可查看课次");
-        var course=course(schedule);
-        require(assigned.contains("admin")||text(course.get("teacherId")).equals(text(SecurityUtils.getUserId())),
-                "只能查看自己负责的课次");
         var row=lesson(schedule,lessonId);
         require(!yes(row.get("cancelled"))&&row.get("classDate")!=null,"该讲已停课，请刷新课次列表");
         require(assigned.contains("admin")||text(row.get("teacherId")).equals(text(SecurityUtils.getUserId())),

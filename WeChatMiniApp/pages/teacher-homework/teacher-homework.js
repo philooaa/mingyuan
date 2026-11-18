@@ -1,4 +1,5 @@
 const { request } = require('../../utils/request')
+const homeworkShare = require('../../utils/homework-share')
 function valueOf(item, names, fallback = '') { for (const n of names) if (item[n] !== undefined && item[n] !== null) return item[n]; return fallback }
 // 卡片按班级展示本班提交情况（后端 targetCounts 为 scheduleId:提交数:已批阅数）
 function classCard(item, scheduleId) {
@@ -20,6 +21,7 @@ Page({
   data: { list: [], shown: [], groups: [], classTabs: [], activeClass: '', statusTabs, activeStatus: 'all', loading: false, schedules: [], scheduleNames: {}, publish: false, publishItem: null, publishClasses: [] },
   onLoad(options = {}) { if (options.filter === 'pending') this.setData({ activeStatus: 'pending' }) },
   onShow() { this.loadList() },
+  onShareAppMessage() { return homeworkShare.card() },
   async loadSchedules() {
     if (this.data.schedules.length) return
     try {

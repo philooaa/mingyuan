@@ -12,6 +12,7 @@
       <view class="actions" catchtap="noop">
         <button wx:if="{{item.status === '0'}}" size="mini" data-id="{{item.homeworkId}}" bindtap="publish">发布</button>
         <button wx:if="{{item.status === '0' || item.status === '1'}}" size="mini" data-id="{{item.homeworkId}}" bindtap="edit">编辑</button>
+        <button wx:if="{{item.status === '1'}}" class="share" size="mini" open-type="share">转发给家长</button>
         <button wx:if="{{item.status === '1'}}" size="mini" data-id="{{item.homeworkId}}" data-type="close" bindtap="action">关闭</button>
       </view>
     </view>

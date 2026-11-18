@@ -50,6 +50,7 @@ public class TimetableImportService
     @Autowired private IEduClassroomService classroomService;
     @Autowired private IEduCourseScheduleService scheduleService;
     @Autowired private EduCourseScheduleMapper courseScheduleMapper;
+    @Autowired private com.ruoyi.system.service.CoursePriceService coursePrices;
     @Autowired private ISysDictDataService dictDataService;
     @Autowired private ISysRoleService roleService;
     @Autowired private ISysUserService userService;
@@ -757,6 +758,7 @@ public class TimetableImportService
                 {
                     s.setUpdateTime(DateUtils.getNowDate());
                     courseScheduleMapper.updateEduCourseSchedule(s);
+                    coursePrices.syncSchedulePricing(s.getScheduleId());
                 }
                 updated++;
             }
@@ -775,6 +777,7 @@ public class TimetableImportService
                 {
                     s.setCreateTime(DateUtils.getNowDate());
                     courseScheduleMapper.insertEduCourseSchedule(s);
+                    coursePrices.syncSchedulePricing(s.getScheduleId());
                 }
                 inserted++;
             }

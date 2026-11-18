@@ -93,6 +93,10 @@ public class AttendanceLessonRosterMysqlTest {
         db.jdbc().update("UPDATE edu_course_schedule SET teacher_id=?,start_date=? WHERE schedule_id=?",otherTeacher,date.plusDays(1).toString(),course);
         var locked=tx(()->service.lessons(course)).stream().filter(r->id(r,"lessonId")==third).findFirst().orElseThrow();assertEquals(String.valueOf(teacher),locked.get("teacherId"));assertEquals(3,((Number)locked.get("lessonNo")).intValue());assertEquals(snapshot,tx(()->service.roster(course,third)));
         principal(teacher,"teacher");var returned=submitBody(date.plusDays(2).toString());tx(()->{service.validateSubmission(returned);return null;});assertEquals(2,tx(()->service.teacherRoster(course,date.plusDays(2).toString())).size());
+        assertEquals(String.valueOf(teacher),tx(()->service.teacherLesson(course,third)).get("teacherId"));
+        var ownHistoricalCourses=(List<Map<String,Object>>)tx(()->service.todos("teacher",true)).get("courses");
+        assertTrue(ownHistoricalCourses.stream().anyMatch(row->String.valueOf(course).equals(row.get("scheduleId"))),"历史快照教师仍可从班级入口找到课程");
+        principal(otherTeacher,"teacher");assertThrows(ServiceException.class,()->tx(()->service.teacherLesson(course,third)));
         principal(otherTeacher,"teacher");assertThrows(ServiceException.class,()->tx(()->{service.validateSubmission(submitBody(date.plusDays(2).toString()));return null;}));assertThrows(ServiceException.class,()->tx(()->service.teacherRoster(course,date.plusDays(2).toString())));
         long offline=3;principal(1,"admin");
         long unpaid=tx(()->service.add(new AttendanceLessonRosterService.MembershipRequest(course,offline,null,5,null,"OFFLINE","UNPAID","线下名单不创建账单")));

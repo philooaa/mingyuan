@@ -36,6 +36,8 @@ public class MiniAppStaffScheduleController extends BaseController {
     @Log(title="教务管理员新增排课",businessType=BusinessType.INSERT)
     public AjaxResult create(@RequestBody EduCourseSchedule input) {
         if (input.getClassroomId()!=null) throw new ServiceException("排课时只选择校区，教室稍后统一分配");
+        if (!"2".equals(input.getClassMode()) && (input.getRequestedLessonCount()==null || input.getRequestedLessonCount()<1 || input.getRequestedLessonCount()>3661))
+            throw new ServiceException("请填写1至3661的整数计费课次数");
         schedules.insertEduCourseSchedule(input); return success(input.getScheduleId());
     }
     @PutMapping

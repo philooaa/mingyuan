@@ -1,5 +1,5 @@
 <view class="page">
-  <view class="hero"><view class="heading">确认订单</view></view><view class="notice">模拟支付，不会真实扣款。订单创建后30分钟内可在订单详情确认模拟支付。</view>
+  <view class="hero"><view class="heading">确认订单</view></view><view class="notice">订单创建后请在30分钟内完成确认；非免费订单目前为模拟支付。</view>
   <view wx:if="{{pending}}" class="notice">正在核对上次提交结果，重试将使用相同商品、数量、地址和留言。</view>
   <view wx:if="{{loading}}" class="state">正在加载…</view><view wx:if="{{error}}" class="state error">{{error}}<button wx:if="{{!pending}}" bindtap="load">重新加载</button></view>
   <block wx:if="{{detail}}"><view class="card row"><image class="cover" src="{{detail.coverUrl}}" mode="aspectFill"/><view class="grow"><view class="title">{{detail.title}}</view><view class="price">{{detail.priceText}}</view><view class="tag">{{detail.deliveryText}}</view></view></view>

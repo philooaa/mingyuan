@@ -203,7 +203,7 @@ CREATE TABLE `edu_material` (
   `unit` varchar(20) NOT NULL DEFAULT '份',
   `stock_quantity` int NOT NULL DEFAULT '0',
   `stock_locked` int NOT NULL DEFAULT '0',
-  `purchase_limit` int NOT NULL DEFAULT '99',
+  `purchase_limit` int DEFAULT NULL,
   `shipping_fee` decimal(10,2) NOT NULL DEFAULT '0.00',
   `ship_from` varchar(200) DEFAULT NULL,
   `dispatch_days` int DEFAULT NULL,

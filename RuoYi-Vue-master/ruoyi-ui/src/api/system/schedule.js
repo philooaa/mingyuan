@@ -27,10 +27,11 @@ export function addSchedule(data) {
 }
 
 // 修改课程排课
-export function updateSchedule(data) {
+export function updateSchedule(data, force = false) {
   return request({
     url: '/system/schedule',
     method: 'put',
+    params: { force },
     data: data
   })
 }

@@ -12,8 +12,8 @@
   <view class="empty" wx:if="{{error}}">{{error}}</view>
   <block wx:if="{{mode === 'courses'}}">
     <view class="card" wx:for="{{courses}}" wx:key="scheduleId" data-id="{{item.scheduleId}}" bindtap="openCourse">
-      <view class="ui-row"><view class="title">{{item.course}}</view><text class="ui-link">›</text></view><view class="ui-time">{{item.time}}</view><view class="muted">{{item.gradeName}} · {{item.room}}</view>
-      <view class="muted">{{item.courseYear}} {{item.termName}} · 班次 {{item.scheduleId}} · {{item.status === '1' ? '已停用' : '正常'}}</view>
+      <view class="ui-row"><view class="title">{{item.course}}</view><text class="ui-link">›</text></view><view class="ui-time">{{item.courseYear ? item.courseYear + '年 ' : ''}}{{item.termName ? item.termName + ' · ' : ''}}{{item.time}}</view><view class="muted">{{item.gradeName}} · {{item.room}}</view>
+      <view class="muted">班次 {{item.scheduleId}} · {{item.status === '1' ? '已停用' : '正常'}}</view>
     </view>
     <view class="empty" wx:if="{{!loading && !error && !courses.length}}">暂无符合筛选条件的课程</view>
   </block>

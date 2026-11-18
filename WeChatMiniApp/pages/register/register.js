@@ -40,12 +40,14 @@ Page({
 
   async onLoad(options = {}) {
     this._unloaded = false
+    this._homeworkShare = options.next === 'homework'
+    if (this._homeworkShare) this.setData({ autoPreview: false })
     this.setData({ privacyAgreed: false })
     const pickRole = options.pickRole === '1'
     if (pickRole) this.setData({ autoPreview: false })
     this.applyBackendOverride()
     if (!pickRole && wx.getStorageSync('token') && options.selectTeacher !== '1' && options.selectParent !== '1') {
-      wx.reLaunch({ url: '/pages/index/index' })
+      wx.reLaunch({ url: this.loginDestination() })
       return
     }
     // 环境判定不可靠时（如基础库缺 getDeviceInfo），主动探测本机后端并切过去。
@@ -55,6 +57,8 @@ Page({
     await this.loadLocalPreview()
     if (pickRole && !this._unloaded && this.data.localPreviewEnabled) this.choosePreviewRole()
   },
+
+  loginDestination() { return this._homeworkShare ? '/pages/homework-share/homework-share' : '/pages/index/index' },
 
   // 真机调试时由长按 logo 写入的本机后端地址，需在页面加载时套用。
   applyBackendOverride() {
@@ -155,7 +159,7 @@ Page({
       this.activateAccount(login.token, info)
       // 预览教务时强制切到教务工作台，避免多角色账号默认落回管理员视角。
       if (devRole === 'education') access.select('education')
-      wx.reLaunch({ url: '/pages/index/index' })
+      wx.reLaunch({ url: this.loginDestination() })
     } catch (e) { if (!this._unloaded) this.setData({ loginError: e.message || '本地预览登录失败' }) }
     finally { if (!this._unloaded) this.setData({ submitting: false }) }
   },
@@ -231,7 +235,7 @@ Page({
       const info = await request({ url: '/getInfo', header: { Authorization: 'Bearer ' + login.token } })
       if (this._unloaded || wx.getStorageSync('token') !== previousToken) return
       this.activateAccount(login.token, info)
-      this.setData({ verificationCode: '', developmentCode: '' }); wx.reLaunch({ url: '/pages/index/index' })
+      this.setData({ verificationCode: '', developmentCode: '' }); wx.reLaunch({ url: this.loginDestination() })
     } catch (e) { if (!this._unloaded) this.setData({ loginError: e.message || '登录失败，请重新获取验证码' }) }
     finally { if (!this._unloaded) this.setData({ submitting: false }) }
   },
@@ -269,7 +273,7 @@ Page({
       const info = await request({ url: '/getInfo', header: { Authorization: 'Bearer ' + login.token } })
       if (this._unloaded || wx.getStorageSync('token') !== previousToken) return
       this.activateAccount(login.token, info)
-      this.setData({ password: '', code: '' }); wx.reLaunch({ url: '/pages/index/index' })
+      this.setData({ password: '', code: '' }); wx.reLaunch({ url: this.loginDestination() })
     } catch (e) { if (!this._unloaded) { this.setData({ loginError: e.message || '登录失败' }); this.loadCaptcha() } }
     finally { if (!this._unloaded) this.setData({ submitting: false }) }
   },
@@ -407,7 +411,7 @@ Page({
           !this._unloaded && wx.getStorageSync('token') === previousToken)
         if (this._unloaded) return
         if (cached.restored) {
-          wx.reLaunch({ url: '/pages/index/index' })
+          wx.reLaunch({ url: this.loginDestination() })
           return
         }
         if (!cached.restarted && wx.getStorageSync('token') !== previousToken) return
@@ -438,7 +442,7 @@ Page({
       if (phoneCode === 'mock') devSession.activate(devRole, loginRes.token, infoRes, loginRes.devSessionVersion)
       else this.activateAccount(loginRes.token, infoRes)
 
-      wx.reLaunch({ url: '/pages/index/index' })
+      wx.reLaunch({ url: this.loginDestination() })
     } catch (error) {
       if (!this._unloaded) this.setData({ loginError: error.message || '登录失败，请重试' })
     } finally {

@@ -1,0 +1,24 @@
+<view class="page">
+  <image class="cover" src="/assets/homework-share.jpg" mode="widthFix" />
+  <view class="panel">
+    <view wx:if="{{loading}}" class="hint">正在打开你的作业…</view>
+    <block wx:elif="{{wrongRole}}">
+      <view class="title">请使用家长账号查看作业</view>
+      <view class="hint">当前账号没有家长身份，可返回首页退出登录后使用家长账号登录，再打开卡片。</view>
+      <button bindtap="goHome">返回首页</button>
+    </block>
+    <block wx:elif="{{error}}">
+      <view class="hint">{{error}}</view>
+      <button bindtap="load">重新加载</button>
+    </block>
+    <block wx:elif="{{noChildren}}">
+      <view class="title">请先添加孩子信息</view>
+      <view class="hint">添加后返回这里，即可查看孩子的作业。</view>
+      <button bindtap="addChild">添加孩子</button>
+    </block>
+    <block wx:else>
+      <view class="title">选择孩子，查看作业</view>
+      <button wx:for="{{children}}" wx:key="accountId" class="child" data-id="{{item.accountId}}" bindtap="chooseChild">{{item.studentName}}<text class="grade">{{item.gradeName}}</text><text> ›</text></button>
+    </block>
+  </view>
+</view>

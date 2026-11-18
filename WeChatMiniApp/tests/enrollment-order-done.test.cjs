@@ -31,7 +31,8 @@ function harness(respond) {
   p.loadPage = async () => {}
   p.refreshCartSummary = () => {}
   p.data.cart = [{ scheduleId: 1, courseClassName: '三年级英语拓展班', amount: '2100.00' }]
-  p.data.newChild = true
+  p._cartKey = 'test-cart'; p.cartKey = () => 'test-cart'
+  p.data.scopeAccountId = '11'; p.data.selectedChildId = '11'; p.data.lessonAccounts = [{accountId:'11',studentName:'小盛测试1',availableCredits:5}]; p.data.newChild = false
   p.data.form = { studentName: '小盛测试1', contactPhone: '13800000000', studentRequestKey: 'key-1' }
   return { p, storage, calls, modals, toasts, copied, previews }
 }
@@ -99,7 +100,8 @@ test('下单失败不弹窗，只提示错误', async () => {
   q.loadPage = async () => {}
   q.refreshCartSummary = () => {}
   q.data.cart = [{ scheduleId: 1 }]
-  q.data.newChild = true
+  q._cartKey = 'test-cart'; q.cartKey = () => 'test-cart'
+  q.data.scopeAccountId = '11'; q.data.selectedChildId = '11'; q.data.lessonAccounts = [{accountId:'11',studentName:'甲'}]; q.data.newChild = false
   q.data.form = { studentName: '甲', contactPhone: '', studentRequestKey: 'key-1' }
   await q.submitCart()
   assert.equal(q.data.orderDoneOpen, false)

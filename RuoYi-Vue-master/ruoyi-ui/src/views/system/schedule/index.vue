@@ -613,7 +613,11 @@ export default {
           const payload = { ...this.form }
           delete payload.enrolledCount
           delete payload.delFlag
-          if (payload.scheduleId) await updateSchedule(payload)
+          if (payload.scheduleId) {
+            try { await this.$modal.confirm('该课程如已有学生报名或签到，修改将影响后续上课安排。已有报名和财务记录保留，不会自动调整费用。确定修改吗？') }
+            catch (_) { return }
+            await updateSchedule(payload, true)
+          }
           else await addSchedule(payload)
           this.$modal.msgSuccess(payload.scheduleId ? '修改成功' : '新增成功')
           this.open = false

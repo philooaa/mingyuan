@@ -327,7 +327,9 @@ export default {
         // 班课不写 lessonLocation，避免后端把 classroom_id 置空
         if (payload.classMode === '1') payload.lessonLocation = null
         if (this.form.scheduleId) {
-          await updateTimetableSchedule(payload)
+          try { await this.$confirm('该课程如已有学生报名或签到，修改将影响后续上课安排。已有报名和财务记录保留，不会自动调整费用。确定修改吗？', '确认修改课程', { type: 'warning' }) }
+          catch (_) { return }
+          await updateTimetableSchedule(payload, true)
           this.$message.success('修改成功')
         } else {
           await addTimetableSchedule(payload)

@@ -21,7 +21,7 @@
     <view class="module-card" wx:for="{{visibleCourses}}" wx:key="scheduleId">
       <view class="ui-row"><view class="module-card-title" bindtap="showCourse" data-id="{{item.scheduleId}}">{{item.courseClassName}}</view><text class="course-type {{item.classMode === '2' ? 'single-type' : 'class-type'}}">{{item.modeText}}</text></view>
       <view class="module-meta">{{item.subjectTag}} · {{item.courseStatusText}}</view>
-      <view class="ui-time">{{item.periodName}} {{item.timeText}}</view>
+      <view class="ui-time">{{item.courseYear ? item.courseYear + '年 ' : ''}}{{item.termName ? item.termName + ' · ' : ''}}{{item.periodName ? item.periodName + ' · ' : ''}}{{item.timeText}}</view>
       <view class="module-meta">{{item.dateRangeText}}</view><view class="module-meta">地点：{{item.placeText}}</view>
       <view class="module-meta warning" wx:if="{{item.pendingReason}}">{{item.pendingReason}}</view>
       <view class="module-actions"><button size="mini" bindtap="showCourse" data-id="{{item.scheduleId}}">{{item.lessonCount}} 个课次 ›</button><button size="mini" bindtap="openStudents" data-id="{{item.scheduleId}}">班级学员</button></view>
