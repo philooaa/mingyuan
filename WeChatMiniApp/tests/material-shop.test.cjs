@@ -306,7 +306,7 @@ test('payment preparation returning after page hides never opens confirmation mo
 })
 test('order timeline translates events while preserving purchased snapshots and download rights', () => {
   const result = shop().order({ orderId: '10', deliveryType: 'DIGITAL', orderStatus: 'COMPLETED', payStatus: '1', aftersaleStatus: 'NONE', items: [{ materialTitle: '购买时的名称', unitPrice: '20.00' }], logs: [{ eventType: 'PAY_SUCCESS', toOrderStatus: 'COMPLETED', createTime: '2026-10-04' }] })
-  assert.equal(result.logs[0].eventText, '模拟支付成功'); assert.equal(result.logs[0].statusText, '已完成')
+  assert.equal(result.logs[0].eventText, '订单支付完成'); assert.equal(result.logs[0].statusText, '已完成')
   assert.equal(result.items[0].materialTitle, '购买时的名称'); assert.equal(result.canDownload, true)
   assert.equal(shop().order({ deliveryType: 'DIGITAL', payStatus: '2', aftersaleStatus: 'REFUNDED' }).canDownload, false)
 })
@@ -490,4 +490,22 @@ test('product media pickers keep successful results when the native picker tempo
   p.chooseImages({ currentTarget: { dataset: { kind: 'cover' } } }); p.onHide()
   await imagePicker.success({ tempFiles: [{ tempFilePath: '/tmp/new.png', size: 10 }] }); assert.equal(p.data.form.coverUrl, 'http://127.0.0.1:8080/profile/new.png')
   p.chooseFile(); p.onHide(); filePicker.success({ tempFiles: [{ name: 'test.pdf', path: '/tmp/test.pdf', size: 10 }] }); assert.equal(p.data.file.name, 'test.pdf')
+})
+
+test('zero payable order uses free claim and does not invoke mock payment', async () => {
+  const calls = []
+  environment({showModal: options => options.success({confirm:true}),request: options => {
+    calls.push(options.url)
+    const data = options.url.endsWith('/payment') ? {mode:'FREE',orderId:'10'} : options.url.endsWith('/free-claim') ? {} : {orderId:'10',orderStatus:'COMPLETED',payStatus:'1',deliveryType:'DIGITAL',items:[],logs:[]}
+    options.success({statusCode:200,data:{code:200,data}})
+  }})
+  const result=await shop().pay('10')
+  assert.equal(result.state,'success');assert.equal(result.free,true)
+  assert.ok(calls.some(url=>url.endsWith('/free-claim')))
+  assert.ok(!calls.some(url=>url.endsWith('/mock-pay')))
+})
+test('unlimited physical quantity is constrained by stock and not 99', () => {
+  assert.equal(shop().normalizeQuantity(100, 150, null), 100)
+  assert.throws(()=>shop().normalizeQuantity(101, 100, null))
+  assert.throws(()=>shop().normalizeQuantity(5, 150, 4))
 })

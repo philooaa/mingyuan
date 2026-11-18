@@ -38,7 +38,7 @@ function request(options) {
           wx.showToast({ title: '登录已失效，请重新进入', icon: 'none' })
           setTimeout(() => {
             if (!wx.getStorageSync('token')) {
-              wx.reLaunch({ url: '/pages/register/register' })
+              wx.reLaunch({ url: options.loginRedirect === '/pages/register/register?next=homework' ? options.loginRedirect : '/pages/register/register' })
             }
           }, 600)
         }

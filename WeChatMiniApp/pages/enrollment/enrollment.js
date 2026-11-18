@@ -24,7 +24,7 @@ Page(childContext.page({
     expandedCourseIds: [],
     subjectIndex: 0,
     gradeIndex: 0,
-    termOptions: termFilter.options,
+    termOptions: termFilter.seasonOptions,
     termIndex: 0,
     selectedSchedule: null,
     cart: [], cartCount: 0, cartTotal: '0.00', cartMode: false,
@@ -162,7 +162,7 @@ Page(childContext.page({
     const grade = this.data.gradeIndex > 0 && this.data.grades[this.data.gradeIndex - 1]
     const eligible = (this._allSchedules || []).filter(course =>
       this.matchesCourseType(course) &&
-      termFilter.matches(course, this.data.termIndex) &&
+      termFilter.matchesSeason(course, this.data.termIndex) &&
       (!subject || course.subjectName === subject.dictLabel) &&
       (!grade || course.gradeName === grade.dictLabel))
     const eligibleKeys = new Set(eligible.map(course => course.teacherKey))
@@ -362,7 +362,7 @@ Page(childContext.page({
   },
   onTermChange(e) {
     const index = Number(e.detail.value)
-    if (!this.current() || this.data.submitting || this.data.showSheet || !Number.isInteger(index) || index < 0 || index >= termFilter.options.length) return
+    if (!this.current() || this.data.submitting || this.data.showSheet || !Number.isInteger(index) || index < 0 || index >= termFilter.seasonOptions.length) return
     this.setData({ termIndex: index, expandedCourseIds: [] }); this.applyFilters()
   },
   chooseCourseType(e) {
@@ -381,13 +381,20 @@ Page(childContext.page({
   },
 
   // ---- 购物车：一个购物车 = 一个订单 ----
+  cartKey() {
+    const owner = childContext.owner(), accountId = String(this.data.scopeAccountId || '')
+    if (!owner || !/^[1-9]\d*$/.test(accountId) || childContext.id() !== accountId) return ''
+    return `enrollCart:v2:${encodeURIComponent(owner)}:${accountId}`
+  },
   loadCart() {
-    const saved = wx.getStorageSync('enrollCart')
+    const key = this.cartKey()
+    this._cartKey = key
+    const saved = key ? wx.getStorageSync(key) : null
     this.setData({ cart: Array.isArray(saved) ? saved : [] })
     this.refreshCartSummary()
   },
 
-  saveCart() { wx.setStorageSync('enrollCart', this.data.cart) },
+  saveCart() { if (this.current() && this._cartKey && this.cartKey() === this._cartKey) wx.setStorageSync(this._cartKey, this.data.cart) },
 
   refreshCartSummary() {
     const cart = this.data.cart || []
@@ -409,6 +416,7 @@ Page(childContext.page({
 
   addToCart(e) {
     if (!this.current() || this.data.submitting || this.data.showSheet) return
+    if (!this._cartKey || this.cartKey() !== this._cartKey) { wx.showToast({title:'请先选择孩子后再添加课程',icon:'none'}); return }
     const key = e.currentTarget.dataset.key
     const course = this.data.schedules.find(item => item.viewKey === key)
     if (!course) return
@@ -463,6 +471,7 @@ Page(childContext.page({
 
   openCart() {
     if (!this.current() || this.data.submitting || !(this.data.cart || []).length) return
+    if (!this._cartKey || this.cartKey() !== this._cartKey) { wx.showToast({title:'孩子信息已变化，请重新进入',icon:'none'}); return }
     const userInfo = wx.getStorageSync('userInfo') || {}
     const selected = this.data.scopeAccountId
       ? this.data.lessonAccounts.find(a => String(a.accountId) === this.data.scopeAccountId)
@@ -579,6 +588,7 @@ Page(childContext.page({
 
   async submitCart() {
     if (!this.current() || this.data.submitting) return
+    if (!this._cartKey || this.cartKey() !== this._cartKey || String(this.data.selectedChildId || '') !== String(this.data.scopeAccountId || '') || this.data.newChild) { wx.showToast({title:'孩子信息已变化，请重新进入',icon:'none'}); return }
     const cart = this.data.cart || [], form = this.data.form
     if (!cart.length) { wx.showToast({ title: '购物车是空的', icon: 'none' }); return }
     if (this.data.accountsLoading || this.data.accountsError || this.data.childMissing) {
@@ -606,7 +616,7 @@ Page(childContext.page({
       if (!this.current()) return
       if (typeof getCurrentPages === 'function') getCurrentPages().forEach(p => { p._scheduleDirty = true })
       this.setData({ cart: [], cartMode: false, showSheet: false, selectedSchedule: null, orderDoneOpen: true, orderDoneKind: 'CLASS' })
-      wx.setStorageSync('enrollCart', [])
+      this.saveCart()
       this.refreshCartSummary()
       await this.loadPage()
     } catch (error) {

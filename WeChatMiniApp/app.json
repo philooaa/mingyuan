@@ -43,6 +43,7 @@
     "pages/sign-review-detail/sign-review-detail",
     "pages/logs/logs",
     "pages/homework/homework",
+    "pages/homework-share/homework-share",
     "pages/homework-detail/homework-detail",
     "pages/teacher-homework/teacher-homework",
     "pages/teacher-homework-create/teacher-homework-create",

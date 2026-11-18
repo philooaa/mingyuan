@@ -134,10 +134,10 @@ test('parent term filter combines with teachers and dimensions, reset restores a
  rows.push({...rows[2],scheduleId:'different-grade',gradeName:'高一'})
  const {p}=harness(()=>Promise.resolve({data:rows}));await p.loadSchedules()
  p.onGradeChange(change(1));p.onSubjectChange(change(1))
- for(let index=1;index<=6;index++){p.onTermChange(change(index));assert.equal(p.data.schedules.length,1);assert.equal(p.data.schedules[0].scheduleId,String(index+19))}
- p.onTermChange(change(3));p.chooseTeachers(change(['teacher:11']));assert.equal(p.data.selectedTeachers[0].key,'teacher:11')
- p.onTermChange(change(4));assert.equal(p.data.selectedTeacherKeys.length,0);assert.equal(p.data.teacherOptions.length,1)
+ for(const [index,count] of [[1,1],[2,1],[3,2],[4,2]]){p.onTermChange(change(index));assert.equal(p.data.schedules.length,count)}
+ p.onTermChange(change(3));p.chooseTeachers(change(['teacher:11']));assert.equal(p.data.selectedTeachers[0].key,'teacher:11');assert.equal(p.data.schedules.length,1)
+ p.onTermChange(change(2));assert.equal(p.data.selectedTeacherKeys.length,0);assert.equal(p.data.teacherOptions.length,1)
  p.resetFilters();assert.equal(p.data.termIndex,0);assert.equal(p.data.schedules.length,7)
- const actualTerm=p.data.termIndex;p.onTermChange(change(7));assert.equal(p.data.termIndex,actualTerm)
- p._allSchedules=rows.map(c=>({...c,classMode:'1'}));p.data.courseTypeIndex=0;p.onTermChange(change(5));assert.equal(p.data.schedules.length,1);assert.equal(p.data.schedules[0].termName,'暑假')
+ const actualTerm=p.data.termIndex;p.onTermChange(change(5));assert.equal(p.data.termIndex,actualTerm)
+ p._allSchedules=rows.map(c=>({...c,classMode:'1'}));p.data.courseTypeIndex=0;p.onTermChange(change(4));assert.equal(p.data.schedules.length,2);assert.equal(p.data.schedules[0].termName,'暑假')
 })

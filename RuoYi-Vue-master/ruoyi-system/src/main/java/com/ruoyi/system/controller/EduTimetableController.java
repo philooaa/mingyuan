@@ -433,7 +433,7 @@ public class EduTimetableController extends BaseController
     @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-修改", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@RequestBody EduCourseSchedule schedule)
+    public AjaxResult edit(@RequestBody EduCourseSchedule schedule, @RequestParam(defaultValue="false") boolean force)
     {
         EduCourseSchedule old = scheduleService.selectEduCourseScheduleByScheduleId(schedule.getScheduleId());
         if (old == null) {
@@ -441,7 +441,7 @@ public class EduTimetableController extends BaseController
         }
         checkEditablePermission(schedule, old, false);
         schedule.setUpdateBy(SecurityUtils.getUsername());
-        return toAjax(scheduleService.updateEduCourseSchedule(schedule));
+        return toAjax(scheduleService.updateEduCourseSchedule(schedule, force));
     }
 
     /**

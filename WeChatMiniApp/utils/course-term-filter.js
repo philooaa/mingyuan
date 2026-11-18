@@ -14,4 +14,13 @@ function matches(course, index) {
   if (index === 0) return true
   return Number.isInteger(index) && index > 0 && index < keys.length && courseKey(course) === keys[index]
 }
-module.exports = { options, matches }
+// 报名页按学期合并期次，课程原始期次仍保留在详情中。
+const seasonOptions = ['全部时段', '春季', '秋季', '寒假', '暑假']
+function matchesSeason(course, index) {
+  if (index === 0) return true
+  if (!Number.isInteger(index) || index < 1 || index >= seasonOptions.length) return false
+  const term = clean(course.termName)
+  const seasons = [[], ['春季', '春期', '春季班', '春季学期'], ['秋季', '秋期', '秋季班', '秋季学期'], ['寒假', '寒期', '寒假班'], ['暑假', '暑期', '暑假班']]
+  return seasons[index].includes(term)
+}
+module.exports = { options, matches, seasonOptions, matchesSeason }

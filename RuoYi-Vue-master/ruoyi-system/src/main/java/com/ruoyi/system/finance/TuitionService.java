@@ -350,6 +350,19 @@ public class TuitionService {
   private static String gradeStage(String column) {
     return "(CASE WHEN TRIM("+column+") IN ('一年级','二年级','三年级','四年级','五年级','六年级','小学一年级','小学二年级','小学三年级','小学四年级','小学五年级','小学六年级','小一','小二','小三','小四','小五','小六','1年级','2年级','3年级','4年级','5年级','6年级','g1','g2','g3','g4','g5','g6') THEN 'PRIMARY' WHEN TRIM("+column+") IN ('初一','初二','初三','初中一年级','初中二年级','初中三年级','七年级','八年级','九年级','7年级','8年级','9年级','g7','g8','g9') THEN 'JUNIOR' WHEN TRIM("+column+") IN ('高一','高二','高三','高中一年级','高中二年级','高中三年级','g10','g11','g12') THEN 'SENIOR' ELSE 'UNKNOWN' END)";
   }
+  public Map<String, Object> billParents(Map<String, String> q) {
+    String keyword = str(q,"keyword").trim();
+    require(keyword.length()<=100,"搜索词过长");
+    String like="%"+keyword+"%";
+    String from=" FROM sys_user u WHERE (EXISTS(SELECT 1 FROM sys_user_role ur JOIN sys_role r ON r.role_id=ur.role_id WHERE ur.user_id=u.user_id AND r.role_key='parent') OR EXISTS(SELECT 1 FROM edu_enrollment e WHERE e.parent_id=u.user_id) OR EXISTS(SELECT 1 FROM edu_student_lesson_account a WHERE a.parent_id=u.user_id) OR EXISTS(SELECT 1 FROM edu_material_order o WHERE o.parent_id=u.user_id)) AND (u.user_name LIKE ? OR u.nick_name LIKE ? OR u.phonenumber LIKE ? OR EXISTS(SELECT 1 FROM edu_enrollment e WHERE e.parent_id=u.user_id AND e.student_name LIKE ?) OR EXISTS(SELECT 1 FROM edu_student st WHERE st.parent_id=u.user_id AND st.student_name LIKE ?))";
+    String select="SELECT u.user_id parent_id,"+FinanceRules.parentNameSql("u")+" parent_name,u.phonenumber parent_phone,u.del_flag,u.status";
+    return CouponService.page(db,select+from+" ORDER BY u.user_id DESC","SELECT COUNT(*)"+from,new ArrayList<>(List.of(like,like,like,like,like)),q);
+  }
+
+  public List<Map<String,Object>> billChildren(long parentId) {
+    return db.rows("SELECT a.account_id,st.student_name FROM edu_student_lesson_account a LEFT JOIN edu_student st ON st.student_id=a.student_id AND st.parent_id=a.parent_id WHERE a.parent_id=? ORDER BY a.account_id",parentId);
+  }
+
   public Map<String, Object> listBills(long actor, boolean admin, Map<String, String> q) {
     actor(actor, admin);
     // 购物车订单里的单门课程不单独成账单，收款统一记在订单主账单上。
@@ -359,6 +372,10 @@ public class TuitionService {
       long account=id(q.get("accountId"));
       if(!admin)checkChildAccount(actor,account);
       where+=" AND e.lesson_account_id=?";a.add(account);
+    }
+    if(admin && "true".equals(str(q,"unlinkedOnly"))) {
+      require(str(q,"accountId").isEmpty(),"不能同时选择孩子和未关联账单");
+      where += " AND e.lesson_account_id IS NULL";
     }
     if (!admin) {
       where += " AND e.parent_id=?";
@@ -831,7 +848,7 @@ public class TuitionService {
               else
                 require(
                     admin
-                        ? Set.of("CASH", "BANK_TRANSFER", "WECHAT_OFFLINE", "FREE")
+                        ? Set.of("CASH", "BANK_TRANSFER", "WECHAT_OFFLINE", "ALIPAY_OFFLINE", "FREE")
                             .contains(channel)
                         : "FREE".equals(channel),
                     "正式在线支付尚未开通，请联系财务线下缴费");
@@ -848,7 +865,7 @@ public class TuitionService {
               require(!payer.isBlank() && payer.length() <= 64, "付款人名称无效");
               String provider = str(b, "providerTradeNo");
               require(provider.length() <= 64, "流水号过长");
-              boolean offline = Set.of("CASH", "BANK_TRANSFER", "WECHAT_OFFLINE").contains(channel);
+              boolean offline = Set.of("CASH", "BANK_TRANSFER", "WECHAT_OFFLINE", "ALIPAY_OFFLINE").contains(channel);
               String proof = offline ? evidence(b, actor, "PAYMENT", enrollment) : null;
               Timestamp paid = offline ? time(b.get("paidTime")) : null;
               require(paid == null || !paid.after(now()), "收款时间不能晚于当前时间");
@@ -961,7 +978,7 @@ public class TuitionService {
     String channel = str(p, "channel"),
         proof = str(p, "evidenceKey"),
         provider = str(p, "providerTradeNo");
-    if (Set.of("CASH", "BANK_TRANSFER", "WECHAT_OFFLINE").contains(channel)) {
+    if (Set.of("CASH", "BANK_TRANSFER", "WECHAT_OFFLINE", "ALIPAY_OFFLINE").contains(channel)) {
       if (!str(b, "evidenceKey").isEmpty()) proof = evidence(b, actor, "PAYMENT", enrollment);
       require(!proof.isBlank(), "必须有有效收款凭证");
       if (!str(b, "providerTradeNo").isEmpty()) provider = str(b, "providerTradeNo");

@@ -17,7 +17,7 @@ export function availableStock(product) {
 export function productForm(product = {}) {
   const form = { title: '', subtitle: '', subjectCode: '', gradeCode: '', materialType: '', textbookVersion: '',
     deliveryType: 'PHYSICAL', price: '0.00', intro: '', detailText: '', coverUrl: '', unit: '份',
-    stockQuantity: 0, stockLocked: 0, purchaseLimit: 99, shippingFee: '0.00', shipFrom: '', dispatchDays: null,
+    stockQuantity: 0, stockLocked: 0, purchaseLimit: null, shippingFee: '0.00', shipFrom: '', dispatchDays: null,
     shelfStatus: '2', sortOrder: 0, filePath: '', fileName: '', fileSize: '', ...product }
   if (form.materialId !== undefined && form.materialId !== null) form.materialId = String(form.materialId)
   const images = (product.images || []).slice().sort((a, b) => a.sortOrder - b.sortOrder)
@@ -39,7 +39,7 @@ export function validateProduct(form, shelfStatus) {
     if (text(key).length > max) errors.push(`${key}内容超过${max}字`)
   }
   if (form.deliveryType === 'PHYSICAL') {
-    if (!Number.isInteger(Number(form.purchaseLimit)) || Number(form.purchaseLimit) < 1 || Number(form.purchaseLimit) > 99) errors.push('单次限购需为1至99的整数')
+    if (form.purchaseLimit !== null && form.purchaseLimit !== undefined && form.purchaseLimit !== '' && (!Number.isInteger(Number(form.purchaseLimit)) || Number(form.purchaseLimit) < 1 || Number(form.purchaseLimit) > 99)) errors.push('单次限购需为1至99的整数')
     if (!form.materialId && (!Number.isInteger(Number(form.stockQuantity)) || Number(form.stockQuantity) < 0 || Number(form.stockQuantity) > 2147483647)) errors.push('初始库存需为非负整数')
     if (form.dispatchDays !== null && form.dispatchDays !== undefined && form.dispatchDays !== '' && (!Number.isInteger(Number(form.dispatchDays)) || Number(form.dispatchDays) < 0 || Number(form.dispatchDays) > 365)) errors.push('发货天数需为0至365的整数')
   }
@@ -50,7 +50,6 @@ export function validateProduct(form, shelfStatus) {
   if ([...cover, ...gallery, ...details].some(url => !/^(\/profile\/|https?:\/\/).+\.(png|jpe?g)([?#].*)?$/i.test(url) || url.length > 500)) errors.push('图片仅支持JPG/PNG公开路径')
   if (shelfStatus === '1') {
     if (!cover.length || !text('subjectCode') || !text('gradeCode') || !text('detailText')) errors.push('上架需填写封面、学科、年级和详情描述')
-    if (Number(form.price) <= 0) errors.push('新商品上架价格必须大于0')
     if (form.deliveryType === 'PHYSICAL' && availableStock(form) <= 0) errors.push('上架需有可售库存，请先调整库存')
     if (form.deliveryType === 'DIGITAL' && (!text('filePath') || !text('fileName'))) errors.push('电子资料上架需上传私有PDF')
   }
@@ -64,7 +63,7 @@ export function productBody(form, shelfStatus) {
   for (const key of ['title', 'subtitle', 'subjectCode', 'gradeCode', 'materialType', 'textbookVersion', 'deliveryType', 'intro', 'detailText', 'coverUrl', 'unit', 'sortOrder']) body[key] = form[key]
   body.price = money(form.price)
   body.shippingFee = form.deliveryType === 'DIGITAL' ? '0.00' : money(form.shippingFee)
-  body.purchaseLimit = form.deliveryType === 'DIGITAL' ? 1 : Number(form.purchaseLimit)
+  body.purchaseLimit = form.deliveryType === 'DIGITAL' ? 1 : (form.purchaseLimit === null || form.purchaseLimit === undefined || form.purchaseLimit === '' ? null : Number(form.purchaseLimit))
   body.shelfStatus = shelfStatus
   body.images = ['GALLERY', 'DETAIL'].flatMap(type => imageUrls(form[type === 'GALLERY' ? 'galleryUrls' : 'detailUrls']).map((url, index) => ({ imageType: type, imageUrl: url, sortOrder: index })))
   if (form.materialId) {

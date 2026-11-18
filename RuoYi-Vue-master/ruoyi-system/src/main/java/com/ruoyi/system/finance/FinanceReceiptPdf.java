@@ -52,7 +52,7 @@ public final class FinanceReceiptPdf {
     return switch (s) {
       case "CASH" -> "现金";
       case "BANK_TRANSFER" -> "银行转账";
-      case "WECHAT_OFFLINE" -> "线下微信收款";
+      case "WECHAT_OFFLINE" -> "微信"; case "ALIPAY_OFFLINE" -> "支付宝";
       case "MOCK" -> "本地模拟";
       case "FREE" -> "零元减免";
       default -> s;

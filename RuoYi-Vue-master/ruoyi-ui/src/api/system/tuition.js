@@ -3,6 +3,12 @@ import request from '@/utils/request'
 export function listTuition(params) {
   return request({ url: '/system/tuition/list', method: 'get', params })
 }
+export function listBillParents(params) {
+  return request({ url: '/system/tuition/parents', method: 'get', params })
+}
+export function listBillChildren(parentId) {
+  return request({ url: '/system/tuition/parents/' + encodeURIComponent(String(parentId)) + '/children', method: 'get' })
+}
 export function getTuitionSummary(params) {
   return request({ url: '/system/tuition/summary', method: 'get', params })
 }

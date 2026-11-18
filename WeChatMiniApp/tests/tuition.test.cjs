@@ -536,3 +536,18 @@ test('education and administrator billing details show every course without chan
   assert.equal(p.data.detail.payableAmount,bill.payableAmount)
  }
 })
+
+test('Alipay is offered for real offline collection and requires a transaction reference', async () => {
+  storage = new Map()
+  env(o => {
+    if (o.url.endsWith('/getInfo')) return o.success({ statusCode: 200, data: { code: 200, roles: ['education'], permissions: ['*:*:*'] } })
+    if (o.url.endsWith('/quote')) return ok(o, { payableAmount:'900.00', financialVersion:2, coupons:[] })
+    return ok(o, { ...bill, financeMode:'REAL', mockAllowed:false, canPay:true })
+  }, 'education')
+  const p=page('admin-tuition');p.onLoad({id:bill.enrollmentId});await p.onShow()
+  assert.deepEqual(p.data.channelLabels,['现金','支付宝','微信','银行转账'])
+  p.setData({channelIndex:1,payerName:'付款人',paidTime:'2026-10-07 12:00:00',evidenceKey:'private-key',providerTradeNo:'',quote:{payableAmount:'900.00',financialVersion:2},quoteLoading:false,quoteError:''})
+  await p.collect();assert.match(p.data.error,/流水/);assert.equal(calls.some(c=>c.url.endsWith('/payments')),false)
+  p.setData({providerTradeNo:'alipay-123'});await p.collect()
+  assert.equal(calls.find(c=>c.url.endsWith('/payments')).data.channel,'ALIPAY_OFFLINE')
+})

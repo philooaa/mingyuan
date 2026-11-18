@@ -1,5 +1,17 @@
 const test = require('node:test'), assert = require('node:assert/strict')
-const { matches } = require('../utils/course-term-filter')
+const { matches, matchesSeason, seasonOptions } = require('../utils/course-term-filter')
+test('enrollment groups all vacation periods by their configured term', () => {
+  assert.deepEqual(seasonOptions, ['全部时段','春季','秋季','寒假','暑假'])
+  for(const periodName of ['一期','二期','三期','']) {
+    assert.equal(matchesSeason({termName:'寒假',periodName},3),true)
+    assert.equal(matchesSeason({termName:'暑期',periodName},4),true)
+    assert.equal(matchesSeason({termName:'寒假',periodName},4),false)
+  }
+  assert.equal(matchesSeason({termName:'春季'},1),true)
+  assert.equal(matchesSeason({termName:'未知'},0),true)
+  assert.equal(matchesSeason({termName:'未知'},3),false)
+  assert.equal(matchesSeason({termName:'暑假'},5),false)
+})
 test('term matching uses configured fields without guessing dates or conflating vacation periods', () => {
   assert.equal(matches({termName:' 暑期 ',periodName:'第２期'},6),true)
   assert.equal(matches({termName:'寒假',periodName:'一期'},3),true)

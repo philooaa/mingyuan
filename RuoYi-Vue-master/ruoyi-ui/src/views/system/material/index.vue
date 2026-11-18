@@ -57,7 +57,7 @@
         <el-row :gutter="16">
           <el-col :span="12"><el-form-item label="销售价格" required><el-input v-model="form.price" placeholder="如12.30"><template slot="prepend">¥</template></el-input></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="计量单位" required><el-input v-model="form.unit" maxlength="20" placeholder="本 / 套 / 份" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="单次限购"><el-input-number :value="form.deliveryType === 'DIGITAL' ? 1 : form.purchaseLimit" @input="form.purchaseLimit = $event" :min="1" :max="99" :precision="0" :disabled="form.deliveryType === 'DIGITAL'" /></el-form-item></el-col>
+          <el-col :span="12"><el-form-item label="单次限购"><el-input v-model="form.purchaseLimit" placeholder="留空不限购，填写1至99" :disabled="form.deliveryType === 'DIGITAL'" /></el-form-item></el-col>
           <el-col :span="12"><el-form-item label="排序"><el-input-number v-model="form.sortOrder" :min="0" :max="2147483647" :precision="0" /></el-form-item></el-col>
           <el-col :span="24" v-if="form.deliveryType === 'PHYSICAL'"><el-form-item :label="form.materialId ? '当前库存' : '初始库存'"><template v-if="form.materialId">可售 {{ availableStock(form) }}，预占 {{ form.stockLocked || 0 }}，总库存 {{ form.stockQuantity || 0 }}<div class="help">库存调整请在列表使用“调整库存”，调整后重新打开编辑。</div></template><el-input-number v-else v-model="form.stockQuantity" :min="0" :max="2147483647" :precision="0" /></el-form-item></el-col>
         </el-row>
@@ -76,7 +76,7 @@
           <div v-if="form.filePath">{{ form.fileName }}（{{ fileSizeText(form.fileSize) }}）</div>
           <div class="help">仅PDF，单文件不超过10MB。文件受购买权限保护，替换不影响旧订单交付版本。</div>
         </el-form-item>
-        <div class="help">保存草稿可稍后补齐；上架需填写学科、年级、封面、详情、正数价格与可售库存或私有PDF。</div>
+        <div class="help">保存草稿可稍后补齐；上架需填写学科、年级、封面、详情、非负价格与可售库存或私有PDF。</div>
       </el-form>
       <div slot="footer">
         <el-button :disabled="saving || pdfUploading" @click="closeEditor">取消</el-button>

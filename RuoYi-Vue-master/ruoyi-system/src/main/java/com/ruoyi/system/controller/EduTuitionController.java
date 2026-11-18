@@ -53,6 +53,18 @@ public class EduTuitionController {
   }
 
   @PreAuthorize("@ss.hasPermi('system:tuition:list')")
+  @GetMapping("/parents")
+  public TableDataInfo parents(@RequestParam Map<String, String> q) {
+    return table(tuition.billParents(q));
+  }
+
+  @PreAuthorize("@ss.hasPermi('system:tuition:list')")
+  @GetMapping("/parents/{parentId}/children")
+  public AjaxResult children(@PathVariable long parentId) {
+    return AjaxResult.success(FinanceRules.dto(Map.of("children",tuition.billChildren(parentId))));
+  }
+
+  @PreAuthorize("@ss.hasPermi('system:tuition:list')")
   @GetMapping("/summary")
   public AjaxResult summary(@RequestParam Map<String, String> q) {
     return EduTuitionController.ok(tuition.summary(SecurityUtils.getUserId(), q));

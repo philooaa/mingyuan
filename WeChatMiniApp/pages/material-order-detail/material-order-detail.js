@@ -19,14 +19,14 @@ Page({
   async pay() {
     if (this.data.busy || !this.data.detail || !this.data.detail.canPay) return
     const operation = ++this._operation
-    this.setData({ busy: true, paymentText: '准备模拟支付…' })
+    this.setData({ busy: true, paymentText: this.data.detail.payment && this.data.detail.payment.channel === 'FREE' ? '准备免费领取…' : '准备模拟支付…' })
     try {
       const result = await shop.pay(this.orderId, () => !this._hidden && operation === this._operation)
       if (this._hidden || operation !== this._operation) return
       if (result.order) this.setData({ detail: result.order })
-      this.setData({ paymentText: { success: '模拟支付成功，未真实扣款', cancelled: '已取消模拟支付，订单仍待支付', pending: '支付结果处理中，请刷新核对订单状态' }[result.state] })
+      this.setData({ paymentText: { success: result.free ? '免费领取成功' : '模拟支付成功，未真实扣款', cancelled: '已取消操作，订单仍待处理', pending: '支付结果处理中，请刷新核对订单状态' }[result.state] })
     } catch (error) {
-      if (!this._hidden && operation === this._operation) { this.setData({ paymentText: error.network ? '结果暂未确认，请刷新订单状态' : `模拟支付失败：${error.message}` }); await this.loadDetail() }
+      if (!this._hidden && operation === this._operation) { this.setData({ paymentText: error.network ? '结果暂未确认，请刷新订单状态' : `订单处理失败：${error.message}` }); await this.loadDetail() }
     } finally { if (!this._hidden && operation === this._operation) this.setData({ busy: false }) }
   },
   async action(e) {
