@@ -1,5 +1,6 @@
 <template>
   <div class="app-container timetable-page">
+    <teacher-attendance class="teacher-attendance-entry"/>
     <!-- 顶部筛选栏 -->
     <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" label-width="64px" class="tt-toolbar">
       <el-form-item label="年份">
@@ -514,6 +515,7 @@
 </template>
 
 <script>
+import TeacherAttendance from './TeacherAttendance.vue'
 import TimetableCell from './TimetableCell.vue'
 import TimetableDialog from './TimetableDialog.vue'
 import OneToOneManager from '../schedule/OneToOneManager.vue'
@@ -534,7 +536,7 @@ import {
 
 export default {
   name: 'CourseTimetable',
-  components: { TimetableCell, TimetableDialog, OneToOneManager },
+  components: { TeacherAttendance, TimetableCell, TimetableDialog, OneToOneManager },
   data() {
     return {
       loading: false,
@@ -1393,3 +1395,8 @@ export default {
 </script>
 
 <style lang="scss" scoped src="./timetable.scss"></style>
+
+<style scoped>
+.teacher-attendance-entry { margin-bottom: 12px; }
+.teacher-attendance-entry:empty { display: none; }
+</style>

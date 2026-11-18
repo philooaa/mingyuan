@@ -107,7 +107,7 @@
   </div>
 </template>
 <script>
-import {rosterCourses,rosterLessons,rosterStudents,rosterList,rosterAdd,rosterRemove,rosterAddOffline,rosterBindParent,rosterPendingParents} from '@/api/system/attendanceRoster'
+import {rosterCourses,rosterLessons,rosterStudents,rosterList,rosterAdd,rosterRemove,rosterAddOffline,rosterBindParent,rosterPendingParents,rosterBindingCandidates,rosterLinkExisting} from '@/api/system/attendanceRoster'
 import {getToken} from '@/utils/auth'
 export default {
   name:'AttendanceRoster',
@@ -210,12 +210,35 @@ export default {
     },
     bindParent(row, pending=false){
       return this.run(async()=>{
-        const phone=await this.promptInput(`请核实「${row.studentName}」（档案 ${row.studentId}）家长的注册手机号。`,'绑定家长',{
-          inputValidator:value=>typeof value==='string'&&/^1[3-9][0-9]{9}$/.test(value.trim()),
-          inputErrorMessage:'请输入11位家长手机号'
-        })
-        if(phone===null||!this.current())return
-        await rosterBindParent(row.studentId,{phone})
+        const {data:candidates=[]}=await rosterBindingCandidates(row.studentId)
+        if(!this.current())return
+        if(candidates.length){
+          const render=this.$createElement
+          let selected=''
+          const selector={data:()=>({value:''}),render(h){return h('el-select',{props:{value:this.value,placeholder:'选择学生档案',filterable:true},on:{input:value=>{this.value=value;selected=value}}},
+            candidates.map(candidate=>h('el-option',{props:{value:String(candidate.studentId),label:[candidate.studentName,'档案 '+candidate.studentId,candidate.contactPhone].filter(Boolean).join(' · ')}})))}}
+          await this.$msgbox({
+            title:'关联已有档案',
+            message:render('div',[
+              render('p','请核对同名档案和家长手机号。'),
+              render(selector)
+            ]),
+            showCancelButton:true,
+            beforeClose:(action,instance,done)=>{
+              if(action!=='confirm'||selected)done()
+              else this.$modal.msgWarning('请先选择档案')
+            }
+          }).catch(error=>{if(error==='cancel'||error==='close')selected='';else throw error})
+          if(!selected||!this.current())return
+          await rosterLinkExisting(row.studentId,selected)
+        }else{
+          const phone=await this.promptInput(`未找到「${row.studentName}」的已有档案，请输入已核实的家长注册手机号。`,'绑定家长',{
+            inputValidator:value=>typeof value==='string'&&/^1[3-9][0-9]{9}$/.test(value.trim()),
+            inputErrorMessage:'请输入11位家长手机号'
+          })
+          if(phone===null||!this.current())return
+          await rosterBindParent(row.studentId,{phone})
+        }
         if(this.current()){
           if(pending)this.pendingRows=this.pendingRows.filter(student=>student.studentId!==row.studentId)
           else await this.fetchRows()

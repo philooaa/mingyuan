@@ -26,6 +26,17 @@ public class MiniAppAttendanceRosterController extends BaseController {
         return success(roster.pendingParentBindings());
     }
 
+    @GetMapping("/miniapp/staff/attendance/students/{studentId}/binding-candidates")
+    public AjaxResult bindingCandidates(@PathVariable long studentId) {
+        return success(roster.bindingCandidates(studentId));
+    }
+
+    @PutMapping("/miniapp/staff/attendance/students/{studentId}/existing/{existingId}")
+    public AjaxResult linkExisting(@PathVariable long studentId, @PathVariable long existingId) {
+        roster.linkExistingStudent(studentId,existingId);
+        return success();
+    }
+
     @PutMapping("/miniapp/staff/attendance/students/{studentId}/parent")
     public AjaxResult bindParent(@PathVariable long studentId,
                                @RequestBody AttendanceLessonRosterService.ParentBindingRequest input) {
@@ -35,5 +46,30 @@ public class MiniAppAttendanceRosterController extends BaseController {
 
     @PutMapping("/miniapp/staff/attendance/roster/{id}") public AjaxResult remove(@PathVariable long id,@RequestBody AttendanceLessonRosterService.RemovalRequest input){roster.remove(id,input);return success();}
     @PutMapping("/miniapp/staff/attendance/roster/enrollment/{id}") public AjaxResult removeEnrollment(@PathVariable long id,@RequestBody AttendanceLessonRosterService.RemovalRequest input){roster.removeEnrollment(id,input);return success();}
-    @GetMapping("/miniapp/attendance/todos") public AjaxResult todos(@RequestParam String role){return success(roster.todos(role));}
+    @GetMapping("/miniapp/attendance/pending-review-count")
+    public AjaxResult pendingReviewCount(@RequestParam String role) {
+        return success(roster.pendingReviewCount(role));
+    }
+
+    @GetMapping("/miniapp/attendance/todos") public AjaxResult todos(@RequestParam String role,@RequestParam(defaultValue="false") boolean allLessons){
+        return success(roster.todos(role,allLessons && "teacher".equals(role)));
+    }
+
+    @GetMapping("/miniapp/teacher/attendance/guests/students")
+    public AjaxResult guestStudents(@RequestParam long scheduleId,@RequestParam String classDate,@RequestParam String keyword){return success(roster.guestStudents(scheduleId,classDate,keyword));}
+    @GetMapping("/miniapp/teacher/attendance/guests/sources")
+    public AjaxResult guestSources(@RequestParam long scheduleId,@RequestParam String classDate,@RequestParam long studentId){return success(roster.guestSources(scheduleId,classDate,studentId));}
+    @GetMapping("/miniapp/teacher/attendance/guests/outgoing")
+    public AjaxResult guestOutgoing(@RequestParam long scheduleId,@RequestParam String classDate){return success(roster.guestOutgoing(scheduleId,classDate));}
+    @PostMapping("/miniapp/teacher/attendance/guests")
+    public AjaxResult addGuest(@RequestBody AttendanceLessonRosterService.GuestRequest input){return success(roster.addGuest(input));}
+    @DeleteMapping("/miniapp/teacher/attendance/guests/{guestId}")
+    public AjaxResult removeGuest(@PathVariable long guestId,@RequestParam long scheduleId,@RequestParam String classDate){roster.removeGuest(scheduleId,classDate,guestId);return success();}
+
+    @GetMapping("/miniapp/attendance/teacher-lesson")
+    public AjaxResult teacherLesson(@RequestParam long scheduleId,@RequestParam long lessonId){
+        var lesson=roster.teacherLesson(scheduleId,lessonId);
+        lesson.put("classDate",String.valueOf(lesson.get("classDate")).substring(0,10));
+        return success(lesson);
+    }
 }

@@ -10,6 +10,12 @@ public class MiniAppSignSubmitBody
     private Long reviewVersion;
     public Long getReviewVersion() { return reviewVersion; }
     public void setReviewVersion(Long value) { reviewVersion=value; }
+    /** 班课课次ID */
+    private Long lessonId;
+
+    public Long getLessonId() { return lessonId; }
+    public void setLessonId(Long lessonId) { this.lessonId = lessonId; }
+
     /** 排课ID */
     private Long scheduleId;
 

@@ -28,6 +28,38 @@ public class EduEnrollment extends BaseEntity
     public void setLessonAccountId(Long value) { lessonAccountId=value; }
     public String getStudentRequestKey() { return studentRequestKey; }
     public void setStudentRequestKey(String value) { studentRequestKey=value; }
+    private String classMode;
+    public String getClassMode() { return classMode; }
+    public void setClassMode(String value) { classMode = value; }
+
+    private String lessonTime;
+    public String getLessonTime() { return lessonTime; }
+    public void setLessonTime(String value) { lessonTime = value; }
+
+    private String lessonCreditStatus;
+    public String getLessonCreditStatus() { return lessonCreditStatus; }
+    public void setLessonCreditStatus(String value) { lessonCreditStatus = value; }
+
+    private java.math.BigDecimal lessonCredits;
+    public java.math.BigDecimal getLessonCredits() { return lessonCredits; }
+    public void setLessonCredits(java.math.BigDecimal value) { lessonCredits = value; }
+
+    private java.math.BigDecimal originalAmount;
+    public java.math.BigDecimal getOriginalAmount() { return originalAmount; }
+    public void setOriginalAmount(java.math.BigDecimal value) { originalAmount = value; }
+
+    private java.math.BigDecimal discountAmount;
+    public java.math.BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(java.math.BigDecimal value) { discountAmount = value; }
+
+    private java.math.BigDecimal payableAmount;
+    public java.math.BigDecimal getPayableAmount() { return payableAmount; }
+    public void setPayableAmount(java.math.BigDecimal value) { payableAmount = value; }
+
+    private java.math.BigDecimal receivedAmount;
+    public java.math.BigDecimal getReceivedAmount() { return receivedAmount; }
+    public void setReceivedAmount(java.math.BigDecimal value) { receivedAmount = value; }
+
     private java.time.LocalDate classDate;
     private String cancelRequestStatus;
     public java.time.LocalDate getClassDate() { return classDate; }

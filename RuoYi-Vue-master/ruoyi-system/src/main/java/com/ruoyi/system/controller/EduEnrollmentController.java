@@ -18,6 +18,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.domain.EduEnrollment;
 import com.ruoyi.system.service.IEduEnrollmentService;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.common.core.page.TableDataInfo;
 
@@ -61,6 +62,8 @@ public class EduEnrollmentController extends BaseController
     @GetMapping("/list")
     public TableDataInfo list(EduEnrollment eduEnrollment)
     {
+        eduEnrollment.getParams().put("showSingleFinance", SecurityUtils.hasPermi("system:tuition:query"));
+        eduEnrollment.setDelFlag("0");
         startPage();
         List<EduEnrollment> list = eduEnrollmentService.selectEduEnrollmentList(eduEnrollment);
         return getDataTable(list);
@@ -74,6 +77,8 @@ public class EduEnrollmentController extends BaseController
     @PostMapping("/export")
     public void export(HttpServletResponse response, EduEnrollment eduEnrollment)
     {
+        eduEnrollment.setDelFlag("0");
+        eduEnrollment.getParams().remove("showSingleFinance");
         List<EduEnrollment> list = eduEnrollmentService.selectEduEnrollmentList(eduEnrollment);
         ExcelUtil<EduEnrollment> util = new ExcelUtil<EduEnrollment>(EduEnrollment.class);
         util.exportExcel(response, list, "课程报名数据");

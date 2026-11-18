@@ -84,8 +84,8 @@ Page({
         const res = await t.request({ url: `${t.adminUrl}/${encodeURIComponent(this.id)}` })
         if (!this._active || visit !== this._visit || sequence !== this._loadSequence) return
         const detail = progress(t.bill({...res.data,courses:(res.data.courses || []).map(courseInfo)})), pending = t.savedIntent('admin-payment', this.id)
-        this.setData({ billingStep: billingStep(detail), retryPayment: !!pending, allowed: { ...allowed, price: allowed.price && detail.billType !== 'CREDIT_PACKAGE' } })
-        this.setData({ detail, price: detail.originalAmount || '', discountAmount: detail.discountAmount ? String(detail.discountAmount) : '', discountReason: detail.remark || '', modeIndex: detail.financeMode === 'MOCK' ? 1 : 0, channels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['MOCK'] : ['CASH', 'ALIPAY_OFFLINE', 'WECHAT_OFFLINE', 'BANK_TRANSFER'], channelLabels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['本地模拟'] : ['现金', '支付宝', '微信', '银行转账'], channelIndex: 0, ...(pending ? { payerName: pending.payerName, providerTradeNo: pending.providerTradeNo || '', paidTime: pending.paidTime || '', evidenceKey: pending.evidenceKey || '', evidenceName: pending.evidenceKey ? '已上传凭证（待确认绑定）' : '' } : {}) })
+        this.setData({ billingStep: billingStep(detail), retryPayment: !!pending, allowed: { ...allowed, price: allowed.price && detail.billType !== 'CREDIT_PACKAGE' && detail.settlementMethod !== 'P' } })
+        this.setData({ detail, isSingleLesson: detail.settlementMethod === 'C' && (detail.courses || []).some(course => course.classMode === '2'), price: detail.originalAmount == null ? '' : String(detail.originalAmount), discountAmount: detail.discountAmount ? String(detail.discountAmount) : '', discountReason: detail.remark || '', modeIndex: detail.financeMode === 'MOCK' ? 1 : 0, channels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['MOCK'] : ['CASH', 'ALIPAY_OFFLINE', 'WECHAT_OFFLINE', 'BANK_TRANSFER'], channelLabels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['本地模拟'] : ['现金', '支付宝', '微信', '银行转账'], channelIndex: 0, ...(pending ? { payerName: pending.payerName, providerTradeNo: pending.providerTradeNo || '', paidTime: pending.paidTime || '', evidenceKey: pending.evidenceKey || '', evidenceName: pending.evidenceKey ? '已上传凭证（待确认绑定）' : '' } : {}) })
         this.pricePreview()
         if (pending) this.setPaidTime(pending.paidTime || '')
         this.setData({ selectedCouponId: detail.billType === 'CREDIT_PACKAGE' ? detail.userCouponId || null : selectedCouponId || null, couponIndex: 0, availableCoupons: [], couponOptions: ['不使用优惠券'] })
@@ -157,7 +157,7 @@ Page({
   },
   editPrice() {
     if (this.data.detail && this.data.detail.billType === 'CREDIT_PACKAGE') return
-    if (!this.data.submitting && this.permitted('price') && this.data.detail && this.data.detail.canPay && !this.data.detail.payments.length && !this.data.retryPayment) this.setData({ billingStep: 1 })
+    if (!this.data.submitting && this.permitted('price') && this.data.detail && this.data.detail.canPay && !this.data.retryPayment) this.setData({ billingStep: 1 })
   },
   nextStep(title, selector) {
     wx.showToast({ title, icon: 'none', duration: 2500 })

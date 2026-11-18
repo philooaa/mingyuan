@@ -119,9 +119,14 @@ class CreditPackageMysqlTest {
   @Test void couponCollectionUsesFinalPriceAndCreditsOnlyAtConfirmation()throws Exception{
     coupon();var b=body(1);b.put("userCouponId",1L);assertEquals("5600.00",quote(b).get("payableAmount"));long id=order(b);
     assertEquals("LOCKED",db.one("SELECT coupon_status FROM edu_user_coupon WHERE user_coupon_id=1").get("couponStatus"));
-    principal(30,"admin");String proof=storage.uploadEvidence(30,"PAYMENT",id,new FinanceFilesTest.FilePart("proof.png",FinanceFilesTest.png())).get("evidenceKey").toString();
-    var payment=tuition.createPayment(id,30,true,Map.of("channel","CASH","payerName","测试家长","evidenceKey",proof,"paidTime",FinanceRules.now().toLocalDateTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),"expectedPayableAmount","5600.00","financialVersion",0,"idempotencyKey","FIX-PAY"));
-    long pid=FinanceRules.id(payment.get("paymentId"));
+    db.jdbc().update("INSERT INTO sys_user(user_id,user_name,nick_name) VALUES(31,'fixture31','教务')");
+    db.jdbc().update("INSERT INTO sys_role(role_id,role_name,role_key,role_sort,status) VALUES(3,'教务','education',3,'0')");
+    db.jdbc().update("INSERT INTO sys_user_role VALUES(31,3)");
+    principal(31,"education");
+    assertEquals("5600.00",tuition.quote(id,31,true,Map.of()).get("payableAmount"),"课包预览不能重复计算订单已存的系统折扣及优惠券");
+    String proof=storage.uploadEvidence(31,"PAYMENT",id,new FinanceFilesTest.FilePart("proof.png",FinanceFilesTest.png())).get("evidenceKey").toString();
+    var payment=tuition.createPayment(id,31,true,Map.of("channel","CASH","payerName","测试家长","evidenceKey",proof,"paidTime",FinanceRules.now().toLocalDateTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),"expectedPayableAmount","5600.00","financialVersion",0,"idempotencyKey","FIX-PAY"));
+    long pid=FinanceRules.id(payment.get("paymentId"));principal(30,"admin");
     assertEquals(0,db.jdbc().queryForObject("SELECT remaining_credits FROM edu_student_lesson_account WHERE account_id=1",Integer.class));
     db.jdbc().update("UPDATE edu_student_lesson_account SET remaining_credits=10000000 WHERE account_id=1");
     assertThrows(ServiceException.class,()->tuition.confirmPayment(pid,30,true,Map.of()));

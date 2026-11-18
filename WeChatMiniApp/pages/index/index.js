@@ -43,7 +43,7 @@ const roleProfiles = {
       { key: 'teacherSinglePending', label: '一对一事务', value: '—', suffix: '项', linkText: '去处理', route: '/pages/teacher-single-transactions/teacher-single-transactions?tab=bookings' }
     ],
     actions: [
-      { key:'teacherAttendance', title: '学生出勤', icon: '签', tone: 'blue', route: '/pages/sign-in/sign-in' },
+      { key:'teacherAttendance', title: '教师点名', icon: '签', tone: 'blue', route: '/pages/attendance-todos/attendance-todos' },
       { key: 'teacherCourses', title: '我的课程', icon: '课', tone: 'orange', route: '/pages/teacher-single-transactions/teacher-single-transactions' },
       { key: 'teacherLeave', title: '请假审核', icon: '假', tone: 'violet', route: '/pages/teacher-leave/teacher-leave' },
       { title: '班级学员', icon: '班', tone: 'green', route: '/pages/teacher-students/teacher-students' },
@@ -223,6 +223,7 @@ function buildRoleState(roleKey, visibleRoles) {
     title: profile.title,
     stats: profile.stats,
     quickActions: profile.actions,
+    attendanceReviewCount: 0,
     agendaTitle: profile.agendaTitle,
     schedule: profile.schedule,
     roles: roles.map((role) => ({
@@ -310,6 +311,7 @@ Page({
     this.stopCoursePendingRefresh()
     this.stopAccountRefresh()
     this.setCoursePending(null)
+    this.setData({ attendanceReviewCount: 0 })
     const loadVersion = this._roleLoadVersion = (this._roleLoadVersion || 0) + 1
     const token = wx.getStorageSync('token')
     if (!token) {
@@ -356,14 +358,17 @@ Page({
     const financeAllowed = access.staff() && access.can('system:tuition:list')
     this._teacherLoadVersion = (this._teacherLoadVersion || 0) + 1
     this.setData({ teacherDataMessage: '',currentChild:null,parentChildren:[],childLoading:false,childError:'',showChildPicker:false,parentScheduleError:'', roleLocked: workspaces.length < 2, developmentLoginEnabled: this.data.developmentLoginEnabled, ...buildRoleState(role, workspaces) })
-    this.loadSignReviewPending()
 
     const actions = this.data.quickActions.filter(a => a.route !== '/pages/admin-tuition/admin-tuition')
     if (financeAllowed && ['admin', 'education'].includes(role)) actions.push({ key:'tuitionFinance', title: '收费财务', icon: '财', tone: 'gold', route: '/pages/admin-tuition/admin-tuition' })
     this.setData({ quickActions: access.actions(actions, role) })
+    this.loadSignReviewPending()
     if(role==='admin') {
-      this.loadFinancePending();this.loadReferralPending();this.loadSignReviewPending();this.loadAdminHomeStats()
-      this._accountTimer=setInterval(()=>{this.loadFinancePending();if(this.data.currentRole==='admin'){this.loadReferralPending();this.loadSignReviewPending();this.loadAdminHomeStats()}},30000)
+      this.loadFinancePending();this.loadReferralPending();this.loadAdminHomeStats()
+      this._accountTimer=setInterval(()=>{this.loadFinancePending();this.loadReferralPending();this.loadAdminHomeStats()},30000)
+    }
+    if(this._visible && ['education','admin','business_admin'].includes(role)){
+      this._signReviewTimer=setInterval(()=>this.loadSignReviewPending(),30000)
     }
 
     if (role === 'parent') {
@@ -398,10 +403,18 @@ Page({
     const token=wx.getStorageSync('token'),roleVersion=this._roleLoadVersion,version=this._signReviewVersion=(this._signReviewVersion||0)+1
     this._signReviewLoading=true
     try {
-      const r=await request({url:'/miniapp/attendance/todos',data:{role},timeout:15000})
+      const url=role==='teacher'?'/miniapp/attendance/todos':'/miniapp/attendance/pending-review-count'
+      const r=await request({url,data:{role},timeout:15000})
       if(this._unloaded||!this._visible||version!==this._signReviewVersion||roleVersion!==this._roleLoadVersion||this.data.currentRole!==role||getRoleFromStorage()!==role||wx.getStorageSync('token')!==token)return
-      const count=Number((r.data||{}).count||0)
-      this.setData({quickActions:this.data.quickActions.map(a=>(a.key==='studentSignReview'||a.key==='teacherAttendance')?{...a,badgeText:courseState.badgeText(count),route:'/pages/attendance-todos/attendance-todos'}:a)})
+      const data=r.data||{}
+      const count=role==='teacher'?(data.items||[]).filter(item=>item.stage==='UNSUBMITTED'&&!item.upcoming).length:Number(data.count||0)
+      const actionKey = role === 'teacher' ? 'teacherAttendance' : 'studentSignReview'
+      const canOpenReview = role !== 'teacher' && this.data.quickActions.some(action => action.key === actionKey)
+      this.setData({
+        attendanceReviewCount: canOpenReview ? count : 0,
+        quickActions: this.data.quickActions.map(action =>
+          action.key === actionKey ? { ...action, badgeText: courseState.badgeText(count) } : action)
+      })
     }catch(e){}finally{if(version===this._signReviewVersion)this._signReviewLoading=false}
   },
 
@@ -425,7 +438,7 @@ Page({
   startCoursePendingRefresh() {
     if (!this._visible || this._unloaded || this.data.currentRole !== 'teacher') return
     clearInterval(this._coursePendingTimer)
-    this._coursePendingTimer = setInterval(()=>{this.loadCoursePending();this.loadLeavePending();this.loadTeacherData()},30000)
+    this._coursePendingTimer = setInterval(()=>{this.loadCoursePending();this.loadLeavePending();this.loadTeacherData();this.loadSignReviewPending()},30000)
   },
   stopCoursePendingRefresh() {
     clearInterval(this._coursePendingTimer)
@@ -475,7 +488,6 @@ Page({
     }
     this.setData({
       stats: roleProfiles.teacher.stats.map(stat => ({ ...stat, value: statValues[stat.key] })),
-      quickActions: this.data.quickActions.map(a => a.key==='teacherAttendance' && classes ? {...a,badgeText:courseState.badgeText(classes.reduce((n,c)=>n+(c.corrections||[]).length,0))} : a),
       schedule: (classes || []).slice(0, 3).map((item) => ({
         time: item.timeSlot || '—',
         name: item.courseClassName || '未命名班级',
@@ -524,7 +536,7 @@ Page({
   },
 
   openChildren() { if(this.data.currentRole==='parent' && getRoleFromStorage()==='parent') wx.navigateTo({url:'/pages/parent-children/parent-children'}) },
-  stopAccountRefresh() {clearInterval(this._accountTimer);this._accountTimer=null;this._adminStatsVersion=(this._adminStatsVersion||0)+1;this._adminStatsBusy=false;this._accountVersion=(this._accountVersion || 0)+1;this._accountBusy=false;this._financeVersion=(this._financeVersion||0)+1;this._financeBusy=false;if(!this._unloaded)this.setData({accountPendingError:'',financePendingError:'',quickActions:this.data.quickActions.map(a=>['personalAccount','tuitionFinance'].includes(a.key)?{...a,badgeText:''}:a)})},
+  stopAccountRefresh() {clearInterval(this._signReviewTimer);this._signReviewTimer=null;this._signReviewVersion=(this._signReviewVersion||0)+1;this._signReviewLoading=false;clearInterval(this._accountTimer);this._accountTimer=null;this._adminStatsVersion=(this._adminStatsVersion||0)+1;this._adminStatsBusy=false;this._accountVersion=(this._accountVersion || 0)+1;this._accountBusy=false;this._financeVersion=(this._financeVersion||0)+1;this._financeBusy=false;if(!this._unloaded)this.setData({accountPendingError:'',financePendingError:'',quickActions:this.data.quickActions.map(a=>['personalAccount','tuitionFinance'].includes(a.key)?{...a,badgeText:''}:a)})},
   async loadAdminHomeStats() {
     const token=wx.getStorageSync('token')
     if(this._adminStatsBusy || !this._visible || this._unloaded || this.data.currentRole!=='admin' || getRoleFromStorage()!=='admin' || !token)return
@@ -649,6 +661,13 @@ Page({
     if (this._unloaded || this.data.roleSwitching || this.data.currentRole !== 'teacher' || getRoleFromStorage() !== 'teacher') return
     const stat = this.data.stats.find(item => item.key === e.currentTarget.dataset.key)
     if (stat && stat.route) wx.navigateTo({ url: stat.route })
+  },
+
+  openAttendanceReview() {
+    const role = this.data.currentRole
+    if (this._unloaded || this.data.roleSwitching || role !== getRoleFromStorage() ||
+        !['education', 'admin', 'business_admin'].includes(role) || !this.data.attendanceReviewCount) return
+    wx.navigateTo({ url: '/pages/attendance-todos/attendance-todos' })
   },
 
   handleAction(e) {

@@ -21,13 +21,18 @@
     </div>
     <div v-if="mode==='review'">
     <el-form inline size="small">
-      <el-form-item><el-date-picker v-model="classDate" type="date" value-format="yyyy-MM-dd" placeholder="按课次日期筛选" /></el-form-item>
+      <el-form-item v-for="field in reviewFields" :key="field.key" :label="field.label">
+        <el-select v-model="reviewFilters[field.key]" clearable filterable :placeholder="'全部' + field.label" style="width:110px">
+          <el-option v-for="value in reviewOptions(field.key)" :key="value" :value="value"
+            :label="field.key === 'lessonNo' ? '第 ' + value + ' 讲' : value"/>
+        </el-select>
+      </el-form-item>
       <el-form-item><el-select v-model="state"><el-option label="待复核" value="0"/><el-option label="待更正" value="2"/><el-option label="已复核" value="1"/></el-select></el-form-item>
       <el-button size="small" type="primary" @click="load">查询</el-button>
     </el-form>
     <el-alert v-if="error" :title="error" type="error" :closable="false"/>
     <el-table :data="displayList" v-loading="loading">
-      <el-table-column label="日期" prop="classDate" width="120"/><el-table-column label="课程" prop="courseClassName" min-width="200"/><el-table-column label="教师" prop="teacherName" width="120"/>
+      <el-table-column label="讲次" prop="lessonNo" width="75"/><el-table-column label="日期" prop="classDate" width="120"/><el-table-column label="课程" prop="courseClassName" min-width="200"/><el-table-column label="教师" prop="teacherName" width="120"/>
       <el-table-column label="时间" prop="timeSlot" width="120"/><el-table-column label="教室" prop="classroomName" width="150"/>
       <el-table-column label="到课 / 名单" width="120"><template slot-scope="s"><b>{{s.row.actualCount || 0}}</b> / {{s.row.totalCount}}</template></el-table-column>
       <el-table-column label="状态" width="100"><template slot-scope="s"><el-tag :type="s.row.reviewStatus==='1'?'success':'warning'">{{s.row.stageText || label(s.row.reviewStatus)}}</el-tag></template></el-table-column>
@@ -61,13 +66,21 @@ import {listReview,getDetail,confirmReview,attendanceCourses,attendanceOverview,
 import {getToken} from '@/utils/auth'
 export default {
   name:'SignReview',
-  data(){return {mode:'overview',courseKeyword:'',courses:[],courseId:'',dateRange:null,studentKeyword:'',overview:null,overviewLoading:false,overviewError:'',studentDialog:false,selectedStudent:null,studentScope:'course',studentStats:{},studentPendingStats:{},studentRows:[],studentPage:1,studentTotal:0,studentLoading:false,studentError:'',classDate:null,state:'0',list:[],loading:false,error:'',opened:false,row:null,detail:{details:[],review:{}},detailLoading:false,detailError:'',ready:false,busy:false,pendingImages:''}},
-  computed:{canInitial(){return this.detail.canInitialReview===true || this.detail.review.canInitialReview===true},canFinal(){return this.detail.canFinalReview===true || this.detail.review.canFinalReview===true},visibleStudents(){const key=this.studentKeyword.trim();return (this.overview?.rows||[]).filter(r=>!key||r.studentName.includes(key)||String(r.parentPhone||'').includes(key))},displayList(){return this.list.filter(r=>String(r.reviewStatus||'0')===this.state)},history(){return (this.detail.review.history||[]).slice().reverse()}},
+  dicts:['edu_grade'],
+  data(){return {mode:'overview',courseKeyword:'',courses:[],courseId:'',dateRange:null,studentKeyword:'',overview:null,overviewLoading:false,overviewError:'',studentDialog:false,selectedStudent:null,studentScope:'course',studentStats:{},studentPendingStats:{},studentRows:[],studentPage:1,studentTotal:0,studentLoading:false,studentError:'',reviewFields:[{key:'courseYear',label:'年份'},{key:'termName',label:'季度'},{key:'teacherName',label:'教师'},{key:'lessonNo',label:'讲次'},{key:'gradeName',label:'年级'}],
+    reviewFilters:{courseYear:'',termName:'',teacherName:'',lessonNo:'',gradeName:''},state:'0',list:[],loading:false,error:'',opened:false,row:null,detail:{details:[],review:{}},detailLoading:false,detailError:'',ready:false,busy:false,pendingImages:''}},
+  computed:{canInitial(){return this.detail.canInitialReview===true || this.detail.review.canInitialReview===true},canFinal(){return this.detail.canFinalReview===true || this.detail.review.canFinalReview===true},visibleStudents(){const key=this.studentKeyword.trim();return (this.overview?.rows||[]).filter(r=>!key||r.studentName.includes(key)||String(r.parentPhone||'').includes(key))},displayList(){return this.list.filter(r=>String(r.reviewStatus||'0')===this.state && this.reviewFields.every(({key})=>!this.reviewFilters[key]||String(r[key])===this.reviewFilters[key]))},history(){return (this.detail.review.history||[]).slice().reverse()}},
   created(){this._alive=true;this.load();this.loadCourses()},
   activated(){this._alive=true;if(this._token!==getToken()){this.close();this.closeStudent();this.load();this.loadCourses()}},
   deactivated(){this.closeStudent();this._overviewVersion=(this._overviewVersion||0)+1;this._coursesVersion=(this._coursesVersion||0)+1;this._alive=false;this._version=(this._version||0)+1;this.opened=false;this.close()},
   beforeDestroy(){this._alive=false;this._overviewVersion=(this._overviewVersion||0)+1;this._coursesVersion=(this._coursesVersion||0)+1;this.closeStudent();this.close()},
   methods:{
+    reviewOptions(key){
+      const values=[...new Set(this.list.map(row=>row[key]).filter(value=>value!=null&&value!=='').map(String))]
+      const grades=(this.dict.type.edu_grade||[]).map(row=>row.label)
+      const rank=value=>grades.includes(value)?grades.indexOf(value):grades.length
+      return values.sort((a,b)=>(key==='gradeName'?rank(a)-rank(b):0)||a.localeCompare(b,'zh-CN',{numeric:true}))
+    },
     lessonLabel(date){const l=(this.overview?.lessons||[]).find(l=>String(l.classDate).slice(0,10)===date);return date+' · 应到 '+(l?l.expectedCount:'—')+'人'},
     courseLabel(c){return [c.courseClassName||[c.gradeName,c.subjectName].filter(Boolean).join(''),c.teacherName,[c.courseYear,c.termName,c.periodName].filter(Boolean).join(' '),c.timeSlot].filter(Boolean).join(' · ')},
     reviewLabel(v){return {'0':'待审核','1':'已终审 / 历史已确认','2':'待更正'}[v]||''},
@@ -88,7 +101,7 @@ export default {
     snapshot(rows){return (rows||[]).map(r=>r.studentName+'：'+this.status(r.signStatus)).join('；')||'无'},
     images(slot){return String(this.detail.review['review'+slot+'Images']||'').split(',').filter(Boolean).map(p=>p.startsWith('http')?p:process.env.VUE_APP_BASE_API+p)},
     close(){this._detailVersion=(this._detailVersion||0)+1;this.row=null;this.detail={details:[],review:{}};this.ready=false;this.busy=false;this.pendingImages=''},
-    async load(){const token=this._token=getToken(),version=this._version=(this._version||0)+1;this.loading=true;this.error='';this.list=[];try{const r=await listReview(this.classDate);if(this._alive&&token===getToken()&&version===this._version)this.list=r.data||[]}catch(e){if(this._alive&&token===getToken()&&version===this._version)this.error=e.message||'加载失败，请重试'}finally{if(version===this._version)this.loading=false}},
+    async load(){const token=this._token=getToken(),version=this._version=(this._version||0)+1;this.loading=true;this.error='';this.list=[];try{const r=await listReview();if(this._alive&&token===getToken()&&version===this._version)this.list=r.data||[]}catch(e){if(this._alive&&token===getToken()&&version===this._version)this.error=e.message||'加载失败，请重试'}finally{if(version===this._version)this.loading=false}},
     async open(row){this.close();this.row=row;this.opened=true;this.detailLoading=true;this.detailError='';const token=getToken(),version=this._detailVersion;try{const r=await getDetail(row.scheduleId,row.classDate);if(this._alive&&this.opened&&token===getToken()&&version===this._detailVersion){this.detail=r.data;this.ready=true}}catch(e){if(version===this._detailVersion)this.detailError=e.message||'加载失败'}finally{if(version===this._detailVersion)this.detailLoading=false}},
     async decide(action){
       if(this.busy||!this.ready||!this.opened||!(this.canInitial || this.canFinal))return

@@ -696,7 +696,7 @@ public class TuitionService {
     }
     Long coupon=selectedCoupon(e,b);
     // 核价时教务填的优惠是账单基线，优惠券在其上叠加。
-    BigDecimal priced = e.get("discountAmount")==null ? money("0") : money(e.get("discountAmount"));
+    BigDecimal priced = CreditPackageService.isPackage(e) || e.get("discountAmount")==null ? money("0") : money(e.get("discountAmount"));
     BigDecimal discount = CreditPackageService.bulkDiscount(e).add(priced).add(
         coupon==null
             ? money("0")
@@ -834,7 +834,7 @@ public class TuitionService {
               boolean cartOrder = "CART_ORDER".equals(str(e, "billType"));
               Long coupon = cartOrder ? null : selectedCoupon(e,b);
               // 核价时填的优惠是账单基线；优惠券在其上叠加（课包只走系统折扣）。
-              BigDecimal priced = e.get("discountAmount") == null ? money("0") : money(e.get("discountAmount"));
+              BigDecimal priced = CreditPackageService.isPackage(e) || e.get("discountAmount") == null ? money("0") : money(e.get("discountAmount"));
               BigDecimal discount = cartOrder
                       ? priced
                       : CreditPackageService.bulkDiscount(e).add(priced).add(coupon == null ? money("0") : coupons.discount(coupon, e, true)),

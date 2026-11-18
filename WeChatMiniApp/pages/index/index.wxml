@@ -36,6 +36,14 @@
     </view>
   </view>
 
+  <button wx:if="{{attendanceReviewCount > 0}}" class="attendance-reminder" bindtap="openAttendanceReview">
+    <view class="attendance-reminder-copy">
+      <text class="attendance-reminder-title">{{currentRole === 'education' ? '出勤待初审' : '出勤待终审'}}</text>
+      <text class="attendance-reminder-detail">{{attendanceReviewCount}} 节课待审核</text>
+    </view>
+    <text class="attendance-reminder-link">去审核 ›</text>
+  </button>
+
   <view class="section">
     <view class="section-head">
       <view>

@@ -47,7 +47,7 @@ public class AttendanceLessonRosterMysqlTest {
     @Test void runRoster() throws Exception {
         String schema=db.jdbc().queryForObject("SELECT DATABASE()",String.class);
         assertTrue(schema.matches("codex_[a-zA-Z0-9_]+"),"Disposable schema required");
-        String migration=Files.readString(Path.of("../../database/migrations/20261106_attendance_lesson_roster.sql"));
+        String migration=Files.readString(Path.of("../../database/migrations/20261106_attendance_lesson_roster.sql"))+Files.readString(Path.of("../../database/migrations/20261118_attendance_lesson_guests.sql"));
         for(int repeat=0;repeat<2;repeat++)tx(()->{for(String statement:migration.split(";"))if(!statement.isBlank())db.jdbc().execute(statement);return null;});
         var service=new AttendanceLessonRosterService(db);
         db.jdbc().update("UPDATE edu_course_schedule SET class_pattern='DAILY',start_date=?,end_date=?,start_time='00:00:00',end_time='00:01:00' WHERE schedule_id=?",date.toString(),date.plusDays(5).toString(),course);
@@ -79,9 +79,24 @@ public class AttendanceLessonRosterMysqlTest {
         assertEquals(financeBefore,db.rows("SELECT * FROM edu_enrollment ORDER BY enrollment_id"));
         var adjustment=new LinkedHashMap<String,Object>();adjustment.put("schedule_id",course);adjustment.put("original_date",date.toString());adjustment.put("adjusted_date",date.plusDays(10).toString());adjustment.put("reason","调课身份测试");db.insert("edu_schedule_adjustment",adjustment);
         var moved=tx(()->service.lessons(course));assertEquals(first,id(moved.get(0),"lessonId"));assertEquals(date.plusDays(10).toString(),moved.get(0).get("classDate"));
+        principal(teacher,"teacher");
+        assertTrue((Boolean)tx(()->service.teacherLesson(course,first)).get("upcoming"));
+        assertThrows(ServiceException.class,()->tx(()->{
+            service.requireStarted(course,date.toString(),first);
+            return null;
+        }),"调课前的日期不能继续提交");
+        assertThrows(ServiceException.class,()->tx(()->{
+            service.requireStarted(course,date.plusDays(10).toString(),first);
+            return null;
+        }),"实际开课前不能提交");
+        principal(1,"admin");
         db.jdbc().update("UPDATE edu_course_schedule SET teacher_id=?,start_date=? WHERE schedule_id=?",otherTeacher,date.plusDays(1).toString(),course);
         var locked=tx(()->service.lessons(course)).stream().filter(r->id(r,"lessonId")==third).findFirst().orElseThrow();assertEquals(String.valueOf(teacher),locked.get("teacherId"));assertEquals(3,((Number)locked.get("lessonNo")).intValue());assertEquals(snapshot,tx(()->service.roster(course,third)));
         principal(teacher,"teacher");var returned=submitBody(date.plusDays(2).toString());tx(()->{service.validateSubmission(returned);return null;});assertEquals(2,tx(()->service.teacherRoster(course,date.plusDays(2).toString())).size());
+        assertEquals(String.valueOf(teacher),tx(()->service.teacherLesson(course,third)).get("teacherId"));
+        var ownHistoricalCourses=(List<Map<String,Object>>)tx(()->service.todos("teacher",true)).get("courses");
+        assertTrue(ownHistoricalCourses.stream().anyMatch(row->String.valueOf(course).equals(row.get("scheduleId"))),"历史快照教师仍可从班级入口找到课程");
+        principal(otherTeacher,"teacher");assertThrows(ServiceException.class,()->tx(()->service.teacherLesson(course,third)));
         principal(otherTeacher,"teacher");assertThrows(ServiceException.class,()->tx(()->{service.validateSubmission(submitBody(date.plusDays(2).toString()));return null;}));assertThrows(ServiceException.class,()->tx(()->service.teacherRoster(course,date.plusDays(2).toString())));
         long offline=3;principal(1,"admin");
         long unpaid=tx(()->service.add(new AttendanceLessonRosterService.MembershipRequest(course,offline,null,5,null,"OFFLINE","UNPAID","线下名单不创建账单")));
@@ -109,6 +124,10 @@ public class AttendanceLessonRosterMysqlTest {
         db.jdbc().update("INSERT INTO edu_class_sign_in(schedule_id,class_date,student_name,source_type,review_stage) VALUES(2,?,'旧点名','2','PENDING_FIRST')",today.minusDays(1).toString());
         principal(20,"education");assertEquals(1,tx(()->service.todos("education")).get("count"));
         db.jdbc().update("INSERT INTO edu_class_sign_in(schedule_id,class_date,student_name,source_type,review_stage) VALUES(2,?,'旧点名','2','PENDING_FINAL')",today.toString());
+        assertEquals(1L,service.pendingReviewCount("education").get("count"));
+        assertThrows(ServiceException.class,()->service.pendingReviewCount("admin"));
+        principal(40,"business_admin");
+        assertEquals(1L,service.pendingReviewCount("admin").get("count"));
         principal(40,"business_admin");assertEquals(1,tx(()->service.todos("admin")).get("count"));assertThrows(ServiceException.class,()->tx(()->service.todos("education")));
         assertFalse(service.courses("").isEmpty());
         db.jdbc().update("UPDATE sys_role SET status='1' WHERE role_key='business_admin'");assertThrows(ServiceException.class,()->tx(()->service.todos("admin")));
@@ -143,6 +162,54 @@ public class AttendanceLessonRosterMysqlTest {
         });
         assertTrue(tx(() -> service.roster(3, offlineThird)).stream().noneMatch(row -> id(row,"studentId")==studentId));
         assertEquals(financeBefore, db.rows("SELECT * FROM edu_enrollment ORDER BY enrollment_id"));
+        long pendingId = tx(() -> service.addOfflineStudent(
+                new AttendanceLessonRosterService.OfflineStudentRequest(3L,"线下学生",3))).get("studentId");
+        assertEquals(List.of(3L),service.bindingCandidates(pendingId).stream().map(row -> id(row,"studentId")).toList());
+        assertThrows(ServiceException.class,() -> tx(() -> {
+            service.linkExistingStudent(pendingId,1L);
+            return null;
+        }));
+        tx(() -> {
+            service.linkExistingStudent(pendingId,3L);
+            return null;
+        });
+        assertTrue(tx(() -> service.roster(3,offlineThird)).stream().anyMatch(row -> id(row,"studentId")==3L));
+        assertTrue(service.pendingParentBindings().stream().noneMatch(row -> id(row,"studentId")==pendingId));
+        // Teachers add real, single-lecture profiles without touching enrollment or finance.
+        principal(teacher,"teacher");String targetDate=today.minusDays(8).toString();
+        var trial=new AttendanceLessonRosterService.GuestRequest(3L,targetDate,null,"临时试听", "TRIAL",null);
+        principal(parent,"parent");assertThrows(ServiceException.class,()->tx(()->service.guestStudents(3,targetDate,"临时")));
+        principal(otherTeacher,"teacher");assertThrows(ServiceException.class,()->tx(()->service.addGuest(trial)));
+        principal(teacher,"teacher");var guest=tx(()->service.addGuest(trial));long trialId=id(guest,"studentId"),guestId=id(guest,"guestId");
+        assertEquals("TRIAL",guest.get("source"));assertNull(db.one("SELECT parent_id FROM edu_student WHERE student_id=?",trialId).get("parentId"));
+        assertThrows(ServiceException.class,()->tx(()->service.addGuest(trial)));
+        assertEquals(1,tx(()->service.guestStudents(3,targetDate,"临时试听")).size());
+        assertTrue(tx(()->service.teacherRoster(3L,targetDate)).stream().anyMatch(row->String.valueOf(trialId).equals(row.get("studentId"))));
+        assertTrue(tx(()->service.teacherRoster(3L,today.minusDays(7).toString())).stream().noneMatch(row->String.valueOf(trialId).equals(row.get("studentId"))));
+        principal(20,"education");assertTrue(service.pendingParentBindings().stream().anyMatch(row->String.valueOf(trialId).equals(row.get("studentId"))));
+        tx(()->{service.bindOfflineStudent(trialId,new AttendanceLessonRosterService.ParentBindingRequest("13800000000"));return null;});
+        assertEquals("30",db.one("SELECT parent_id FROM edu_student WHERE student_id=?",trialId).get("parentId"));
+        principal(teacher,"teacher");
+        var choices=tx(()->service.guestSources(3,targetDate,2));assertFalse(choices.isEmpty());
+        long originId=id(choices.get(0),"lessonId");String originDate=choices.get(0).get("classDate").toString();
+        var transfer=new AttendanceLessonRosterService.GuestRequest(3L,targetDate,2L,null,"TRANSFER",originId);
+        var transferred=tx(()->service.addGuest(transfer));long transferId=id(transferred,"guestId");
+        assertEquals("TRANSFER",transferred.get("source"));assertNotNull(transferred.get("originText"));
+        principal(1,"admin");assertTrue(tx(()->service.roster(1,originId)).stream().noneMatch(row->"2".equals(row.get("studentId"))));
+        assertTrue(tx(()->service.roster(1,id(choices.get(1),"lessonId"))).stream().anyMatch(row->"2".equals(row.get("studentId"))));
+        assertEquals(1,tx(()->service.guestOutgoing(1,originDate)).size());principal(teacher,"teacher");
+        assertThrows(ServiceException.class,()->tx(()->service.addGuest(transfer)));
+        tx(()->{service.removeGuest(3,targetDate,transferId);return null;});
+        principal(1,"admin");assertTrue(tx(()->service.roster(1,originId)).stream().anyMatch(row->"2".equals(row.get("studentId"))));
+        principal(teacher,"teacher");transferred=tx(()->service.addGuest(transfer));long readded=id(transferred,"guestId");
+        var submit=new MiniAppSignSubmitBody();submit.setScheduleId(3L);submit.setClassDate(targetDate);
+        submit.setDetails(tx(()->service.teacherRoster(3L,targetDate)).stream().map(row->{var d=new MiniAppSignSubmitBody.Detail();d.setStudentId(id(row,"studentId"));d.setStudentName("客户端伪造");return d;}).toList());
+        tx(()->{service.validateSubmission(submit);return null;});
+        assertEquals(1,submit.getDetails().stream().filter(d->"3".equals(d.getSourceType())).count());
+        tx(()->{service.lockLesson(3,targetDate,teacher);return null;});
+        assertThrows(ServiceException.class,()->tx(()->{service.removeGuest(3,targetDate,readded);return null;}));
+        assertThrows(ServiceException.class,()->tx(()->{service.removeGuest(3,targetDate,guestId);return null;}));
+        assertEquals(financeBefore,db.rows("SELECT * FROM edu_enrollment ORDER BY enrollment_id"));
         System.out.println("PASS: stable lesson identity, effective insertion/removal, locked snapshot and teacher, same-name IDs, unpaid roster-only membership, immutable finance and role checks");
     }
 }

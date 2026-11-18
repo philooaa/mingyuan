@@ -100,7 +100,7 @@ test('role menu handles cancellation and rechecks roles revoked by the server', 
 test('student attendance badge rejects late responses after switching workspace with the same token', async () => {
   const finishes = []; let delayed = false
   const h = harness('index', ['admin', 'parent'], ['*:*:*'], o => {
-    if (o.url === '/miniapp/attendance/todos') return delayed
+    if (o.url === '/miniapp/attendance/pending-review-count') return delayed
       ? new Promise(resolve => { finishes.push(resolve) })
       : { data: {count:2,overdueCount:0,items:[]} }
   })
@@ -334,3 +334,31 @@ for (const assigned of [['admin', 'business_admin', 'education'], ['business_adm
     h.p.onUnload()
   })
 }
+
+test('attendance reminder moves from education to business admin and disappears after final approval', async () => {
+  let stage = 'PENDING_FIRST'
+  const h = harness('index', ['education', 'business_admin'], ['*:*:*'], request => {
+    if (request.url === '/miniapp/attendance/pending-review-count') {
+      const expected = request.data.role === 'education' ? 'PENDING_FIRST' : 'PENDING_FINAL'
+      return { data: { count: Number(stage === expected) } }
+    }
+  })
+  h.p.onLoad()
+  h.p._visible = true
+  await h.p.applyLoginRole()
+  await h.p.switchRole(click('education'))
+  assert.equal(h.p.data.attendanceReviewCount, 1)
+  h.p.openAttendanceReview()
+  assert.match(h.navigations.at(-1), /attendance-todos/)
+  stage = 'PENDING_FINAL'
+  await h.p.loadSignReviewPending()
+  assert.equal(h.p.data.attendanceReviewCount, 0)
+  await h.p.switchRole(click('admin'))
+  assert.equal(h.p.data.attendanceReviewCount, 1)
+  h.p.openAttendanceReview()
+  assert.match(h.navigations.at(-1), /attendance-todos/)
+  stage = 'FINAL'
+  await h.p.loadSignReviewPending()
+  assert.equal(h.p.data.attendanceReviewCount, 0)
+  h.p.onUnload()
+})
