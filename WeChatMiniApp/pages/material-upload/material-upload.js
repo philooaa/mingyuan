@@ -1,5 +1,5 @@
 const shop = require('../../utils/material-shop')
-const blank = role => ({ title: '', subtitle: '', subjectCode: '', gradeCode: '', materialType: '', textbookVersion: '', deliveryType: role === 'teacher' ? 'DIGITAL' : 'PHYSICAL', price: '0.00', unit: '份', stockQuantity: 0, purchaseLimit: role === 'teacher' ? 1 : 99, shippingFee: '0.00', shipFrom: '', dispatchDays: 0, sortOrder: 0, intro: '', detailText: '', coverUrl: '', images: [], shelfStatus: '2', filePath: '', fileName: '', fileSize: 0 })
+const blank = role => ({ title: '', subtitle: '', subjectCode: '', gradeCode: '', materialType: '', textbookVersion: '', deliveryType: role === 'teacher' ? 'DIGITAL' : 'PHYSICAL', price: '0.00', unit: '份', stockQuantity: 0, purchaseLimit: role === 'teacher' ? 1 : '', shippingFee: '0.00', shipFrom: '', dispatchDays: 0, sortOrder: 0, intro: '', detailText: '', coverUrl: '', images: [], shelfStatus: '2', filePath: '', fileName: '', fileSize: 0 })
 Page({
   data: { role: '', loading: false, submitting: false, error: '', subjects: [], grades: [], materialTypes: [], subjectIndex: -1, gradeIndex: -1, typeIndex: -1, list: [], total: 0, pageNum: 1, showForm: false, form: blank(''), file: null, stockDelta: '', stockRemark: '' },
   onLoad() { this._sequence = 0; this._removeOperation = 0 },
@@ -115,6 +115,7 @@ Page({
       const form = { ...this.data.form, images: this.data.form.images || [] }
       if (!form.title.trim()) throw new Error('请填写商品名称')
       shop.cents(form.price || '0.00'); shop.cents(form.shippingFee || '0.00')
+      if(form.deliveryType === 'PHYSICAL' && (form.purchaseLimit === '' || form.purchaseLimit == null)) form.purchaseLimit = null
       if (this.data.subjectIndex >= 0) form.subjectCode = this.data.subjects[this.data.subjectIndex].dictValue
       if (this.data.gradeIndex >= 0) form.gradeCode = this.data.grades[this.data.gradeIndex].dictValue
       form.shelfStatus = role === 'teacher' ? '2' : (e && e.currentTarget.dataset.publish === '1' ? '1' : '2')

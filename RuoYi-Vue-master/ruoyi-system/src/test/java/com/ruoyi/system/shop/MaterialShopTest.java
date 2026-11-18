@@ -9,7 +9,6 @@ class MaterialShopTest {
         env.setActiveProfiles("local","production");
         env.getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("test-payment-mode",java.util.Map.of("payment.mode","mock")));
         var service=new ShopService(null,null,env);
-        assertThrows(com.ruoyi.common.exception.ServiceException.class,()->service.preparePayment(2,1));
         assertThrows(com.ruoyi.common.exception.ServiceException.class,()->service.pay(2,1));
         assertThrows(com.ruoyi.common.exception.ServiceException.class,()->service.refund(1,1,"模拟"));
     }

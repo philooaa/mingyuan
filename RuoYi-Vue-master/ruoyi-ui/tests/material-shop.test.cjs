@@ -46,7 +46,7 @@ test('digital saves private upload metadata without numeric precision loss or de
 test('publish validates real cover, positive money, education, details and available stock', () => {
   assert.equal(typeof shop.validateProduct, 'function')
   assert.deepEqual(shop.validateProduct(physical(), '1'), [])
-  for (const patch of [{ coverUrl: '' }, { subjectCode: '' }, { gradeCode: '' }, { detailText: ' ' }, { price: '0.00' }, { stockLocked: 3 }, { galleryUrls: '1,2,3,4,5' }]) {
+  for (const patch of [{ coverUrl: '' }, { subjectCode: '' }, { gradeCode: '' }, { detailText: ' ' }, { stockLocked: 3 }, { galleryUrls: '1,2,3,4,5' }]) {
     assert.ok(shop.validateProduct({ ...physical(), ...patch }, '1').length, JSON.stringify(patch))
   }
   assert.ok(shop.validateProduct({ ...physical(), deliveryType: 'DIGITAL', filePath: '' }, '1').length)
@@ -317,4 +317,11 @@ test('product saves optional active material dictionary codes and rejects free t
   dictionary.type.edu_material_type = dictionary.type.edu_material_type.filter(item => item.value !== 'workbook')
   await instance.submitForm('2')
   assert.equal(saved.length, 2)
+})
+
+test('zero price and optional limit are accepted without changing existing limits', () => {
+  assert.deepEqual(shop.validateProduct({ ...physical(), price: '0.00', purchaseLimit: '' }, '1'), [])
+  assert.equal(shop.productBody({ ...physical(), price: '0.00', purchaseLimit: '' }, '1').purchaseLimit, null)
+  assert.equal(shop.productBody({ ...physical(), purchaseLimit: 4 }, '1').purchaseLimit, 4)
+  assert.ok(shop.validateProduct({ ...physical(), purchaseLimit: 0 }, '1').length)
 })

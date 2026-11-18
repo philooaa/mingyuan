@@ -28,7 +28,7 @@ function product(item) {
     detailImages: images.filter(image => image.imageType === 'DETAIL') }
 }
 const statuses = { WAIT_PAY: '待支付', WAIT_SHIP: '待发货', WAIT_RECEIVE: '待收货', COMPLETED: '已完成', CANCELLED: '已取消', CLOSED: '已关闭' }
-const events = { CREATE: '订单已创建', PAY_SUCCESS: '模拟支付成功', CANCEL: '订单已取消', EXPIRE: '支付超时关闭', SHIP: '资料已发货', RECEIVE: '确认收货', MOCK_REFUND: '模拟退款完成' }
+const events = { CREATE: '订单已创建', PAY_SUCCESS: '订单支付完成', CANCEL: '订单已取消', EXPIRE: '支付超时关闭', SHIP: '资料已发货', RECEIVE: '确认收货', MOCK_REFUND: '模拟退款完成' }
 function order(item) {
   return { ...item, items: (item.items || []).map(line => ({ ...line, coverUrl: imageUrl(line.coverUrl) })),
     logs: (item.logs || []).map(log => ({ ...log, eventText: events[log.eventType] || '订单已更新', statusText: statuses[log.toOrderStatus] || '' })),
@@ -45,14 +45,15 @@ async function pay(id, isActive = () => true) {
   const base = `${ordersUrl}/${id}`
   const prepared = await request({ url: `${base}/payment`, method: 'POST' })
   if (!isActive()) return { state: 'cancelled' }
-  if (!prepared.data || prepared.data.mode !== 'MOCK') throw new Error('当前支付方式不可用')
-  if (!await confirm('模拟支付', '仅本地/测试环境使用，不会真实扣款。确认模拟支付此订单？')) return { state: 'cancelled' }
+  if (!prepared.data || !['MOCK', 'FREE'].includes(prepared.data.mode)) throw new Error('当前支付方式不可用')
+  const free=prepared.data.mode === 'FREE'
+  if (!await confirm(free ? '确认免费领取' : '模拟支付', free ? '确认领取此免费订单？' : '仅本地/测试环境使用，不会真实扣款。确认模拟支付此订单？')) return { state: 'cancelled' }
   if (!isActive()) return { state: 'cancelled' }
   let failure
-  try { await request({ url: `${base}/mock-pay`, method: 'POST' }) } catch (error) { failure = error }
+  try { await request({ url: `${base}/${free ? 'free-claim' : 'mock-pay'}`, method: 'POST' }) } catch (error) { failure = error }
   const refreshed = await request({ url: base })
   const detail = order(refreshed.data)
-  if (String(detail.payStatus) === '1') return { state: 'success', order: detail }
+  if (String(detail.payStatus) === '1') return { state: 'success', order: detail, free }
   if (failure && !failure.network) throw failure
   return { state: 'pending', order: detail }
 }

@@ -124,7 +124,7 @@ export const labels = {
   FREE: '零元减免',
   CASH: '现金',
   BANK_TRANSFER: '银行转账',
-  WECHAT_OFFLINE: '微信线下收款',
+  WECHAT_OFFLINE: '微信', ALIPAY_OFFLINE: '支付宝',
   PENDING: '待确认',
   UNKNOWN: '结果未知／待核对',
   SUCCESS: '成功',

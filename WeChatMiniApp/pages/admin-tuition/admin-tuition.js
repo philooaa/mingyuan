@@ -39,7 +39,7 @@ function progress(detail) {
 }
 Page({
   // Keep the same yyyy-MM-dd HH:mm:ss value used by the web form and API.
-  data: { loading: false, submitting: false, error: '', rows: [], total: 0, pageNum: 1, searchText: '', filterIndex: 0, confirmationOnly: false, filters: ['全部账单', '待核价', '已核价', '历史待核验', '已关闭', '待管理员确认', '已完成'], detail: null, allowed: {}, price: '', discountAmount: '', discountReason: '', priceBaseText: '待填写', priceDiscountText: '¥0.00', pricePayableText: '待填写', modeIndex: 0, modes: ['REAL', 'MOCK'], modeLabels: ['真实线下收费', '本地模拟（仅本地可用）'], channelIndex: 0, channels: ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: ['现金', '银行转账', '微信线下收款'], payerName: '', providerTradeNo: '', paidTime: '', evidenceKey: '', evidenceName: '', closeReason: '' },
+  data: { loading: false, submitting: false, error: '', rows: [], total: 0, pageNum: 1, searchText: '', filterIndex: 0, confirmationOnly: false, filters: ['全部账单', '待核价', '已核价', '历史待核验', '已关闭', '待管理员确认', '已完成'], detail: null, allowed: {}, price: '', discountAmount: '', discountReason: '', priceBaseText: '待填写', priceDiscountText: '¥0.00', pricePayableText: '待填写', modeIndex: 0, modes: ['REAL', 'MOCK'], modeLabels: ['真实线下收费', '本地模拟（仅本地可用）'], channelIndex: 0, channels: ['CASH', 'ALIPAY_OFFLINE', 'WECHAT_OFFLINE', 'BANK_TRANSFER'], channelLabels: ['现金', '支付宝', '微信', '银行转账'], payerName: '', providerTradeNo: '', paidTime: '', evidenceKey: '', evidenceName: '', closeReason: '' },
   onLoad(options) {
     this.setData({gradeStages:['全部学段','小学','初中','高中','未分类'],gradeStageIndex:0})
     this.id = String(options.id || ''); this._visit = 0
@@ -85,7 +85,7 @@ Page({
         if (!this._active || visit !== this._visit || sequence !== this._loadSequence) return
         const detail = progress(t.bill({...res.data,courses:(res.data.courses || []).map(courseInfo)})), pending = t.savedIntent('admin-payment', this.id)
         this.setData({ billingStep: billingStep(detail), retryPayment: !!pending, allowed: { ...allowed, price: allowed.price && detail.billType !== 'CREDIT_PACKAGE' } })
-        this.setData({ detail, price: detail.originalAmount || '', discountAmount: detail.discountAmount ? String(detail.discountAmount) : '', discountReason: detail.remark || '', modeIndex: detail.financeMode === 'MOCK' ? 1 : 0, channels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['MOCK'] : ['CASH', 'BANK_TRANSFER', 'WECHAT_OFFLINE'], channelLabels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['本地模拟'] : ['现金', '银行转账', '微信线下收款'], channelIndex: 0, ...(pending ? { payerName: pending.payerName, providerTradeNo: pending.providerTradeNo || '', paidTime: pending.paidTime || '', evidenceKey: pending.evidenceKey || '', evidenceName: pending.evidenceKey ? '已上传凭证（待确认绑定）' : '' } : {}) })
+        this.setData({ detail, price: detail.originalAmount || '', discountAmount: detail.discountAmount ? String(detail.discountAmount) : '', discountReason: detail.remark || '', modeIndex: detail.financeMode === 'MOCK' ? 1 : 0, channels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['MOCK'] : ['CASH', 'ALIPAY_OFFLINE', 'WECHAT_OFFLINE', 'BANK_TRANSFER'], channelLabels: detail.financeMode === 'MOCK' && detail.mockAllowed ? ['本地模拟'] : ['现金', '支付宝', '微信', '银行转账'], channelIndex: 0, ...(pending ? { payerName: pending.payerName, providerTradeNo: pending.providerTradeNo || '', paidTime: pending.paidTime || '', evidenceKey: pending.evidenceKey || '', evidenceName: pending.evidenceKey ? '已上传凭证（待确认绑定）' : '' } : {}) })
         this.pricePreview()
         if (pending) this.setPaidTime(pending.paidTime || '')
         this.setData({ selectedCouponId: detail.billType === 'CREDIT_PACKAGE' ? detail.userCouponId || null : selectedCouponId || null, couponIndex: 0, availableCoupons: [], couponOptions: ['不使用优惠券'] })
@@ -235,7 +235,7 @@ Page({
       const channel = (saved ? saved.expectedPayableAmount : quote.payableAmount) === '0.00' ? 'FREE' : this.data.channels[this.data.channelIndex]
       if (!saved && !this.data.payerName.trim()) throw new Error('请填写实际付款人')
       if (!saved && !['MOCK', 'FREE'].includes(channel) && (!this.data.evidenceKey || !this.data.paidTime.trim())) throw new Error('线下登记须上传凭证并填写实际收款时间')
-      if (!saved && ['BANK_TRANSFER', 'WECHAT_OFFLINE'].includes(channel) && !this.data.providerTradeNo.trim()) throw new Error('转账须填写完整流水参考号')
+      if (!saved && ['BANK_TRANSFER', 'WECHAT_OFFLINE', 'ALIPAY_OFFLINE'].includes(channel) && !this.data.providerTradeNo.trim()) throw new Error('转账须填写完整流水参考号')
       const body = saved || { channel, userCouponId: quote.userCouponId || null, expectedPayableAmount: quote.payableAmount, financialVersion: quote.financialVersion, payerName: this.data.payerName.trim(), providerTradeNo: this.data.providerTradeNo.trim() || null, evidenceKey: this.data.evidenceKey || null, paidTime: this.data.paidTime.trim() || null }
       if (!await t.confirm('登记收款', `${t.money(body.expectedPayableAmount)} · ${t.status(body.channel)}。登记后须核对确认。`) || !this._active || visit !== this._visit) return
       await t.request({ url: `${t.adminUrl}/${encodeURIComponent(this.id)}/payments`, method: 'POST', data: t.intent('admin-payment', this.id, body) })

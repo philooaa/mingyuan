@@ -39,6 +39,8 @@ public class MiniAppMaterialController {
     @PreAuthorize("@ss.hasRole('parent')")
     @PostMapping("/parent/material/orders/{id}/payment") public AjaxResult payment(@PathVariable long id){return AjaxResult.success(shop.preparePayment(SecurityUtils.getUserId(),id));}
     @PreAuthorize("@ss.hasRole('parent')")
+    @PostMapping("/parent/material/orders/{id}/free-claim") public AjaxResult claimFree(@PathVariable long id){return AjaxResult.success(shop.claimFree(SecurityUtils.getUserId(),id));}
+    @PreAuthorize("@ss.hasRole('parent')")
     @PostMapping("/parent/material/orders/{id}/cancel") public AjaxResult cancel(@PathVariable long id){return AjaxResult.success(shop.cancel(SecurityUtils.getUserId(),id));}
     @PreAuthorize("@ss.hasRole('parent')")
     @PostMapping("/parent/material/orders/{id}/receive") public AjaxResult receive(@PathVariable long id){return AjaxResult.success(shop.receive(SecurityUtils.getUserId(),id));}

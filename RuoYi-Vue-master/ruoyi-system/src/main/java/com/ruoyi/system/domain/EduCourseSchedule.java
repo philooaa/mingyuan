@@ -17,6 +17,10 @@ import com.ruoyi.common.core.domain.BaseEntity;
  */
 public class EduCourseSchedule extends BaseEntity
 {
+    /** 新增排课时指定的计费课次数，由服务端写入手动计费配置。 */
+    private Integer requestedLessonCount;
+    public Integer getRequestedLessonCount() { return requestedLessonCount; }
+    public void setRequestedLessonCount(Integer value) { requestedLessonCount = value; }
     /** 排课时选择的校区；classroomId 可稍后由教室分配功能填写。 */
     private String campusName;
     public String getCampusName() { return campusName; }

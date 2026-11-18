@@ -201,19 +201,22 @@ Page({
     if (!f.scheduleId && (!/^\d+(\.\d{1,2})?$/.test(String(f.unitPrice).trim()) || Number(f.unitPrice) <= 0)) { this.setData({formError:'课时单价须大于0且最多保留两位小数'}); return }
     if(f.classPattern==='WEEKLY' && !/^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:f.classMode==='2'?'请选择一对一上课日期':'请选择上课星期'});return}
     if(f.classPattern!=='WEEKLY' && /^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:'请选择期次'});return}
+    if (!f.scheduleId && f.classMode !== '2' && (!/^[1-9]\d*$/.test(String(f.requestedLessonCount || '')) || Number(f.requestedLessonCount)>3661)) { this.setData({formError:'请填写1至3661的整数计费课次数'}); return }
     for(const [key,label] of [['campusName','校区'],['termName','学期'],['periodName',f.classPattern==='WEEKLY'?'上课星期':'期次'],['timeSlot','时段'],['gradeName','年级'],['subjectName','学科'],['teacherId','教师'],['courseClassName','课程名称']]) {
       if(!String(f[key] || '').trim()) {this.setData({formError:'请填写或选择'+label});return}
     }
     const scheduleCode=f.scheduleCode || ('SCH'+Date.now().toString(36)+Math.random().toString(36).slice(2,12))
     this.setData({'form.scheduleCode':scheduleCode})
     const payload={...f,scheduleCode,teacherId:Number(f.teacherId),courseYear:Number(f.courseYear),unitPrice:f.unitPrice===''?null:f.unitPrice,enrollLimit:f.enrollLimit===''?null:Number(f.enrollLimit),startDate:f.startDate || null,endDate:f.endDate || null}
+    if (!f.scheduleId && f.classMode !== '2') payload.requestedLessonCount=Number(f.requestedLessonCount)
+    else delete payload.requestedLessonCount
     delete payload.classroomId;delete payload.teacherLabel
     const version=this._version
     let saved=false
     this.setData({saving:true,formError:''})
     try {
       if(f.scheduleId) {
-        const result=await wx.showModal({title:'确认修改课程',content:'即使已有报名或签到记录，也将修改课程信息并影响后续上课安排。原报名、签到和财务记录保留，不会自动调整费用。请先与学员沟通，确认后强制保存。',confirmText:'确认修改'})
+        const result=await wx.showModal({title:'确认修改课程',content:'该课程如已有学生报名或签到，修改将影响后续上课安排。已有报名和财务记录保留，不会自动调整费用。确定修改吗？',confirmText:'确认修改'})
         if(!result.confirm || !this.current() || version!==this._version)return
       }
       await request({url:root+(f.scheduleId?'?force=true':''),method:f.scheduleId?'PUT':'POST',data:payload})

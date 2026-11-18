@@ -82,6 +82,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         requirePlanningStaff();
         require(schedule != null && schedule.getScheduleId() == null, "新增排课不能指定排课ID");
         requireValidUnitPrice(schedule.getUnitPrice());
+        if (schedule.getRequestedLessonCount()!=null) require(schedule.getRequestedLessonCount()>=1 && schedule.getRequestedLessonCount()<=3661, "计费课次数须为1至3661的整数");
         bindTeacher(schedule, null);
         if ("2".equals(schedule.getClassMode())) schedule.setSubjectName(singleService.subject(schedule.getTeacherId()));
         if (blank(schedule.getScheduleCode())) schedule.setScheduleCode("SCH" + UUID.randomUUID().toString().replace("-", "").substring(0, 28));
@@ -98,6 +99,8 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         schedule.setCreateBy(SecurityUtils.getUsername());
         schedule.setCreateTime(DateUtils.getNowDate());
         int changed=eduCourseScheduleMapper.insertEduCourseSchedule(schedule);
+        if (changed>0 && !"2".equals(schedule.getClassMode()) && schedule.getRequestedLessonCount()!=null)
+            db.jdbc().update("UPDATE edu_course_schedule SET lesson_count_override=?,lesson_count_override_reason=? WHERE schedule_id=?", schedule.getRequestedLessonCount(), "新增排课时填写", schedule.getScheduleId());
         if(changed>0 && !"2".equals(schedule.getClassMode())) coursePrices.syncSchedulePricing(schedule.getScheduleId());
         return changed;
     }

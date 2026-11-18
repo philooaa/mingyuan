@@ -72,7 +72,7 @@ public class ShopService {
         db.insert("edu_material_order_log",log);
     }
     public Map<String,Object> createOrder(long user,Map<String,Object> body) {
-        long material=id(body.get("materialId"));int quantity=integer(body.get("quantity"),1,99,"数量");
+        long material=id(body.get("materialId"));int quantity=integer(body.get("quantity"),1,Integer.MAX_VALUE,"数量");
         String key=str(body,"clientRequestId");require(key.matches("[A-Za-z0-9_-]{1,64}"),"请提供有效的请求编号");
         BigDecimal expected=money(body.get("expectedPrice"));require(str(body,"buyerRemark").length()<=500,"留言不能超过500字");
         Map<String,Object> inputAddress=new LinkedHashMap<>();
@@ -92,7 +92,7 @@ public class ShopService {
             require("0".equals(str(p,"delFlag"))&&"0".equals(str(p,"status"))&&"1".equals(str(p,"shelfStatus")),"商品不存在或已下架");
             require(money(p.get("price")).compareTo(expected)==0,"商品价格已变化，请重新确认");
             boolean physical="PHYSICAL".equals(p.get("deliveryType"));
-            require(quantity<=integer(p.get("purchaseLimit"),1,99,"限购数量"),"超过单次限购数量");
+            if(p.get("purchaseLimit")!=null) require(quantity<=integer(p.get("purchaseLimit"),1,99,"限购数量"),"超过单次限购数量");
             if(!physical) {
                 require(quantity==1,"电子资料数量必须为1");
                 var rights=db.rows("SELECT o.order_id,o.order_status,o.request_hash FROM edu_material_order o JOIN edu_material_order_item i ON o.order_id=i.order_id WHERE o.parent_id=? AND i.material_id=? AND (o.pay_status='1' OR (o.order_status='WAIT_PAY' AND o.expire_time>?)) ORDER BY o.order_id DESC LIMIT 1",user,material,now());
@@ -152,40 +152,50 @@ public class ShopService {
         require(str(a,"postalCode").length()<=10,"邮编过长");
     }
     public Map<String,Object> preparePayment(long user,long order) {
-        require(mockEnabled,"此环境未启用模拟支付");
         var o=order(order,user,false);require("WAIT_PAY".equals(o.get("orderStatus")),"订单不可支付");
         require(!expired(o),"订单已超时，请重新下单");
-        return Map.of("mode","MOCK","orderId",String.valueOf(order));
+        boolean free=money(o.get("payableAmount")).signum()==0;
+        require(free || mockEnabled,"此环境未启用模拟支付");
+        return Map.of("mode",free?"FREE":"MOCK","orderId",String.valueOf(order));
     }
     private static boolean expired(Map<String,Object> o) {
         return !str(o,"expireTime").isBlank()&&!LocalDateTime.parse(str(o,"expireTime"),DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).isAfter(LocalDateTime.now(ZONE));
     }
     public Map<String,Object> pay(long user,long order) {
         require(mockEnabled,"此环境未启用模拟支付");
+        return payInternal(user,order,false);
+    }
+    public Map<String,Object> claimFree(long user,long order) {
+        return payInternal(user,order,true);
+    }
+    private Map<String,Object> payInternal(long user,long order,boolean freeOnly) {
         var result=transaction(()->{
             var o=lockOrder(order,user,false);var payment=db.one("SELECT * FROM edu_material_payment WHERE order_id=? FOR UPDATE",order);
+            if(freeOnly) require("FREE".equals(payment.get("channel")) && money(o.get("payableAmount")).signum()==0 && integer(payment.get("amountCent"),0,Integer.MAX_VALUE,"支付金额")==0,"仅允许领取零元订单");
             if("1".equals(o.get("payStatus")))return order(order,user,false);
             require("WAIT_PAY".equals(o.get("orderStatus"))&&"0".equals(o.get("payStatus")),"订单不可支付");
             if(expired(o)){close(o,order,user,"CLOSED","订单超时");return order(order,user,false);}
             require(List.of("MOCK","FREE").contains(payment.get("channel")),"此订单不能模拟支付");
+            require(mockEnabled || "FREE".equals(payment.get("channel")),"此环境未启用模拟支付");
             int cents=money(o.get("payableAmount")).movePointRight(2).intValueExact();
             require(cents==integer(payment.get("amountCent"),0,Integer.MAX_VALUE,"支付金额"),"订单支付金额不一致");
+            if("FREE".equals(payment.get("channel"))) require(cents==0,"免费订单金额异常");
             var item=db.one("SELECT * FROM edu_material_order_item WHERE order_id=?",order);
-            boolean physical="PHYSICAL".equals(o.get("deliveryType"));int qty=integer(item.get("quantity"),1,99,"数量");long material=id(item.get("materialId"));
+            boolean physical="PHYSICAL".equals(o.get("deliveryType"));int qty=integer(item.get("quantity"),1,Integer.MAX_VALUE,"数量");long material=id(item.get("materialId"));
             db.one("SELECT material_id FROM edu_material WHERE material_id=? FOR UPDATE",material);
             if(physical)require(db.jdbc().update("UPDATE edu_material SET stock_quantity=stock_quantity-?,stock_locked=stock_locked-?,sale_count=sale_count+?,version=version+1 WHERE material_id=? AND stock_locked>=? AND stock_quantity>=?",qty,qty,qty,material,qty,qty)==1,"库存状态异常");
             else db.jdbc().update("UPDATE edu_material SET sale_count=sale_count+1,version=version+1 WHERE material_id=?",material);
             String next=physical?"WAIT_SHIP":"COMPLETED";
             db.jdbc().update("UPDATE edu_material_payment SET payment_status='SUCCESS',paid_amount_cent=?,mock_transaction_id=?,success_time=?,update_time=? WHERE order_id=?",cents,code("M"),now(),now(),order);
             db.jdbc().update("UPDATE edu_material_order SET pay_status='1',amount=payable_amount,pay_time=?,order_status=?,stock_state=?,finish_time=?,update_time=? WHERE order_id=?",now(),next,physical?"CONSUMED":"NOT_APPLICABLE",physical?null:now(),now(),order);
-            log(order,"PAY_SUCCESS",o,next,"1",user,"PAYMENT","模拟支付，无真实扣款");return order(order,user,false);
+            log(order,"PAY_SUCCESS",o,next,"1",user,"PAYMENT","FREE".equals(payment.get("channel"))?"免费领取":"模拟支付，无真实扣款");return order(order,user,false);
         });
         require(!"CLOSED".equals(result.get("orderStatus")),"订单已超时，请重新下单");return result;
     }
     private void close(Map<String,Object> o,long order,long user,String next,String reason) {
         db.one("SELECT order_id FROM edu_material_payment WHERE order_id=? FOR UPDATE",order);
         if("RESERVED".equals(o.get("stockState"))) {
-            var item=db.one("SELECT material_id,quantity FROM edu_material_order_item WHERE order_id=?",order);int qty=integer(item.get("quantity"),1,99,"数量");
+            var item=db.one("SELECT material_id,quantity FROM edu_material_order_item WHERE order_id=?",order);int qty=integer(item.get("quantity"),1,Integer.MAX_VALUE,"数量");
             require(db.jdbc().update("UPDATE edu_material SET stock_locked=stock_locked-?,version=version+1 WHERE material_id=? AND stock_locked>=?",qty,id(item.get("materialId")),qty)==1,"库存预占状态异常");
         }
         db.jdbc().update("UPDATE edu_material_order SET order_status=?,stock_state=?,close_reason=?,cancel_time=?,update_time=? WHERE order_id=?",next,"RESERVED".equals(o.get("stockState"))?"RELEASED":"NOT_APPLICABLE",reason,now(),now(),order);
@@ -335,7 +345,7 @@ public class ShopService {
             Map<String,Object> values=fields(body,PRODUCT);
             if(body.containsKey("materialType"))values.put("material_type",str(body,"materialType"));
             if(teacher){require(!body.containsKey("shelfStatus")||"2".equals(str(body,"shelfStatus")),"教师只能提交草稿");values.put("shelf_status","2");}
-            if(!editing){values.putIfAbsent("title","");values.putIfAbsent("delivery_type","PHYSICAL");values.putIfAbsent("price","0.00");values.putIfAbsent("shelf_status","2");values.putIfAbsent("unit","份");values.putIfAbsent("purchase_limit",99);values.putIfAbsent("shipping_fee","0.00");}
+            if(!editing){values.putIfAbsent("title","");values.putIfAbsent("delivery_type","PHYSICAL");values.putIfAbsent("price","0.00");values.putIfAbsent("shelf_status","2");values.putIfAbsent("unit","份");values.putIfAbsent("purchase_limit",null);values.putIfAbsent("shipping_fee","0.00");}
             Map<String,Object> merged=new LinkedHashMap<>(old);values.forEach((k,v)->merged.put(ShopRepository.camel(k),v));
             require(str(merged,"title").length()<=100,"商品名称不能超过100字");
             require(List.of("PHYSICAL","DIGITAL").contains(str(merged,"deliveryType")),"交付方式无效");
@@ -344,7 +354,8 @@ public class ShopService {
             if(body.containsKey("materialType")&&!str(body,"materialType").isBlank())
                 require(!db.rows("SELECT dict_value FROM sys_dict_data WHERE dict_type='edu_material_type' AND dict_value=? AND status='0'",str(body,"materialType")).isEmpty(),"请选择有效资料类型");
             validateImage(str(merged,"coverUrl"),true);
-            money(merged.get("price"));money(merged.get("shippingFee"));integer(merged.get("purchaseLimit"),1,99,"限购数量");
+            money(merged.get("price"));money(merged.get("shippingFee"));if(merged.get("purchaseLimit")!=null&&!str(merged,"purchaseLimit").isBlank()) integer(merged.get("purchaseLimit"),1,99,"限购数量");
+            if(values.containsKey("purchase_limit") && str(merged,"purchaseLimit").isBlank()) values.put("purchase_limit",null);
             if(merged.get("dispatchDays")!=null&&!str(merged,"dispatchDays").isBlank())integer(merged.get("dispatchDays"),0,365,"发货天数");
             if(editing) {
                 require(body.get("version")!=null&&integer(body.get("version"),0,Integer.MAX_VALUE,"版本")==integer(old.get("version"),0,Integer.MAX_VALUE,"版本"),"商品已被更新，请刷新后重试");
@@ -390,7 +401,7 @@ public class ShopService {
     private void validateShelf(Map<String,Object> p) {
         for(String key:List.of("title","coverUrl","detailText","subjectCode","gradeCode"))require(!str(p,key).isBlank(),"上架需填写名称、封面、详情、学科和年级");
         for(var entry:Map.of("subjectCode","edu_subject","gradeCode","edu_grade").entrySet())require(!db.rows("SELECT dict_value FROM sys_dict_data WHERE dict_type=? AND dict_value=? AND status='0'",entry.getValue(),p.get(entry.getKey())).isEmpty(),"请选择有效学科和年级");
-        require(money(p.get("price")).signum()>0||"1".equals(str(p,"legacyFree")),"新商品上架价格必须大于0");
+        money(p.get("price"));
         if("PHYSICAL".equals(p.get("deliveryType")))require(integer(p.getOrDefault("stockQuantity",0),0,Integer.MAX_VALUE,"库存")-integer(p.getOrDefault("stockLocked",0),0,Integer.MAX_VALUE,"预占")>0,"上架需有可售库存");
         else {require(!str(p,"filePath").isBlank(),"电子商品上架需私有PDF");storage.resolve(str(p,"filePath"));}
     }
