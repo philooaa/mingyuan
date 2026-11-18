@@ -5,7 +5,7 @@
   </view>
 
   <view class="date-bar">
-    <view class="date-label">课次日期</view>
+    <view class="date-label">{{lessonNo ? '第 ' + lessonNo + ' 讲' : '课次日期'}}</view>
     <view class="date-value">{{classDate}}</view>
     <view class="review-tag {{locked ? 'done' : 'pending'}}" wx:if="{{review}}">
       {{review.stageText || (review.reviewStatus === '1' ? '已终审' : review.reviewStatus === '2' ? '已退回' : '待审核')}}
@@ -14,6 +14,7 @@
 
   <view class="banner half" wx:if="{{review.reviewStatus === '2'}}">审核异常：{{review.reviewReason}}。请更正后重新提交，监控截图和两级审核需重新确认。</view>
   <view class="banner done" wx:elif="{{locked}}">该课次正在审核或已终审，点名已锁定。未终审数据不计入正式统计。</view>
+  <view class="banner half" wx:if="{{upcoming}}">尚未到实际开课时间，可先查看名单，开课后重新加载即可点名。</view>
   <view class="detail-reload" bindtap="loadDetail">重新加载当前课次</view>
 
   <view class="stats" wx:if="{{stats && stats.total > 0}}">
@@ -32,15 +33,16 @@
           {{row.studentName}}
           <text class="source {{row.sourceType === '1' ? '' : 'extra'}}">{{row.sourceText}}</text>
         </view>
-        <view class="remove" wx:if="{{row.added && !locked && !loading && !submitting && ready}}" data-row-key="{{row.rowKey}}" bindtap="removeRow">移除</view>
+        <view class="remove" wx:if="{{row.added && !locked && !upcoming && !loading && !submitting && ready}}" data-row-key="{{row.rowKey}}" bindtap="removeRow">移除</view>
       </view>
-      <view class="status-btns" wx:if="{{!locked}}">
+      <view class="guest-origin" wx:if="{{row.originText}}">来自 {{row.originText}}</view>
+      <view class="status-btns" wx:if="{{!locked && !upcoming}}">
         <view
           wx:for="{{row.statusOptions}}"
           wx:for-item="opt"
           wx:for-index="statusIndex"
           wx:key="key"
-          class="status-btn {{row.signStatus === opt.key ? 'active' : ''}} {{row.signStatus === opt.key && opt.key === '3' ? 'leave' : ''}} {{locked || loading || submitting || !ready ? 'disabled' : ''}}"
+          class="status-btn {{row.signStatus === opt.key ? 'active' : ''}} {{row.signStatus === opt.key && opt.key === '3' ? 'leave' : ''}} {{locked || upcoming || loading || submitting || !ready ? 'disabled' : ''}}"
           data-row-key="{{row.rowKey}}"
           data-key="{{opt.key}}"
           bindtap="setStatus"
@@ -50,17 +52,49 @@
     </view>
   </view>
 
-  <view class="add-bar" wx:if="{{!locked && !loading && !submitting && ready}}">
+  <view class="outgoing-card" wx:if="{{outgoing.length}}">
+    <view class="outgoing-title">本讲已调出 · {{outgoing.length}} 人</view>
+    <view class="outgoing-item" wx:for="{{outgoing}}" wx:key="index">{{item.studentName}}<text> → {{item.courseName}} · 第{{item.lessonNo}}讲</text></view>
+  </view>
+
+  <view class="add-bar" wx:if="{{!locked && !upcoming && !loading && !submitting && ready}}">
     <view class="add-btn audited" bindtap="addAudited">+ 试听学员</view>
-    <view class="add-btn transferred" bindtap="addTransferred">+ 调课学员</view>
+    <view class="add-btn transferred" bindtap="addTransferred">+ 临时调课</view>
   </view>
 
   <view class="empty" wx:if="{{loading}}">加载中...</view>
   <view class="empty" wx:if="{{!loading && rows.length === 0}}">该班级暂无报名学员</view>
 
-  <view class="submit-wrap" wx:if="{{!locked}}">
+  <view class="submit-wrap" wx:if="{{!locked && !upcoming}}">
     <view class="submit-btn {{submitting || loading || !ready ? 'disabled' : ''}}" bindtap="submit">
       {{loading ? '加载中...' : (submitting ? '提交中...' : '提交点名表给教务')}}
+    </view>
+  </view>
+  <view class="guest-overlay" wx:if="{{guestOpen}}" catchtap="closeGuest" catchtouchmove="stopTap">
+    <view class="guest-panel" catchtap="stopTap">
+      <view class="guest-heading"><view>{{guestSource === 'TRIAL' ? '添加试听学员' : '添加临时调课学员'}}</view><view class="guest-close" bindtap="closeGuest">关闭</view></view>
+      <view class="guest-hint">{{guestSource === 'TRIAL' ? '先查找已有档案，未找到可新建待绑定学员。仅加入当前这一讲。' : '选择学生及原课程讲次，临时调入当前这一讲。原讲次将显示已调出。'}}</view>
+      <view class="guest-search">
+        <input placeholder="输入学生姓名" value="{{guestKeyword}}" maxlength="30" disabled="{{guestBusy}}" bindinput="guestKeywordInput" bindconfirm="searchGuests" confirm-type="search"/>
+        <button class="guest-search-btn" loading="{{guestBusy}}" disabled="{{guestBusy}}" bindtap="searchGuests">查询</button>
+      </view>
+      <scroll-view class="guest-results" scroll-y="true">
+        <view wx:for="{{guestCandidates}}" wx:key="studentId" class="guest-option {{guestStudent.studentId === item.studentId ? 'chosen' : ''}}" data-index="{{index}}" bindtap="pickGuest">
+          <view>{{item.studentName}}<text class="guest-profile" wx:if="{{item.courseSummary}}">{{item.courseSummary}}</text><text class="guest-profile">{{item.pendingParent ? '待绑定家长' : '已有档案'}}</text></view>
+          <text class="guest-check">{{guestStudent.studentId === item.studentId ? '已选择' : '选择'}}</text>
+        </view>
+        <view class="guest-no-results" wx:if="{{guestSearched && !guestCandidates.length}}">未找到匹配的学生档案</view>
+      </scroll-view>
+      <view wx:if="{{guestSource === 'TRANSFER' && guestStudent}}" class="guest-origin-picker">
+        <view class="guest-field-label">原课程及讲次</view>
+        <picker range="{{guestSources}}" range-key="label" value="{{guestSourceIndex < 0 ? 0 : guestSourceIndex}}" bindchange="pickGuestSource" disabled="{{guestBusy || !guestSources.length}}">
+          <view class="guest-picker-value">{{guestSourceIndex >= 0 ? guestSources[guestSourceIndex].label : '请选择原课程和第几讲'}}<text>⌄</text></view>
+        </picker>
+      </view>
+      <view class="guest-error" wx:if="{{guestError}}">{{guestError}}</view>
+      <button wx:if="{{guestSource === 'TRIAL' && guestSearched && !guestCandidates.length}}" class="guest-confirm" loading="{{guestBusy}}" disabled="{{guestBusy}}" bindtap="createTrial">新建「{{guestKeyword}}」并加入试听</button>
+      <button wx:else class="guest-confirm" loading="{{guestBusy}}" disabled="{{guestBusy || !guestStudent || (guestSource === 'TRANSFER' && guestSourceIndex < 0)}}" bindtap="saveGuest">加入当前讲次</button>
+      <view class="guest-footer">添加后请核对出勤状态，随点名表一起提交教务审核</view>
     </view>
   </view>
 </view>

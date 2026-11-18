@@ -372,3 +372,11 @@ page {
 .home-child-picker{margin-top:22rpx;background:#fff;border:1rpx solid #e3eaf4;border-radius:20rpx;padding:8rpx 24rpx;box-shadow:0 10rpx 30rpx rgba(40,60,90,.06)}
 .home-child-option{display:flex;align-items:center;justify-content:space-between;padding:25rpx 0;font-size:29rpx;color:#34445b;gap:18rpx}
 .home-child-option+.home-child-option{border-top:1rpx solid #f0f3f7}.home-child-option.chosen{color:#315ca7;font-weight:600}.child-option-grade{font-size:24rpx;color:#8893a4;margin-left:20rpx;font-weight:400}.child-option-badge{display:inline-block;background:#df4c58;color:#fff;border-radius:99rpx;min-width:28rpx;padding:0 9rpx;line-height:34rpx;font-size:22rpx;margin-right:18rpx}.home-child-add{border-top:1rpx solid #edf1f6;padding:25rpx 0;color:#315ca7;font-size:27rpx}.child-load-retry{color:#315ca7;font-size:25rpx;margin-top:14rpx}
+
+.attendance-reminder { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; width: auto; margin: 22rpx 0 0; padding: 20rpx 24rpx; border: 1rpx solid #dbe7f7; border-radius: 18rpx; background: #edf4ff; color: #194476; line-height: 1.5; text-align: left; }
+.attendance-reminder::after { border: 0; }
+.attendance-reminder-copy { display: flex; flex-wrap: wrap; align-items: center; gap: 8rpx 16rpx; }
+.attendance-reminder-title { font-size: 27rpx; font-weight: 600; }
+.attendance-reminder-detail, .attendance-reminder-link { font-size: 23rpx; }
+.attendance-reminder-detail { color: #516f90; }
+.attendance-reminder-link { flex-shrink: 0; color: #245eaa; }

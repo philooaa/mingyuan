@@ -220,7 +220,7 @@
               size="small"
               @click="openOperation('price')"
             >
-              核价
+              {{ isSingleLesson ? '核价／自定义减免' : '核价' }}
             </el-button>
             <el-button
               v-hasPermi="['system:tuition:historyVerify']"
@@ -644,6 +644,10 @@ export default {
     }
   },
   computed: {
+    isSingleLesson() {
+      return !!this.detail && this.detail.settlementMethod === 'C' &&
+        (this.detail.courses || []).some(course => course.classMode === '2')
+    },
     isCartOrder() {
       return !!this.detail && this.detail.billType === 'CART_ORDER'
     },
@@ -746,7 +750,7 @@ export default {
       this.operation = operation
       this.payment = payment || null
       this.operationTitle = {
-        price: '核定课程价格',
+        price: this.isSingleLesson ? '核定一对一费用' : '核定课程价格',
         history: '历史收费核验',
         collect: '登记收款（后端最终核价）',
         confirm: '核对凭证后确认收款',

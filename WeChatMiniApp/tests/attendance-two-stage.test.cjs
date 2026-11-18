@@ -21,9 +21,12 @@ test('roster editor selects same-name children by stable ID and removes from a f
 })
 test('todos load current workspace and navigate the exact occurrence',async()=>{
  let page,role='education';const navigations=[],calls=[];const wx={getStorageSync:()=> 'token',navigateTo:o=>navigations.push(o.url)}
- const module={exports:{}};vm.runInNewContext(fs.readFileSync(path.join(root,'utils/attendance-workflow.js'),'utf8'),{module,require:()=>({request:async o=>{calls.push(o);return {data:{count:1,items:[{scheduleId:'99',classDate:'2026-11-06'}]}}}})})
+ const module={exports:{}};vm.runInNewContext(fs.readFileSync(path.join(root,'utils/attendance-workflow.js'),'utf8'),{module,require:()=>({request:async o=>{calls.push(o);return {data:{count:1,courses:[{scheduleId:'99',courseName:'班级'}],items:[{scheduleId:'99',lessonId:'12',lessonNo:14,classDate:'2026-11-06',overdue:true},{scheduleId:'99',lessonId:'10',lessonNo:2,classDate:'2026-11-08',stage:'PENDING_FIRST',overdue:true}]}}}})})
  vm.runInNewContext(fs.readFileSync(path.join(root,'pages/attendance-todos/attendance-todos.js'),'utf8'),{Page:p=>page=p,require:id=>id.endsWith('/attendance-filters')?require('../utils/attendance-filters'):id.endsWith('/access')?{selected:()=>role}:module.exports,wx})
- const p={...page,data:structuredClone(page.data),setData(v){Object.assign(this.data,v)}};await p.onShow();assert.equal(calls[0].data.role,'education');p.open({currentTarget:{dataset:{index:0}}});assert.match(navigations[0],/sign-review-detail.*scheduleId=99&classDate=2026-11-06/);role='teacher';p.open({currentTarget:{dataset:{index:0}}});assert.equal(navigations.length,1);await p.onShow();p.open({currentTarget:{dataset:{index:0}}});assert.match(navigations[1],/sign-in-edit/)
+ const p={...page,data:structuredClone(page.data),setData(v){Object.assign(this.data,v)}};await p.onShow();assert.equal(calls[0].data.role,'education');p.open({currentTarget:{dataset:{index:0}}});assert.match(navigations[0],/sign-review-detail.*scheduleId=99&classDate=2026-11-06/);role='teacher';p.open({currentTarget:{dataset:{index:0}}});assert.equal(navigations.length,1);await p.onShow();assert.equal(p.data.items.length,0);p.queryCourses();assert.equal(p.data.matchedCourses.length,1);p.chooseCourse({currentTarget:{dataset:{index:0}}});
+ assert.deepEqual(Array.from(p.data.items, item => [item.lessonNo, item.shortClassDate, item.attendanceLabel]), [[2,'11-08','待初审'],[14,'11-06','已逾期']])
+ p.open({currentTarget:{dataset:{index:1}}})
+ assert.match(navigations[1],/sign-in-edit.*classDate=2026-11-06.*lessonId=12/)
 })
 
 test('monitor screenshot picker resumes without refreshing away uploads or leaving button busy',async()=>{

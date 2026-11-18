@@ -202,7 +202,12 @@ public class EduClassSignInServiceImpl implements IEduClassSignInService
             throw new ServiceException("课次日期格式应为 yyyy-MM-dd");
         }
 
-        if (rosterService != null) rosterService.validateSubmission(body);
+        if (rosterService != null) {
+            if (!"2".equals(schedule.getClassMode())) {
+                rosterService.requireStarted(scheduleId,classDate,body.getLessonId());
+            }
+            rosterService.validateSubmission(body);
+        }
 
         // 已复核完成的课次锁定，不允许修改签到
         Map<String, Object> info = signInMapper.selectReviewInfo(scheduleId, classDate);

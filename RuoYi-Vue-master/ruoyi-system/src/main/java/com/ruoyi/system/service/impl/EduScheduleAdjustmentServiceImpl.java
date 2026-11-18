@@ -51,6 +51,19 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         if (schedule != null && "2".equals(schedule.getClassMode()) && !singleDb.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND class_date IS NOT NULL FOR UPDATE",scheduleId).isEmpty()) throw new ServiceException("一对一已有按日期报名，不能通过批量调课改变原课次；请先核对处理历史");
     }
     private void checkResult(Long scheduleId) { availability.check(singleSchedules.lockSchedule(scheduleId)); }
+    private void requireUnsubmitted(Long scheduleId,String termName,String periodName,Date original,Date actual) {
+        String scope=scheduleId!=null&&scheduleId!=0L?"c.schedule_id=?":"c.term_name=? AND c.period_name=?";
+        var args=new ArrayList<Object>();
+        if(scheduleId!=null&&scheduleId!=0L)args.add(scheduleId);
+        else { args.add(termName); args.add(periodName); }
+        args.add(original); args.add(original); args.add(actual);
+        if(!singleDb.rows("SELECT r.sign_in_id FROM edu_class_sign_in r JOIN edu_course_schedule c "
+                + "ON c.schedule_id=r.schedule_id LEFT JOIN edu_attendance_lesson l "
+                + "ON l.schedule_id=r.schedule_id AND l.class_date=r.class_date "
+                + "WHERE c.del_flag='0' AND r.del_flag='0' AND "+scope
+                + " AND (l.original_date=? OR r.class_date=? OR r.class_date=?) LIMIT 1",args.toArray()).isEmpty())
+            throw new ServiceException("该讲已提交点名，请先核对出勤记录后再处理调课");
+    }
     private void validateChange(EduScheduleAdjustment change,Long excludeId) {
         var schedule=singleSchedules.lockSchedule(change.getScheduleId());
         LocalDate original=com.ruoyi.system.service.ScheduleCalendar.date(change.getOriginalDate());
@@ -103,6 +116,7 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
     {
         protectSingle(eduScheduleAdjustment.getScheduleId());
         validateChange(eduScheduleAdjustment,null);
+        requireUnsubmitted(eduScheduleAdjustment.getScheduleId(),null,null,eduScheduleAdjustment.getOriginalDate(),null);
         eduScheduleAdjustment.setCreateTime(DateUtils.getNowDate());
         int count = eduScheduleAdjustmentMapper.insertEduScheduleAdjustment(eduScheduleAdjustment);
         checkResult(eduScheduleAdjustment.getScheduleId());
@@ -130,6 +144,8 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         eduScheduleAdjustment.setScheduleId(current.getScheduleId());
         if(eduScheduleAdjustment.getOriginalDate() == null) eduScheduleAdjustment.setOriginalDate(current.getOriginalDate());
         validateChange(eduScheduleAdjustment,current.getAdjustmentId());
+        requireUnsubmitted(current.getScheduleId(),null,null,current.getOriginalDate(),current.getAdjustedDate());
+        requireUnsubmitted(current.getScheduleId(),null,null,eduScheduleAdjustment.getOriginalDate(),null);
         eduScheduleAdjustment.setUpdateTime(DateUtils.getNowDate());
         int count = eduScheduleAdjustmentMapper.updateEduScheduleAdjustment(eduScheduleAdjustment);
         checkResult(current.getScheduleId());
@@ -169,6 +185,11 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         }
         availability.lockResources(schedules.stream().map(singleSchedules::selectEduCourseScheduleByScheduleId).toList());
         schedules.forEach(this::protectSingle);
+        for (Long id : adjustmentIds) {
+            var record=eduScheduleAdjustmentMapper.selectEduScheduleAdjustmentByAdjustmentId(id);
+            if(record!=null)requireUnsubmitted(record.getScheduleId(),record.getTermName(),record.getPeriodName(),
+                    record.getOriginalDate(),record.getAdjustedDate());
+        }
         int count = eduScheduleAdjustmentMapper.deleteEduScheduleAdjustmentByIds(adjustmentIds);
         schedules.forEach(this::checkResult);
         return count;
@@ -346,6 +367,7 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
     private int insertRecord(Long scheduleId, String termName, String periodName, LocalDate originalDate,
                              Date adjustedDate, Integer courseCount, String reason, String username, Date now)
     {
+        requireUnsubmitted(scheduleId,termName,periodName,toDate(originalDate),null);
         EduScheduleAdjustment adj = new EduScheduleAdjustment();
         adj.setScheduleId(scheduleId);
         adj.setTermName(termName);

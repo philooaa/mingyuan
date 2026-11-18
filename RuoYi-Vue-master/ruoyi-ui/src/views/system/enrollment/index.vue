@@ -27,6 +27,12 @@
           @keyup.enter.native="handleQuery"
         />
       </el-form-item>
+      <el-form-item label="课程类型" prop="classMode">
+        <el-select v-model="queryParams.classMode" placeholder="全部课程" clearable @change="handleQuery">
+          <el-option label="班课" value="1" />
+          <el-option label="一对一" value="2" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="学生姓名" prop="studentName">
         <el-input
           v-model="queryParams.studentName"
@@ -126,12 +132,17 @@
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="学生" prop="studentName" min-width="140" fixed="left"><template slot-scope="scope"><div class="edu-table-name">{{ scope.row.studentName || '未提供姓名' }}</div><div class="edu-table-secondary">{{ scope.row.contactPhone || scope.row.studentPhone || '电话未提供' }}</div></template></el-table-column>
       <el-table-column v-if="showDetailedColumns" key="detail-enrollmentId" label="报名ID" align="center" prop="enrollmentId" />
-      <el-table-column v-if="showDetailedColumns" key="detail-enrollmentCode" label="报名编码" align="center" prop="enrollmentCode" min-width="160" show-overflow-tooltip />
+      <el-table-column v-if="showDetailedColumns || queryParams.classMode !== '1'" key="enrollment-code" label="报名编号" min-width="155" show-overflow-tooltip>
+        <template slot-scope="{ row }">{{ row.classMode === '2' || showDetailedColumns ? row.enrollmentCode : '—' }}</template>
+      </el-table-column>
       <el-table-column label="课程信息" align="left" min-width="190">
         <template slot-scope="scope">
           <div v-if="scope.row.courseClassName || scope.row.subjectName" class="schedule-info">
             <div class="edu-table-name">{{ scope.row.courseClassName || '未命名课程' }}</div>
             <div class="info-grade">{{ scope.row.gradeName || '-' }} · {{ scope.row.subjectName || '-' }} <span v-if="scope.row.classType" class="info-type">{{ scope.row.classType }}</span></div>
+            <div v-if="scope.row.classMode === '2'" class="edu-table-secondary">
+              一对一 · {{ scope.row.classDate || '日期待核对' }} {{ scope.row.lessonTime }}
+            </div>
             <div class="info-teacher">{{ scope.row.teacherName || '-' }} · <span class="info-status" :class="'rs-' + scope.row.recruitStatus">{{ getRecruitLabel(scope.row.recruitStatus) }}</span></div>
           </div>
           <span v-else class="text-muted">暂无排课信息</span>
@@ -148,6 +159,25 @@
           <div>请假：{{ scope.row.leaveLessonCount || 0 }} 次</div>
         </template>
       </el-table-column>
+      <el-table-column v-if="queryParams.classMode !== '1'" key="one-to-one-settlement" label="一对一结算" min-width="145">
+        <template slot-scope="{ row }">
+          <template v-if="row.classMode === '2'">
+            <template v-if="row.settlementMethod === 'P'">
+              <div>课包 · {{ row.lessonCredits == null ? '待核对' : row.lessonCredits + ' 次' }}</div>
+              <div class="edu-table-secondary">{{ creditStatusLabel(row.lessonCreditStatus) }}</div>
+            </template>
+            <template v-else-if="row.settlementMethod === 'C'">
+              <div>单次 · 1 讲</div>
+              <template v-if="row.receivedAmount != null">
+                <div class="edu-table-secondary">原价 {{ fee(row.originalAmount) }} / 减免 {{ fee(row.discountAmount) }}</div>
+                <div class="edu-table-secondary">应收 {{ fee(row.payableAmount) }} / 实收 {{ fee(row.receivedAmount) }}</div>
+              </template>
+            </template>
+            <span v-else>结算方式待核对</span>
+          </template>
+          <span v-else class="edu-table-secondary">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="报名状态" align="center" prop="enrollmentStatus">
         <template slot-scope="scope">
           {{ getEnrollmentStatusLabel(scope.row.enrollmentStatus) }}
@@ -156,16 +186,16 @@
       <el-table-column label="支付状态" align="center" width="120">
         <template slot-scope="scope">
           <el-tag :type="getPayStatusType(scope.row.payStatus)" size="small">
-            {{ scope.row.payStatus || '待核对' }}
+            {{ scope.row.settlementMethod === 'P' ? '课包结算' : getPaymentLabel(scope.row.payStatus) }}
           </el-tag>
-          <div class="pay-actions">
+          <div v-if="scope.row.settlementMethod !== 'P'" class="pay-actions">
             <el-button
               size="mini"
               type="text"
               style="color: #67C23A;"
               @click="handleFinance(scope.row)"
               v-hasPermi="['system:tuition:query']"
-            >收费详情</el-button>
+            >{{ scope.row.classMode === '2' && ['PENDING_PRICE', 'OPEN'].includes(scope.row.billingStatus) ? '查看费用' : '收费详情' }}</el-button>
           </div>
         </template>
       </el-table-column>
@@ -347,6 +377,7 @@ export default {
       queryParams: {
         pageNum: 1,
         pageSize: 10,
+        classMode: null,
         enrollmentCode: null,
         scheduleId: null,
         parentId: null,
@@ -430,6 +461,7 @@ export default {
       listEnrollment(this.queryParams).then(response => {
         this.enrollmentList = response.rows
         this.total = response.total
+      }).finally(() => {
         this.loading = false
       })
     },
@@ -570,7 +602,17 @@ export default {
       return labels[String(status)] || status || '-'
     },
     /** 支付状态标签颜色 */
+    getPaymentLabel(status) {
+      return ({ '0': '未支付', '1': '已支付', '2': '已退款' })[status] || status || '待核对'
+    },
+    creditStatusLabel(status) {
+      return ({ HOLD: '已占用', CONSUME: '已扣减', RELEASE: '已释放' })[status] || '扣次待核对'
+    },
+    fee(value) {
+      return value == null ? '待核验' : '¥' + Number(value).toFixed(2)
+    },
     getPayStatusType(status) {
+      status = this.getPaymentLabel(status)
       if (status === '已支付') return 'success'
       if (status === '已退款') return 'warning'
       return 'info'

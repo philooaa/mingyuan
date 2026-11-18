@@ -21,9 +21,9 @@ test('attendance filters combine exact date subject grade and teacher without ch
 test('todo filters show matching counts and keep navigation on the filtered lesson',async()=>{
  const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');let definition;const navigations=[]
  const wx={getStorageSync:()=> 'session',navigateTo:o=>navigations.push(o.url)}
- vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../pages/attendance-todos/attendance-todos.js'),'utf8'),{Page:p=>definition=p,wx,require:id=>id.endsWith('/attendance-filters')?filters:id.endsWith('/access')?{selected:()=> 'education'}:{request:async()=>({data:{items:rows}}),todoRoute:item=>item.scheduleId}})
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../pages/attendance-todos/attendance-todos.js'),'utf8'),{Page:p=>definition=p,wx,require:id=>id.endsWith('/attendance-filters')?filters:id.endsWith('/access')?{selected:()=> 'education'}:{request:async()=>({data:{items:rows.map((row,i)=>({...row,lessonNo:i+1}))}}),todoRoute:item=>item.scheduleId}})
  const p={...definition,data:structuredClone(definition.data),setData(v){Object.assign(this.data,v)}};await p.onShow();assert.equal(p.data.count,3)
- p.onAttendanceFilter({currentTarget:{dataset:{field:'subjectName'}},detail:{value:p.data.filterOptions.subjectName.indexOf('数学')}});p.onDateFilter({detail:{value:'2026-11-07'}})
+ p.onAttendanceFilter({currentTarget:{dataset:{field:'lessonNo'}},detail:{value:p.data.filterOptions.lessonNo.indexOf('3')}})
  assert.equal(p.data.count,1);p.open({currentTarget:{dataset:{index:0}}});assert.deepEqual(navigations,['3'])
  p.resetAttendanceFilters();assert.equal(p.data.count,3);assert.equal(p.data.filterDate,'')
 })

@@ -9,3 +9,5 @@ export const rosterRemove=(row,data)=>request({url:base+'/roster/'+(row.membersh
 export const rosterAddOffline=data=>request({url:base+'/roster/offline',method:'post',data})
 export const rosterBindParent=(studentId,data)=>request({url:base+'/students/'+studentId+'/parent',method:'put',data})
 export const rosterPendingParents=()=>request({url:base+'/students/pending-parent'})
+export const rosterBindingCandidates=id=>request({url:base+'/students/'+id+'/binding-candidates'})
+export const rosterLinkExisting=(id,existingId)=>request({url:base+'/students/'+id+'/existing/'+existingId,method:'put'})

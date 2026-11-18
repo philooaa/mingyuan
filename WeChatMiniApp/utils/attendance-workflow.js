@@ -2,7 +2,7 @@ const { request } = require('./request')
 const base = '/miniapp/staff/attendance'
 function todoRoute(item, role) {
  const page = role === 'teacher' ? 'sign-in-edit' : 'sign-review-detail'
- return `/pages/${page}/${page}?scheduleId=${encodeURIComponent(item.scheduleId)}&classDate=${encodeURIComponent(item.classDate)}`
+ return `/pages/${page}/${page}?scheduleId=${encodeURIComponent(item.scheduleId)}&classDate=${encodeURIComponent(item.classDate)}${role === 'teacher' && item.lessonId ? '&lessonId='+encodeURIComponent(item.lessonId) : ''}`
 }
 function range(form) {
  const start = Number(form.startLesson), end = form.endLesson === '' || form.endLesson == null ? null : Number(form.endLesson)

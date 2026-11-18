@@ -87,6 +87,17 @@ public class EduClassSignIn extends BaseEntity
     private String courseClassName;
 
     /** 年级 */
+    private Integer lessonNo;
+    private Integer courseYear;
+    private String termName;
+
+    public Integer getLessonNo() { return lessonNo; }
+    public void setLessonNo(Integer value) { lessonNo=value; }
+    public Integer getCourseYear() { return courseYear; }
+    public void setCourseYear(Integer value) { courseYear=value; }
+    public String getTermName() { return termName; }
+    public void setTermName(String value) { termName=value; }
+
     private String gradeName;
 
     /** 学科 */

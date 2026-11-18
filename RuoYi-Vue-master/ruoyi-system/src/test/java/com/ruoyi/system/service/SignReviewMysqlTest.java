@@ -43,7 +43,7 @@ class SignReviewMysqlTest {
         }));
         inject("classLeaves",new ClassLeaveService(){@Override public Set<Long> approved(Long id,String date){return Set.of();}});
         inject("singleDb",new com.ruoyi.system.shop.ShopRepository(ds));
-        jdbc.execute("CREATE TABLE edu_attendance_lesson(lesson_id BIGINT PRIMARY KEY,schedule_id BIGINT,class_date DATE,teacher_id BIGINT,start_time TIME,end_time TIME,locked TINYINT,course_name VARCHAR(200))");
+        jdbc.execute("CREATE TABLE edu_attendance_lesson(lesson_id BIGINT PRIMARY KEY,schedule_id BIGINT,class_date DATE,teacher_id BIGINT,start_time TIME,end_time TIME,locked TINYINT,course_name VARCHAR(200),lesson_no INT,course_year INT,term_name VARCHAR(64))");
         jdbc.execute("CREATE TABLE edu_enrollment(enrollment_id BIGINT PRIMARY KEY,schedule_id BIGINT,class_date DATE,lesson_completed_time DATETIME,student_id BIGINT,parent_id BIGINT,student_name VARCHAR(30),del_flag CHAR(1) DEFAULT '0')");
         jdbc.execute("CREATE TABLE edu_student(student_id BIGINT PRIMARY KEY,parent_id BIGINT,student_name VARCHAR(30))");
         jdbc.execute("CREATE TABLE sys_user(user_id BIGINT PRIMARY KEY,user_name VARCHAR(30),nick_name VARCHAR(30),phonenumber VARCHAR(11),status CHAR(1) DEFAULT '0',del_flag CHAR(1) DEFAULT '0')");

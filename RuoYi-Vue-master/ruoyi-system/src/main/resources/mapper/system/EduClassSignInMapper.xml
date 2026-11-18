@@ -36,6 +36,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <resultMap type="EduClassSignIn" id="EduClassSignInJoinResult" extends="EduClassSignInResult">
         <result property="courseClassName" column="course_class_name" />
+        <result property="lessonNo" column="lesson_no"/>
+        <result property="courseYear" column="course_year"/>
+        <result property="termName" column="term_name"/>
         <result property="gradeName"       column="grade_name"       />
         <result property="subjectName"     column="subject_name"     />
         <result property="periodName"      column="period_name"      />
@@ -82,6 +85,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 管理端：按课次聚合的签到列表 -->
     <select id="selectReviewList" resultMap="EduClassSignInJoinResult">
         select r.schedule_id, r.class_date,
+               max(l.lesson_no) lesson_no, max(coalesce(l.course_year,c.course_year)) course_year,
+               max(coalesce(l.term_name,c.term_name)) term_name,
                max(r.review_stage) as review_stage, max(r.review_status) as review_status,
                max(r.review_reason) as review_reason, max(r.review_version) as review_version,
                max(r.review1_admin_id) as review1_admin_id,
