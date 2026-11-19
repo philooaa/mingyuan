@@ -28,7 +28,8 @@ Page({
       this.setData({...attendanceFilters.state(this._courses||[],this.data.attendanceFilters),courses,courseOptions:[{label:'请选择课程',scheduleId:''},...courses],courseIndex:-1,courseId:'',overviewLoading:false,overviewError:'',overviewReady:false,studentKeyword:'',students:[],shownStudents:[],dates:[],dateColumns:[],courseStats:{},coursePendingStats:{},plannedExpectedCount:0,occurrenceCount:0})
   },
   onAttendanceFilter(e){this.setData({attendanceFilters:attendanceFilters.change(this.data,e)});return this.data.mode==='overview'?this.applyCourseFilters():this.applyFilter()},
-  resetAttendanceFilters(){this.setData({attendanceFilters:{},filterDate:'',from:'',to:''});return this.data.mode==='overview'?this.loadCourses():this.loadList()},
+  resetAttendanceFilters(){this.setData({attendanceFilters:{},courseKeyword:'',filterDate:'',from:'',to:''});return this.data.mode==='overview'?this.loadCourses():this.loadList()},
+  chooseOverviewCourse(e){return this.pickCourse({detail:{value:Number(e.currentTarget.dataset.index)+1}})},
   pickCourse(e){const index=Number(e.detail.value)-1,course=this.data.courses[index];if(!course)return this.applyCourseFilters();this.setData({courseIndex:index,courseId:String(course.scheduleId),studentKeyword:''});return this.loadOverview()},
   changeRange(e){const field=e.currentTarget.dataset.field;if(!['from','to'].includes(field))return;this.setData({[field]:e.detail.value});return this.loadCourses()},
   resetRange(){this.setData({from:'',to:''});return this.loadCourses()},

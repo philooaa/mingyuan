@@ -18,3 +18,15 @@
     <view class="register-note">未注册手机号将自动创建家长账号</view>
   </view>
 </view>
+
+<view wx:if="{{localPreviewEnabled && previewIdentityVisible}}" class="identity-mask" bindtap="closePreviewIdentity">
+  <view class="identity-panel" catchtap="preventPreviewClose">
+    <view class="identity-heading"><text>选择{{previewIdentityRole === 'teacher' ? '教师' : '家长'}}</text><text class="identity-close" bindtap="closePreviewIdentity">关闭</text></view>
+    <input class="identity-search" placeholder="输入姓名搜索" value="{{previewIdentityKeyword}}" bindinput="searchPreviewIdentity"/>
+    <view class="identity-count">共 {{filteredPreviewIdentities.length}} 位{{previewIdentityRole === 'teacher' ? '教师' : '家长'}}</view>
+    <scroll-view scroll-y class="identity-list">
+      <view wx:for="{{filteredPreviewIdentities}}" wx:key="userId" class="identity-row" data-id="{{item.userId}}" bindtap="selectPreviewIdentity"><text>{{item.name || item.label || item.userName}}</text><text class="identity-arrow">›</text></view>
+      <view wx:if="{{!filteredPreviewIdentities.length}}" class="identity-empty">没有找到匹配的账号</view>
+    </scroll-view>
+  </view>
+</view>

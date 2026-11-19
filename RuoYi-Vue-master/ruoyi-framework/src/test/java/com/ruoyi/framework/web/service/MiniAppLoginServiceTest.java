@@ -225,14 +225,14 @@ class MiniAppLoginServiceTest
         assertNull(issuedToken);
     }
 
-    @Test void businessAdminCannotUsePasswordFreeTeacherShortcut() throws Exception
+    @Test void localTeacherPreviewIncludesBusinessAdminWithTeacherRole() throws Exception
     {
         SysRole business = new SysRole(9L);
         business.setRoleKey("business_admin"); business.setStatus("0"); business.setDelFlag("0");
         users.get(0).setRoles(List.of(teacherRole, business));
-        assertTrue(service.developmentTeachers().isEmpty());
-        assertThrows(ServiceException.class, this::login);
-        assertNull(issuedToken);
+        assertEquals(1, service.developmentTeachers().size());
+        assertEquals("test-token", login());
+        assertEquals(List.of("teacher", "business_admin"), issuedToken.getUser().getRoles().stream().map(SysRole::getRoleKey).toList());
     }
 
     @Test

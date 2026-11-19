@@ -21,6 +21,8 @@ Page({
     developmentLoginEnabled: false, showDevelopment: false,
     username: '', password: '', captchaEnabled: false, captchaImage: '', code: '', uuid: '', loginError: '',
     devRole: 'parent',
+    previewIdentityVisible: false, previewIdentityRole: '', previewIdentityKeyword: '',
+    previewIdentities: [], filteredPreviewIdentities: [],
     teachers: [],
     teacherOptions: [{ label: '请选择教师' }],
     teachersLoading: false,
@@ -158,7 +160,7 @@ Page({
       if (this._unloaded || wx.getStorageSync('token') !== previousToken) return
       this.activateAccount(login.token, info)
       // 预览教务时强制切到教务工作台，避免多角色账号默认落回管理员视角。
-      if (devRole === 'education') access.select('education')
+      if (devRole === 'education' || devRole === 'teacher') access.select(devRole)
       wx.reLaunch({ url: this.loginDestination() })
     } catch (e) { if (!this._unloaded) this.setData({ loginError: e.message || '本地预览登录失败' }) }
     finally { if (!this._unloaded) this.setData({ submitting: false }) }
@@ -184,12 +186,25 @@ Page({
       const res = await request({ url, timeout: 15000 })
       const list = res.data || []
       if (!list.length) return this.handleLocalPreview(role)
-      const items = list.slice(0, 6).map(item => String(item.label || item.name || item.userId))
-      wx.showActionSheet({
-        itemList: items,
-        success: pick => this.handleLocalPreview(role, list[pick.tapIndex].userId)
-      })
+      this.setData({ previewIdentityVisible: true, previewIdentityRole: role,
+        previewIdentityKeyword: '', previewIdentities: list, filteredPreviewIdentities: list })
     } catch (e) { wx.showToast({ title: e.message || '身份列表加载失败', icon: 'none' }) }
+  },
+
+  closePreviewIdentity() { this.setData({ previewIdentityVisible: false }) },
+  preventPreviewClose() {},
+  searchPreviewIdentity(e) {
+    const keyword = String(e.detail.value || '').trim()
+    this.setData({ previewIdentityKeyword: keyword,
+      filteredPreviewIdentities: this.data.previewIdentities.filter(item =>
+        [item.name, item.label, item.userName].some(value => String(value || '').includes(keyword))) })
+  },
+  selectPreviewIdentity(e) {
+    const id = String(e.currentTarget.dataset.id)
+    if (!this.data.previewIdentities.some(item => String(item.userId) === id)) return
+    const role = this.data.previewIdentityRole
+    this.closePreviewIdentity()
+    this.handleLocalPreview(role, id)
   },
 
   async loadPhoneConfig() {

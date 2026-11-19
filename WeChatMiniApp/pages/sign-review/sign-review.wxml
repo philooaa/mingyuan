@@ -8,14 +8,23 @@
   <block wx:if="{{mode==='overview'}}">
     <view class="overview-filters">
       <template is="attendanceFilters" data="{{filterOptions:filterOptions,filterIndexes:filterIndexes,attendanceFilters:attendanceFilters,showDate:false}}"/>
-      <view class="course-search"><input value="{{courseKeyword}}" maxlength="100" placeholder="搜索课程、老师、年级或学科" bindinput="courseInput" bindconfirm="loadCourses"/><button size="mini" bindtap="loadCourses">查询</button></view>
-      <picker range="{{courseOptions}}" range-key="label" value="{{courseIndex + 1}}" bindchange="pickCourse" disabled="{{overviewLoading || !courses.length}}"><view class="course-choice">{{courseIndex>=0 ? courses[courseIndex].label : '请选择课程'}} <text>▾</text></view></picker>
+      <view class="course-filter-hint">筛选条件可不选，支持模糊搜索</view>
+      <view class="course-search"><input value="{{courseKeyword}}" maxlength="100" placeholder="课程名 / 老师姓名" bindinput="courseInput" bindconfirm="loadCourses"/><button class="overview-query" bindtap="loadCourses" loading="{{overviewLoading}}" disabled="{{overviewLoading}}">查询</button></view>
+      <view wx:if="{{courseId}}" class="selected-overview-course">{{courses[courseIndex].label}}</view>
       <view class="range-filters"><picker mode="date" value="{{from}}" data-field="from" bindchange="changeRange"><view>{{from || '开始日期'}}</view></picker><text>至</text><picker mode="date" value="{{to}}" data-field="to" bindchange="changeRange"><view>{{to || '结束日期'}}</view></picker><view class="range-reset" bindtap="resetRange">全部日期</view></view>
     </view>
     <view class="overview-message" wx:if="{{overviewLoading}}">加载出勤总览…</view>
     <view class="overview-message" wx:if="{{overviewError}}">{{overviewError}}<button size="mini" bindtap="loadCourses">重新加载</button></view>
     <view class="overview-message" wx:if="{{!overviewLoading && !overviewError && !courses.length}}">未找到课程，请调整搜索条件</view>
-    <view class="overview-message" wx:if="{{!overviewLoading && !overviewError && courses.length && !courseId}}">请先筛选，再选择课程查看出勤统计和名单</view>
+    <view class="overview-course-results" wx:if="{{!overviewLoading && !overviewError && courses.length && !courseId}}">
+      <view class="course-results-heading">找到 {{courses.length}} 个课程<text>点击查看出勤</text></view>
+      <scroll-view scroll-y class="course-results-scroll">
+        <view class="overview-course-option" wx:for="{{courses}}" wx:key="scheduleId" data-index="{{index}}" bindtap="chooseOverviewCourse" hover-class="course-option-pressed">
+          <view class="course-option-body"><view class="course-option-title">{{item.courseClassName || item.gradeName + item.subjectName}}</view><view class="course-option-meta">{{item.teacherName}} · {{item.courseYear || ''}} {{item.termName || ''}}</view><view class="course-option-time">{{item.periodName || ''}} {{item.timeSlot || ''}}</view></view>
+          <text class="course-option-arrow">›</text>
+        </view>
+      </scroll-view>
+    </view>
     <block wx:if="{{overviewReady && !overviewLoading}}">
       <view class="overview-metrics"><view><text class="metric-value">{{occurrenceCount}}</text><text>范围内课次</text></view><view><text class="metric-value">{{courseStats.attended || 0}}</text><text>正式实到人次</text></view><view><text class="metric-value">{{courseStats.leave || 0}}</text><text>请假人次</text></view></view>
       <view class="overview-caption">{{students.length}}位学员 · 正式汇总只含已终审；待核实汇总单列，不计入正式人数与课酬</view>
@@ -38,7 +47,11 @@
   <block wx:if="{{mode==='review'}}">
   <template is="attendanceFilters" data="{{filterOptions:filterOptions,filterIndexes:filterIndexes,attendanceFilters:attendanceFilters,filterDate:filterDate,showDate:true}}"/>
 
-  <view class="filter-bar"><view class="filter-reset" wx:for="{{filters}}" wx:key="*this" data-index="{{index}}" bindtap="changeFilter">{{filterIndex === index ? '● ' : ''}}{{item}}</view></view>
+  <view class="review-status-switch">
+    <button wx:for="{{filters}}" wx:key="*this" class="review-status-button {{filterIndex === index ? 'is-selected' : ''}}" data-index="{{index}}" bindtap="changeFilter" hover-class="review-status-pressed" aria-label="{{item}}" aria-pressed="{{filterIndex === index}}">
+      <text>{{item}}</text><text class="review-status-count">{{index === 0 ? pendingCount : index === 1 ? confirmedCount : pendingCount + confirmedCount}}</text>
+    </button>
+  </view>
   <view class="empty" wx:if="{{error}}">{{error}}<button size="mini" bindtap="loadList">刷新</button></view>
   <view class="list" wx:if="{{!showEmpty}}">
     <view class="card" wx:for="{{list}}" wx:key="rowKey"

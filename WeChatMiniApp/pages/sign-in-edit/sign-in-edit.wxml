@@ -7,17 +7,25 @@
   <view class="date-bar">
     <view class="date-label">{{lessonNo ? '第 ' + lessonNo + ' 讲' : '课次日期'}}</view>
     <view class="date-value">{{classDate}}</view>
-    <view class="review-tag {{locked ? 'done' : 'pending'}}" wx:if="{{review}}">
+    <view class="review-tag {{review.reviewStage === 'FINAL' || review.reviewStatus === '1' ? 'done' : 'pending'}}" wx:if="{{review}}">
       {{review.stageText || (review.reviewStatus === '1' ? '已终审' : review.reviewStatus === '2' ? '已退回' : '待审核')}}
     </view>
   </view>
 
   <view class="banner half" wx:if="{{review.reviewStatus === '2'}}">审核异常：{{review.reviewReason}}。请更正后重新提交，监控截图和两级审核需重新确认。</view>
-  <view class="banner done" wx:elif="{{locked}}">该课次正在审核或已终审，点名已锁定。未终审数据不计入正式统计。</view>
+  <view class="banner done" wx:elif="{{locked && (review.reviewStage === 'FINAL' || review.reviewStatus === '1')}}">本课次已终审通过，点名记录已锁定。</view>
+  <view class="banner review-pending" wx:elif="{{locked && review.reviewStage === 'PENDING_FIRST'}}">点名已提交，待教务初审，暂不可修改。</view>
+  <view class="banner review-pending" wx:elif="{{locked && review.reviewStage === 'PENDING_FINAL'}}">教务初审已通过，待管理员终审，暂不可修改。终审通过后计入正式统计。</view>
+  <view class="banner review-pending" wx:elif="{{locked}}">点名已提交，等待审核，暂不可修改。</view>
   <view class="banner half" wx:if="{{upcoming}}">尚未到实际开课时间，可先查看名单，开课后重新加载即可点名。</view>
   <view class="detail-reload" bindtap="loadDetail">重新加载当前课次</view>
 
-  <view class="stats" wx:if="{{stats && stats.total > 0}}">
+  <view class="stats" wx:if="{{upcoming && stats && stats.total > 0}}">
+    <view class="stat main"><text class="num">{{stats.total}}</text><text class="label">应到学员</text></view>
+    <view class="stat"><text class="num">{{stats.unmarked}}</text><text class="label">待点名</text></view>
+  </view>
+  <view class="roster-summary" wx:if="{{!upcoming && stats && stats.total > 0}}">应到 {{stats.total}} 人<text wx:if="{{stats.unmarked}}"> · 待点名 {{stats.unmarked}} 人</text></view>
+  <view class="stats" wx:if="{{!upcoming && stats && stats.total > 0}}">
     <view class="stat main"><text class="num">{{stats.actual}}</text><text class="label">实到</text></view>
     <view class="stat"><text class="num">{{stats.attended}}</text><text class="label">到课</text></view>
     <view class="stat"><text class="num">{{stats.audited}}</text><text class="label">试听</text></view>
@@ -42,13 +50,13 @@
           wx:for-item="opt"
           wx:for-index="statusIndex"
           wx:key="key"
-          class="status-btn {{row.signStatus === opt.key ? 'active' : ''}} {{row.signStatus === opt.key && opt.key === '3' ? 'leave' : ''}} {{locked || upcoming || loading || submitting || !ready ? 'disabled' : ''}}"
+          class="status-btn {{row.signStatus === opt.key || (row.signStatus === '6' && opt.key === '3') ? 'active' : ''}} {{(row.signStatus === '3' || row.signStatus === '6') && opt.key === '3' ? 'leave' : ''}} {{locked || upcoming || loading || submitting || !ready ? 'disabled' : ''}}"
           data-row-key="{{row.rowKey}}"
           data-key="{{opt.key}}"
           bindtap="setStatus"
         >{{opt.label}}</view>
       </view>
-      <view class="status-btns" wx:else>{{row.statusText}}</view>
+      <view class="status-btns {{!row.signStatus ? 'unmarked-status' : ''}}" wx:else>{{row.statusText}}</view>
     </view>
   </view>
 

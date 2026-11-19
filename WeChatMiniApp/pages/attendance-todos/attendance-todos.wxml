@@ -5,7 +5,7 @@
       <view class="hero-title">{{role === 'teacher' ? '教师点名' : role === 'education' ? '教务初审' : '出勤终审'}}</view>
       <view class="hero-description">{{role === 'teacher' ? '核对学员名单，登记本课出勤' : role === 'education' ? '核对出勤记录，上传监控截图' : '查看出勤与截图，完成最终确认'}}</view>
     </view>
-    <view class="hero-count"><text class="hero-number">{{loading ? '—' : totalCount}}</text><text class="hero-count-label">{{role === 'teacher' ? '课次' : '待处理课次'}}</text></view>
+    <view wx:if="{{role !== 'teacher'}}" class="hero-count"><text class="hero-number">{{loading ? '—' : totalCount}}</text><text class="hero-count-label">待处理课次</text></view>
   </view>
 
   <view class="todo-filters" wx:if="{{!courseId}}">
