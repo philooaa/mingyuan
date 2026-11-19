@@ -75,3 +75,15 @@ test('date-only filters request matching courses before any course is selected',
  assert.equal(calls.some(o=>o.url.endsWith('/overview')),false);await p.pickCourse({detail:{value:1}});assert.equal(calls.at(-1).data.from,'2030-10-12')
  await p.resetRange();assert.equal(calls.at(-1).url,'/miniapp/admin/sign/courses');assert.equal(calls.at(-1).data.from,'');assert.equal(p.data.courseId,'')
 })
+
+test('partial category filters list matching courses without requiring every field or selecting automatically',async()=>{
+ const courses=[{...course,subjectName:'英语',gradeName:'初一',teacherName:'王文晶'},{...course,scheduleId:'20',subjectName:'英语',gradeName:'初二',teacherName:'王文晶'},{...course,scheduleId:'30',subjectName:'数学',gradeName:'初一',teacherName:'李老师'}]
+ const {p}=harness(o=>Promise.resolve({data:o.url.endsWith('/courses')?courses:grid}))
+ await p.loadCourses()
+ p.data.attendanceFilters={teacherName:'王文晶'};await p.applyCourseFilters()
+ assert.equal(p.data.courses.length,2);assert.equal(p.data.courseId,'')
+ p.data.attendanceFilters={subjectName:'英语'};await p.applyCourseFilters()
+ assert.equal(p.data.courses.length,2)
+ await p.chooseOverviewCourse({currentTarget:{dataset:{index:1}}})
+ assert.equal(p.data.courseId,'20');assert.equal(p.data.overviewReady,true)
+})

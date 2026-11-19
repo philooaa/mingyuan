@@ -281,3 +281,9 @@
 .guest-confirm {background:#2459d9;color:#fff;font-size:27rpx;border-radius:12rpx;margin:24rpx 0 0;line-height:84rpx;padding:0 12rpx;white-space:normal;}
 .guest-confirm[disabled] {background:#dce5f8;color:#8799ba;}
 .guest-footer {font-size:22rpx;color:#8a95a3;line-height:1.6;margin-top:16rpx;text-align:center;}
+
+.banner.half {background:#fff6e5;color:#8b6423;line-height:1.6;}
+.roster-summary {margin:0 28rpx 14rpx;font-size:24rpx;color:#68778c;line-height:1.5;}
+.unmarked-status {font-size:25rpx;color:#8a95a3;}
+
+.banner.review-pending { background: #edf3ff; color: #3158a4; line-height: 1.6; }

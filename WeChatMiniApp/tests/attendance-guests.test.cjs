@@ -28,3 +28,38 @@ test('removal persists before changing visible roster; blocked submission cannot
  await p.removeGuest(p.data.rows[0]);assert.equal(calls[0].method,'DELETE');assert.equal(p.data.rows.length,0)
  p.data.locked=true;p.addAudited();assert.equal(p.data.guestOpen,false)
 })
+
+test('future lecture roster remains unmarked and never pretends students attended',async()=>{
+ const {p}=harness(async o=>({data:o.url.endsWith('/teacher-lesson')?{classDate:'2027-02-27',lessonNo:1,courseName:'测试课程',upcoming:true,startTime:'18:30:00',endTime:'20:00:00'}:o.url.endsWith('/detail')?{reviewStage:'NEW',review:{reviewStage:'NEW'},details:[]}:o.url.endsWith('/students')?[{studentId:'191',enrollmentId:'476',studentName:'学员甲',source:'ENROLLED'}]:[]}))
+ Object.assign(p.data,{lessonId:'2084',classDate:'2027-02-27'})
+ await p.loadDetail()
+ assert.equal(p.data.ready,true);assert.equal(p.data.upcoming,true);assert.equal(p.canEdit(),false)
+ assert.equal(p.data.rows[0].signStatus,'');assert.equal(p.data.rows[0].statusText,'未点名')
+ assert.equal(p.data.stats.actual,0);assert.equal(p.data.stats.unmarked,1);assert.equal(p.data.stats.total,1)
+})
+test('started lecture requires explicit marking before submitting; saved facts remain unchanged',async()=>{
+ const {p,calls}=harness(async o=>({data:o.url.endsWith('/detail')?{reviewStage:'NEW',details:[]}:o.url.endsWith('/students')?[{studentId:'1',studentName:'学员甲',source:'ENROLLED'}]:[]}))
+ await p.loadDetail();await p.submit();assert.equal(calls.some(o=>o.method==='POST'),false)
+ p.setStatus({currentTarget:{dataset:{rowKey:p.data.rows[0].rowKey,key:'1'}}});assert.equal(p.data.stats.actual,1);assert.equal(p.data.stats.unmarked,0)
+ const saved=harness(async()=>({data:{reviewStage:'PENDING_FIRST',details:[{studentId:'1',studentName:'学员甲',sourceType:'1',signStatus:'1'}]}}))
+ await saved.p.loadDetail();assert.equal(saved.p.data.rows[0].signStatus,'1');assert.equal(saved.p.data.stats.actual,1);assert.equal(saved.p.data.locked,true)
+})
+
+test('teacher leave selection updates leave count immediately and submits the leave status',()=>{
+ const {p}=harness(async()=>({}))
+ const leave=p.decorateRow({studentId:'1',studentName:'甲',signStatus:'3'},'1')
+ const absent=p.decorateRow({studentId:'2',studentName:'乙',signStatus:'6'},'1')
+ const unmarked=p.decorateRow({studentId:'3',studentName:'丙'},'1')
+ assert.deepEqual(Array.from(leave.statusOptions,o=>o.key),['1','2','3'])
+ assert.equal(leave.signStatus,'3');assert.equal(leave.statusText,'请假')
+ p.data.rows=[leave,absent,unmarked]
+ assert.equal(p.buildStats(p.data.rows).leave,2)
+ p.setStatus({currentTarget:{dataset:{rowKey:leave.rowKey,key:'3'}}})
+ assert.equal(p.data.rows[0].signStatus,'3')
+ p.setStatus({currentTarget:{dataset:{rowKey:unmarked.rowKey,key:'3'}}})
+ assert.equal(p.data.rows[2].signStatus,'3');assert.equal(p.data.stats.leave,3)
+ assert.equal(p.data.stats.actual,0)
+ p.setStatus({currentTarget:{dataset:{rowKey:unmarked.rowKey,key:'1'}}})
+ assert.equal(p.data.stats.leave,2);assert.equal(p.data.stats.actual,1)
+ for(const type of ['2','3'])assert.equal(p.decorateRow({},type).statusOptions.filter(o=>o.key==='3'||o.key==='6').length,1)
+})

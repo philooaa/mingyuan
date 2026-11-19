@@ -94,3 +94,14 @@ page {
 .consent-choice checkbox {flex-shrink:0}
 .consent-link {padding:14rpx 0;color:#1767ba}
 .panel .consent-pending {background:#e5ebf3;color:#6f7f92;box-shadow:none}
+
+.identity-mask { position:fixed; inset:0; z-index:100; background:rgba(22,36,55,.45); display:flex; align-items:flex-end; }
+.identity-panel { box-sizing:border-box; width:100%; padding:32rpx 32rpx calc(32rpx + env(safe-area-inset-bottom)); border-radius:28rpx 28rpx 0 0; background:#fff; }
+.identity-heading { display:flex; justify-content:space-between; align-items:center; color:#263952; font-size:32rpx; font-weight:600; }
+.identity-close { padding:12rpx; color:#647792; font-size:26rpx; font-weight:400; }
+.identity-search { margin-top:24rpx; padding:20rpx 24rpx; border-radius:14rpx; background:#f3f5fa; font-size:28rpx; }
+.identity-count { margin:18rpx 0 8rpx; color:#8290a5; font-size:24rpx; }
+.identity-list { height:52vh; }
+.identity-row { padding:28rpx 8rpx; border-bottom:1rpx solid #edf0f5; display:flex; justify-content:space-between; color:#263952; font-size:30rpx; }
+.identity-arrow { color:#8a9bb3; }
+.identity-empty { padding:48rpx 0; text-align:center; color:#8290a5; font-size:27rpx; }

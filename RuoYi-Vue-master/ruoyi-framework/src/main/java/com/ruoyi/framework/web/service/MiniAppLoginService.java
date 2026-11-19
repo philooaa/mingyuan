@@ -200,7 +200,7 @@ public class MiniAppLoginService
             user = userService.selectUserById(devTeacherId);
             if (!isEligibleTeacher(user))
             {
-                throw new ServiceException("该教师不存在、已停用或不具备独立教师身份，请刷新教师列表");
+                throw new ServiceException("该教师不存在、已停用或不具备有效教师身份，请刷新教师列表");
             }
         }
         else if (EduRoleConstants.PARENT.equals(role))
@@ -346,7 +346,6 @@ public class MiniAppLoginService
         {
             // An administrator account must not enter through the teacher shortcut.
             if (role.isAdmin() || EduRoleConstants.ADMIN.equals(role.getRoleKey())
-                    || EduRoleConstants.BUSINESS_ADMIN.equals(role.getRoleKey())
                     || "administrator".equals(role.getRoleKey()))
             {
                 return false;

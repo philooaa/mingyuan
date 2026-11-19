@@ -1,13 +1,12 @@
 const { request } = require('../../utils/request')
 
-// 各来源可选的签到状态：报名=到课/录播/请假，试听=试听到课/请假，调课=调课到课/请假
+// 教师统一登记请假；兼容历史未到课记录的展示和计数。
 const STATUS_OPTIONS = {
   '1': [{ key: '1', label: '到课' }, { key: '2', label: '录播' }, { key: '3', label: '请假' }],
   '2': [{ key: '4', label: '试听到课' }, { key: '3', label: '请假' }],
   '3': [{ key: '5', label: '调课到课' }, { key: '3', label: '请假' }]
 }
-Object.values(STATUS_OPTIONS).forEach(options => options.push({key:'6',label:'未到课'}))
-const STATUS_LABELS = { '1': '到课', '2': '录播', '3': '请假', '4': '试听到课', '5': '调课到课', '6': '未到课' }
+const STATUS_LABELS = { '1': '到课', '2': '录播', '3': '请假', '4': '试听到课', '5': '调课到课', '6': '请假' }
 const GUEST_API = '/miniapp/teacher/attendance/guests'
 const SOURCE_LABELS = { '1': '报名', '2': '试听', '3': '调课' }
 
@@ -66,7 +65,7 @@ Page({
         if (!current()) return
         classDate=lesson.classDate
         this.setData({classDate,lessonNo:lesson.lessonNo,course:lesson.courseName || this.data.course,
-          upcoming:lesson.upcoming,timeText:[lesson.startTime,lesson.endTime].filter(Boolean).join('–')})
+          upcoming:lesson.upcoming,timeText:[lesson.startTime,lesson.endTime].filter(Boolean).map(value=>String(value).slice(0,5)).join('–')})
       }
       const detail = await request({
         url: '/miniapp/teacher/sign/detail',
@@ -101,7 +100,7 @@ Page({
           enrollmentId: s.enrollmentId || s.enrollment_id,
           studentName: s.studentName || s.student_name,
           sourceType: s.sourceType || ({TRIAL:'2',TRANSFER:'3'}[s.source] || '1'),
-          signStatus: approvedLeave.has(String(s.enrollmentId || s.enrollment_id)) ? '3' : s.source === 'TRIAL' ? '4' : s.source === 'TRANSFER' ? '5' : '1',
+          signStatus: approvedLeave.has(String(s.enrollmentId || s.enrollment_id)) ? '3' : '',
           remark: ''
         }, s.sourceType || ({TRIAL:'2',TRANSFER:'3'}[s.source] || '1')))
       }
@@ -116,7 +115,7 @@ Page({
         ready: true, outgoing,
         submissionVersion: data.submissionVersion || '',
         rows,
-        review,
+        review: { ...review, reviewStage: stage },
         locked: reviewed,
         stats: this.buildStats(rows)
       })
@@ -140,10 +139,10 @@ Page({
     return {
       ...row,
       rowKey: `student:${this._rowSequence}`,
-      signStatus: String(row.signStatus),
+      signStatus: String(row.signStatus || ''),
       sourceType,
       sourceText: SOURCE_LABELS[sourceType] || '报名',
-      statusText: STATUS_LABELS[row.signStatus] || '',
+      statusText: STATUS_LABELS[row.signStatus] || '未点名',
       statusOptions: STATUS_OPTIONS[sourceType] || STATUS_OPTIONS['1'],
       added: !!row.guestId
     }
@@ -154,10 +153,11 @@ Page({
     return {
       attended: count('1'),
       recorded: count('2'),
-      leave: count('3'),
+      leave: count('3') + count('6'),
       audited: count('4'),
       transferred: count('5'),
       actual: count('1') + count('4') + count('5'),
+      unmarked: rows.filter(row => !row.signStatus).length,
       total: rows.length
     }
   },
@@ -280,6 +280,10 @@ Page({
     if (!this.canEdit() || this.data.guestBusy || this.data.guestOpen) return
     if (!rows.length) {
       wx.showToast({ title: '暂无学员可签到', icon: 'none' })
+      return
+    }
+    if (rows.some(row => !row.signStatus)) {
+      wx.showToast({ title: '请完成所有学员点名后再提交', icon: 'none' })
       return
     }
     this.setData({ submitting: true })
