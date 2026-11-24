@@ -17,6 +17,29 @@ import com.ruoyi.common.core.domain.BaseEntity;
  */
 public class EduCourseSchedule extends BaseEntity
 {
+    private Long scheduleRuleId;
+    private String scheduleRuleName;
+    private Long scheduleRuleVersion;
+    private String customDatesJson;
+    private Boolean applyScheduleRule;
+    private Boolean clearScheduleRule;
+    public Boolean getClearScheduleRule() { return clearScheduleRule; }
+    public void setClearScheduleRule(Boolean value) { clearScheduleRule = value; }
+    public Long getScheduleRuleId() { return scheduleRuleId; }
+    public void setScheduleRuleId(Long value) { scheduleRuleId = value; }
+    public String getScheduleRuleName() { return scheduleRuleName; }
+    public void setScheduleRuleName(String value) { scheduleRuleName = value; }
+    public Long getScheduleRuleVersion() { return scheduleRuleVersion; }
+    public void setScheduleRuleVersion(Long value) { scheduleRuleVersion = value; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getCustomDatesJson() { return customDatesJson; }
+    public void setCustomDatesJson(String value) { customDatesJson = value; }
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+    public java.util.List<String> getCustomDates() {
+        return customDatesJson == null ? java.util.List.of() : com.alibaba.fastjson2.JSON.parseArray(customDatesJson, String.class);
+    }
+    public Boolean getApplyScheduleRule() { return applyScheduleRule; }
+    public void setApplyScheduleRule(Boolean value) { applyScheduleRule = value; }
     /** 新增排课时指定的计费课次数，由服务端写入手动计费配置。 */
     private Integer requestedLessonCount;
     public Integer getRequestedLessonCount() { return requestedLessonCount; }

@@ -13,6 +13,31 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class ScheduleDateRuleTest {
 
+    @Test
+    void snapshotDatesMustMatchCourseBounds() {
+        Map<String, Object> row = new HashMap<>();
+        row.put("classPattern", "CUSTOM_DATES");
+        row.put("startDate", "2027-01-27"); row.put("endDate", "2027-02-01");
+        row.put("customDates", "[\"2027-01-27\",\"2027-02-01\"]");
+        assertEquals(2, ScheduleCalendar.dates(row, List.of()).size());
+        row.put("endDate", "2027-02-02");
+        assertThrows(IllegalArgumentException.class, () -> ScheduleCalendar.dates(row, List.of()));
+    }
+
+    @Test
+    void customDatesPreserveGapsAndApplyAdjustments() {
+        var a = LocalDate.parse("2027-01-27");
+        var b = LocalDate.parse("2027-01-30");
+        var c = LocalDate.parse("2027-02-01");
+        Map<String, Object> cancel = new HashMap<>();
+        cancel.put("originalDate", a);
+        cancel.put("adjustedDate", null);
+        var move = Map.<String, Object>of("originalDate", c, "adjustedDate", "2027-02-03");
+        assertEquals(List.of(b, LocalDate.parse("2027-02-03")),
+                new ArrayList<>(ScheduleCalendar.customDates(List.of(c, a, b, b), List.of(cancel, move))));
+        assertThrows(IllegalArgumentException.class, () -> ScheduleCalendar.customDates(List.of(), List.of()));
+    }
+
     // ---------- 学期 → 上课模式 ----------
 
     @Test

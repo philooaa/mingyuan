@@ -29,6 +29,7 @@ public class ScheduleCrudTest {
     @BeforeEach void setup() throws Exception {
         principal(21, "admin", "teacher"); db = new FakeDb(); current = course(); current.setScheduleId(10L);
         service = new EduCourseScheduleServiceImpl();
+        inject(service, "customRulesEnabled", true);
         inject(service, "db", db);
         inject(service, "coursePrices", new CoursePriceService(db) { @Override public void syncSchedulePricing(long id) {} });
         var availability = new ScheduleAvailabilityService(); inject(availability,"db",db); inject(service,"availability",availability);
@@ -243,6 +244,56 @@ public class ScheduleCrudTest {
         assertNull(captured.getClassroomId());assertEquals("万达",captured.getCampusName());
         assertEquals(List.of("teacher:21"),db.locks);
     }
+    private EduCourseSchedule customCourse() {
+        var s=course(); s.setClassMode("1");s.setApplyScheduleRule(true);s.setScheduleRuleId(7L);s.setScheduleRuleVersion(1L);return s;
+    }
+    @Test void rolloutGateRejectsCustomWritesUntilClientsAreUpgraded() throws Exception {
+        inject(service, "customRulesEnabled", false);
+        var error = assertThrows(ServiceException.class, () -> service.insertEduCourseSchedule(customCourse()));
+        assertTrue(error.getMessage().contains("尚未开放"));
+        assertNull(captured);
+    }
+    @Test void customRuleBuildsImmutableSnapshotAndKeepsBillingCount() {
+        var input=customCourse();input.setRequestedLessonCount(10);
+        assertEquals(1,service.insertEduCourseSchedule(input));
+        assertEquals("CUSTOM_DATES",captured.getClassPattern());
+        assertEquals("2026-12-26",ScheduleCalendar.date(captured.getStartDate()).toString());
+        assertEquals("2027-01-02",ScheduleCalendar.date(captured.getEndDate()).toString());
+        assertEquals(2,captured.getCustomDates().size());assertEquals(10,captured.getRequestedLessonCount());
+        String snapshot=captured.getCustomDatesJson();db.ruleDates=List.of("2027-02-01");
+        assertEquals(snapshot,captured.getCustomDatesJson());
+    }
+    @Test void staleDisabledAndEmptyRulesCannotBeApplied() {
+        var input=customCourse();input.setScheduleRuleVersion(2L);
+        assertThrows(ServiceException.class,()->service.insertEduCourseSchedule(input));
+        input.setScheduleRuleVersion(1L);db.ruleEnabled=false;
+        assertThrows(ServiceException.class,()->service.insertEduCourseSchedule(input));
+        db.ruleEnabled=true;db.ruleDates=List.of();
+        assertThrows(ServiceException.class,()->service.insertEduCourseSchedule(input));
+    }
+    @Test void customDatesConflictWithLegacyAndNotWithUnselectedDates() {
+        db.conflicts=List.of(Map.of("scheduleId","30","startTime","09:00:00","endTime","10:00:00","startDate","2026-12-27","endDate","2026-12-27","classPattern","DAILY","periodName","一期"));
+        assertEquals(1,service.insertEduCourseSchedule(customCourse()));
+        db.ruleDates=List.of("2026-12-27");
+        assertThrows(ServiceException.class,()->service.insertEduCourseSchedule(customCourse()));
+    }
+    @Test void customDatesSurviveOrdinaryEditsAndRejectOldClientOverwrite() {
+        current.setClassMode("1");current.setClassPattern("CUSTOM_DATES");current.setCustomDatesJson("[\"2026-12-26\"]");
+        var patch=new EduCourseSchedule();patch.setScheduleId(10L);patch.setCourseClassName("新课程名称");
+        assertEquals(1,service.updateEduCourseSchedule(patch,true));assertEquals("[\"2026-12-26\"]",current.getCustomDatesJson());
+        patch.setClassPattern("WEEKLY");assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));
+        patch.setApplyScheduleRule(true);patch.setScheduleRuleId(7L);patch.setScheduleRuleVersion(1L);db.attendance=1;
+        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));
+    }
+    @Test void replacingSnapshotCannotInvalidateMaterializedLectureNumbers() {
+        current.setClassMode("1");current.setClassPattern("CUSTOM_DATES");current.setCustomDatesJson("[\"2026-12-26\"]");
+        db.materializedLesson=true;
+        var patch=new EduCourseSchedule();patch.setScheduleId(10L);patch.setApplyScheduleRule(true);patch.setScheduleRuleId(7L);patch.setScheduleRuleVersion(1L);
+        var error=assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));
+        assertTrue(error.getMessage().contains("讲次"));assertNull(captured);
+        patch.setApplyScheduleRule(false);patch.setClearScheduleRule(true);patch.setClassPattern("WEEKLY");
+        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));assertNull(captured);
+    }
     static EduCourseSchedule course() {
         var s = new EduCourseSchedule(); s.setUnitPrice(new java.math.BigDecimal("100.00")); s.setTeacherId(21L); s.setClassroomId(1L); s.setCampusName("万达"); s.setScheduleCode("TEST"); s.setCourseYear(2026L);
         s.setTermName("秋季"); s.setPeriodName("周六"); s.setTimeSlot("8:00-10:00"); s.setGradeName("一年级"); s.setSubjectName("数学"); s.setCourseClassName("班次");
@@ -259,11 +310,15 @@ public class ScheduleCrudTest {
     static void inject(Object target, String field, Object value) throws Exception { var f = target.getClass().getDeclaredField(field); f.setAccessible(true); f.set(target,value); }
     @SuppressWarnings("unchecked") static <T> T proxy(Class<T> type, InvocationHandler handler) { return (T) Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},handler); }
     static class FakeDb extends ShopRepository {
+        boolean materializedLesson; boolean ruleEnabled=true; List<String> ruleDates=List.of("2026-12-26","2027-01-02");
         long attendance, references, activeEnrollments; boolean makeupSession, canceledEnrollment, activeEnrollment, enrollmentArrivesOnLock;
         List<Map<String,Object>> conflicts = List.of(); List<String> locks = new ArrayList<>();
         FakeDb() { super(new DriverManagerDataSource()); }
         @Override public List<Map<String,Object>> rows(String sql,Object... args) {
             if (sql.contains("FROM edu_attendance_makeup_session")) return makeupSession ? List.of(Map.of("scheduleId",10)) : List.of();
+            if (sql.contains("SELECT lesson_id FROM edu_attendance_lesson")) return materializedLesson && !sql.contains("locked=1") ? List.of(Map.of("lessonId",1)) : List.of();
+            if (sql.contains("FROM edu_schedule_rule WHERE")) return ruleEnabled?List.of(Map.of("ruleName","测试规则","version",1L)):List.of();
+            if (sql.contains("FROM edu_schedule_rule_date")) return ruleDates.stream().map(d->Map.<String,Object>of("classDate",d)).toList();
             if (sql.contains("SELECT DISTINCT campus_name")) return "万达".equals(args[0]) ? List.of(Map.of("campusName","万达")) : List.of();
             if (sql.contains("SELECT u.nick_name")) return List.of(Map.of("nickName","Teacher A","userName","teacher21"));
             if (sql.contains("information_schema")) return List.of(Map.of("tableName","edu_homework"));
@@ -286,6 +341,7 @@ public class ScheduleCrudTest {
             throw new AssertionError(sql);
         }
         @Override public JdbcTemplate jdbc() { return new JdbcTemplate() {
+            @Override public int update(String sql,Object... args) { return 1; }
             @Override @SuppressWarnings("unchecked") public <T> T queryForObject(String sql,Class<T> type,Object... args) {
                 long value = sql.startsWith("SELECT (SELECT COUNT") ? attendance : sql.contains("`edu_homework`") ? references : 0;
                 return (T) Long.valueOf(value);

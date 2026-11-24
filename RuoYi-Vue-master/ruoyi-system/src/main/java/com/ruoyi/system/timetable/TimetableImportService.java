@@ -735,6 +735,11 @@ public class TimetableImportService
             EduCourseSchedule exist = classroomId == null ? null : findExisting(s);
             if (exist != null)
             {
+                if (ScheduleCalendar.CUSTOM_DATES.equals(exist.getClassPattern())) {
+                    skipped++;
+                    if (skipMsgs.size() < 10) skipMsgs.add("自定义排课规则的课程未覆盖，请在排课管理中修改：" + exist.getCourseClassName());
+                    continue;
+                }
                 // Importing a timetable must not silently reprice existing courses.
                 s.setUnitPrice(null);
                 if (!updateSupport) { skipped++; if (skipMsgs.size() < 10) skipMsgs.add("已存在（未勾选覆盖）：" + s.getCourseClassName()); continue; }
@@ -834,6 +839,7 @@ public class TimetableImportService
                 q.setSourceSheet(sheet);
                 for (EduCourseSchedule e : scheduleService.selectEduCourseScheduleList(q))
                 {
+                    if (ScheduleCalendar.CUSTOM_DATES.equals(e.getClassPattern())) continue;
                     String t = str(e.getTermName()), p = str(e.getPeriodName());
                     // ① 该「学期/期次」本次文件没覆盖到 —— 可能只导了别的期次，不动它
                     if (!en.getValue().contains(t + "|" + p)) continue;

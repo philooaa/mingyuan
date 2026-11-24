@@ -80,7 +80,7 @@ public class CoursePriceService {
                 db.rows(
                         "SELECT s.schedule_id,s.course_class_name,s.grade_name,s.subject_name,s.term_name,s.period_name,"
                                 + "s.class_mode,s.lesson_count,s.lesson_count_override,s.lesson_count_override_reason,s.unit_price,s.tuition_price,"
-                                + "s.start_date,s.end_date,s.class_pattern,"
+                                + "s.start_date,s.end_date,s.class_pattern,s.custom_dates,"
                                 + "COALESCE(NULLIF(s.campus_name,''),c.campus_name) campus_name "
                                 + "FROM edu_course_schedule s LEFT JOIN edu_classroom c ON c.classroom_id=s.classroom_id"
                                 + where
@@ -190,8 +190,10 @@ public class CoursePriceService {
     public static Integer systemLessonCount(Map<String,Object> row, List<Map<String,Object>> adjustments) {
         String pattern=text(row.get("classPattern")), period=text(row.get("periodName"));
         if (pattern.isBlank() && ScheduleCalendar.weekday(period)>0) pattern=ScheduleCalendar.WEEKLY;
-        var dates=ScheduleCalendar.dates(ScheduleCalendar.date(row.get("startDate")),
-            ScheduleCalendar.date(row.get("endDate")),pattern,period,adjustments);
+        Map<String,Object> calendarRow = new LinkedHashMap<>(row);
+        calendarRow.put("classPattern", pattern);
+        calendarRow.put("periodName", period);
+        var dates=ScheduleCalendar.dates(calendarRow,adjustments);
         return dates.isEmpty()?null:dates.size();
     }
 
@@ -216,7 +218,7 @@ public class CoursePriceService {
         Integer calculated=systemLessonCount(row,adjustments(id));
         try {
             StringJoiner version=new StringJoiner("|");
-            for(String key:List.of("scheduleId","startDate","endDate","classPattern","periodName","lessonCountOverride","lessonCount","unitPrice","tuitionPrice"))
+            for(String key:List.of("scheduleId","startDate","endDate","classPattern","periodName","customDates","lessonCountOverride","lessonCount","unitPrice","tuitionPrice"))
                 version.add(Objects.toString(row.get(key),""));
             version.add(Objects.toString(calculated,""));
             row.put("lessonCountVersion",HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(version.toString().getBytes(StandardCharsets.UTF_8))));
@@ -228,7 +230,7 @@ public class CoursePriceService {
     }
 
     private Map<String,Object> countRow(long id,boolean lock) {
-        return db.one("SELECT schedule_id,course_class_name,class_mode,start_date,end_date,class_pattern,period_name,"
+        return db.one("SELECT schedule_id,course_class_name,class_mode,start_date,end_date,class_pattern,period_name,custom_dates,"
             +"lesson_count,lesson_count_override,lesson_count_override_reason,unit_price,tuition_price FROM edu_course_schedule "
             +"WHERE schedule_id=? AND del_flag='0'"+(lock?" FOR UPDATE":""),id);
     }

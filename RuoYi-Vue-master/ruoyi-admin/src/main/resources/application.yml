@@ -75,6 +75,11 @@ wechat:
     mock-teacher-username: ${WECHAT_MOCK_TEACHER_USERNAME:}
     mock-teacher-phone: ${WECHAT_MOCK_TEACHER_PHONE:}
 
+schedule:
+  rules:
+    # Enable only after migration and compatible web/miniapp releases are complete.
+    custom-enabled: ${CUSTOM_SCHEDULE_RULES_ENABLED:false}
+
 mybatis:
   typeAliasesPackage: com.ruoyi.**.domain
   mapperLocations: classpath*:mapper/**/*Mapper.xml

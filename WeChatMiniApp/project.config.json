@@ -6,7 +6,20 @@
   "compileType": "miniprogram",
   "libVersion": "3.8.12",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "tests"
+      },
+      {
+        "type": "file",
+        "value": "app.js.bak.20261028"
+      },
+      {
+        "type": "file",
+        "value": "pages/register/register.js.bak.20261028"
+      }
+    ],
     "include": []
   },
   "setting": {
@@ -14,7 +27,7 @@
     "coverView": true,
     "es6": true,
     "postcss": true,
-    "minified": false,
+    "minified": true,
     "enhance": true,
     "showShadowRootInWxmlPanel": true,
     "packNpmRelationList": [],

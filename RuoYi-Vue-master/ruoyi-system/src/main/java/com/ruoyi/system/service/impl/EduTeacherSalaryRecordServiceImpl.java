@@ -303,6 +303,7 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
      */
     private int sessionTimes(Map<String, Object> s, LocalDate begin, LocalDate finish)
     {
+        if ("CUSTOM_DATES".equals(s.get("classPattern"))) return (int) com.ruoyi.system.service.ScheduleCalendar.dates(s, List.of()).stream().filter(d -> !d.isBefore(begin) && !d.isAfter(finish)).count();
         String pattern = s.get("classPattern") == null ? "" : String.valueOf(s.get("classPattern"));
         if ("WEEKLY".equals(pattern))
         {

@@ -184,7 +184,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                s.teacher_id as teacherId,
                s.course_class_name as courseClassName,
                s.grade_name as gradeName,
-               s.class_pattern as classPattern,
+               s.class_pattern as classPattern, s.custom_dates as customDates,
                s.period_name as periodName,
                s.class_mode as classMode,
                s.start_time as startTime,
