@@ -270,7 +270,7 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         {
             Long scheduleId = ((Number) s.get("scheduleId")).longValue();
             protectSingle(scheduleId);
-            Set<LocalDate> classDates = computeClassDates(
+            Set<LocalDate> classDates = "CUSTOM_DATES".equals(s.get("classPattern")) ? com.ruoyi.system.service.ScheduleCalendar.dates(singleSchedules.selectEduCourseScheduleByScheduleId(scheduleId), List.of()) : computeClassDates(
                     toLocalDate((Date) s.get("startDate")),
                     toLocalDate((Date) s.get("endDate")),
                     (String) s.get("classPattern"),

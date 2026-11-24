@@ -172,3 +172,15 @@ test('canceling billing count confirmation never sends a mutation',async()=>{
   wx.showActionSheet=async()=>({tapIndex:1});wx.showModal=async()=>({confirm:false})
   await p.editBillingCount();assert.ok(!requests.some(r=>r.method==='PUT'));assert.equal(p.data.saving,false)
 })
+
+
+test('custom-rule courses keep their date mode when edited in the miniapp',async()=>{
+  const {p,requests}=setup();await p.load();p.add()
+  Object.assign(p.data.form,{scheduleId:99,campusName:'万达',teacherId:'7',unitPrice:'100',courseClassName:'初一数学',termName:'秋季',periodName:'周六',timeSlot:'8:00-10:00',gradeName:'初一',subjectName:'数学',classPattern:'CUSTOM_DATES',startDate:'2026-12-26',endDate:'2027-01-02',customDates:['2026-12-26','2027-01-02']})
+  p.setPeriodOptions(true);assert.equal(p.data.form.periodName,'周六')
+  p.choose({currentTarget:{dataset:{key:'classPattern'}},detail:{value:0}})
+  assert.equal(p.data.form.classPattern,'CUSTOM_DATES')
+  await p.save()
+  const body=requests.find(r=>r.method==='PUT').data
+  assert.equal(body.classPattern,'CUSTOM_DATES');assert.equal(body.startDate,'2026-12-26');assert.equal(body.endDate,'2027-01-02')
+})

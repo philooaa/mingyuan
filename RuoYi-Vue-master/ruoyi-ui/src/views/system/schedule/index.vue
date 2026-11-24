@@ -248,7 +248,8 @@
               <el-select v-model="form.termName" filterable placeholder="请选择学期" style="width:100%"><el-option v-for="item in dims.terms" :key="item.value" :label="item.label" :value="item.value" /></el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="24"><el-form-item label="上课模式"><el-select v-model="form.classPattern" @change="onClassPatternChange" :disabled="form.classMode === '2'"><el-option label="每周一次（周一至周日）" value="WEEKLY" /><el-option label="连上无假期（每天上课）" value="DAILY" /><el-option label="上5天休1天" value="DAILY_5_1" /><el-option label="上6天休1天" value="DAILY_6_1" /><el-option label="上5天休2天" value="DAILY_5_2" /><el-option label="上4天休1天" value="DAILY_4_1" /><el-option label="其他（暂不排课）" value="OTHER" /></el-select></el-form-item></el-col>
+          <el-col :span="24"><schedule-rule-picker :form="form" /></el-col>
+          <el-col :span="24"><el-form-item label="上课模式"><el-select v-model="form.classPattern" @change="onClassPatternChange" :disabled="form.classMode === '2'"><el-option label="自定义日期规则" value="CUSTOM_DATES" /><el-option label="每周一次（周一至周日）" value="WEEKLY" /><el-option label="连上无假期（每天上课）" value="DAILY" /><el-option label="上5天休1天" value="DAILY_5_1" /><el-option label="上6天休1天" value="DAILY_6_1" /><el-option label="上5天休2天" value="DAILY_5_2" /><el-option label="上4天休1天" value="DAILY_4_1" /><el-option label="其他（暂不排课）" value="OTHER" /></el-select></el-form-item></el-col>
           <el-col :span="24" v-if="form.classMode !== '2'">
             <el-form-item :label="form.classPattern === 'WEEKLY' ? '上课星期' : '期次'" prop="periodName">
               <el-select v-model="form.periodName" filterable :placeholder="form.classPattern === 'WEEKLY' ? '请选择上课星期' : '请选择期次'" style="width:100%"><el-option v-for="item in formPeriodOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select>
@@ -343,8 +344,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="24" v-if="form.scheduleId && form.classMode !== '2'"><el-form-item label="计费课次数"><el-button type="text" @click="openLessonCountEditor">查看／修改计费课次数</el-button><div style="color:#909399">按已保存的排课计算；如修改了日期或规则，请先保存课程。教务和管理员可调整，不改变已有订单。</div></el-form-item></el-col>
-          <el-col :span="24"><el-form-item label="开课日期"><el-date-picker v-model="form.startDate" type="date" value-format="yyyy-MM-dd" placeholder="待配置" /></el-form-item></el-col>
-          <el-col :span="24"><el-form-item label="结课日期"><el-date-picker v-model="form.endDate" type="date" value-format="yyyy-MM-dd" placeholder="待配置" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="开课日期"><el-date-picker :disabled="form.classPattern === 'CUSTOM_DATES'" v-model="form.startDate" type="date" value-format="yyyy-MM-dd" placeholder="待配置" /></el-form-item></el-col>
+          <el-col :span="24"><el-form-item label="结课日期"><el-date-picker :disabled="form.classPattern === 'CUSTOM_DATES'" v-model="form.endDate" type="date" value-format="yyyy-MM-dd" placeholder="待配置" /></el-form-item></el-col>
 
           <el-col :span="24"><el-form-item label="招生状态"><el-select v-model="form.recruitStatus"><el-option label="可报名" value="0" /><el-option label="停招" value="1" /><el-option label="满班" value="2" /></el-select></el-form-item></el-col>
           <el-col :span="24"><el-form-item label="排课状态"><el-select v-model="form.status"><el-option label="正常" value="0" /><el-option label="停用" value="1" /></el-select></el-form-item></el-col>
@@ -366,6 +367,7 @@
 </template>
 
 <script>
+import ScheduleRulePicker from "@/components/ScheduleRulePicker"
 import { listSchedule, getSchedule, delSchedule, addSchedule, updateSchedule } from "@/api/system/schedule"
 import { getTimetableDimensions } from "@/api/system/timetable"
 import OneToOneManager from './OneToOneManager.vue'
@@ -376,7 +378,7 @@ import { updateAutomaticCourseName } from '@/utils/auto-course-name'
 
 export default {
   name: "Schedule",
-  components: { OneToOneManager, CourseLessonCountEditor },
+  components: { ScheduleRulePicker, OneToOneManager, CourseLessonCountEditor },
   data() {
     return {
       // 遮罩层
@@ -442,7 +444,7 @@ export default {
           { required: true, message: "学期不能为空", trigger: "blur" }
         ],
         periodName: [
-          { validator: (rule, value, callback) => value && (this.form.classMode === '2' || isWeekday(value) === (this.form.classPattern === 'WEEKLY')) ? callback() : callback(new Error(this.form.classPattern === 'WEEKLY' ? '请选择上课星期' : '请选择期次')), trigger: 'change' }
+          { validator: (rule, value, callback) => value && (this.form.classMode === '2' || this.form.classPattern === 'CUSTOM_DATES' || isWeekday(value) === (this.form.classPattern === 'WEEKLY')) ? callback() : callback(new Error(this.form.classPattern === 'WEEKLY' ? '请选择上课星期' : '请选择期次')), trigger: 'change' }
         ],
         timeSlot: [
           { required: true, message: "时段不能为空", trigger: "blur" }
@@ -490,11 +492,15 @@ export default {
       await editor.openLessonCount(this.form)
     },
     onClassPatternChange() {
+      this.$set(this.form, "applyScheduleRule", false)
+      this.$set(this.form, "clearScheduleRule", this.form.classPattern !== "CUSTOM_DATES")
       if (!this.formPeriodOptions.some(item => item.value === this.form.periodName)) this.form.periodName = null
       this.$nextTick(() => this.$refs.form && this.$refs.form.clearValidate('periodName'))
     },
     syncSingleDay() {
       if (this.form.classMode !== '2') return
+      this.$set(this.form, 'applyScheduleRule', false)
+      this.$set(this.form, 'clearScheduleRule', true)
       this.form.classPattern = 'WEEKLY'
       const date = String(this.form.startDate || '').slice(0,10)
       this.form.periodName = date ? ['周日','周一','周二','周三','周四','周五','周六'][new Date(date.replace(/-/g,'/')+' 12:00:00').getDay()] : null
@@ -605,6 +611,8 @@ export default {
     },
     /** 提交按钮 */
     submitForm() {
+      if (this.form.ruleSelectionLoading) { this.$message.warning('请等待排课规则读取完成'); return }
+      if (this.form.classPattern === 'CUSTOM_DATES' && !(this.form.customDates || []).length) { this.$modal.msgError('请选择排课规则'); return }
       if (this.submitting) return
       this.$refs.form.validate(async valid => {
         if (!valid || this.submitting) return

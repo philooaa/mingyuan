@@ -22,6 +22,37 @@ public final class ScheduleCalendar {
     public static final String DAILY_4_1 = "DAILY_4_1";
     /** 其他：暂不排课，不展开任何上课日期 */
     public static final String OTHER = "OTHER";
+    /** Explicit dates saved with the course, independent of later rule edits. */
+    public static final String CUSTOM_DATES = "CUSTOM_DATES";
+
+    public static SortedSet<LocalDate> dates(com.ruoyi.system.domain.EduCourseSchedule schedule, List<Map<String, Object>> adjustments) {
+        if (!CUSTOM_DATES.equals(schedule.getClassPattern())) return dates(date(schedule.getStartDate()), date(schedule.getEndDate()),
+                schedule.getClassPattern(), schedule.getPeriodName(), adjustments);
+        Map<String, Object> row = new HashMap<>();
+        row.put("classPattern", schedule.getClassPattern());
+        row.put("startDate", schedule.getStartDate());
+        row.put("endDate", schedule.getEndDate());
+        row.put("customDates", schedule.getCustomDatesJson());
+        return dates(row, adjustments);
+    }
+
+    /** Expand a database row; custom dates are a course snapshot, never the live rule. */
+    public static SortedSet<LocalDate> dates(Map<String, Object> row, List<Map<String, Object>> adjustments) {
+        String pattern = Objects.toString(row.get("classPattern"), "");
+        if (!CUSTOM_DATES.equals(pattern)) return dates(date(row.get("startDate")), date(row.get("endDate")), pattern,
+                Objects.toString(row.get("periodName"), ""), adjustments);
+        Object snapshot = row.get("customDates");
+        try {
+            List<String> raw = snapshot instanceof Collection<?> values ? values.stream().map(String::valueOf).toList() : com.alibaba.fastjson2.JSON.parseArray(Objects.toString(snapshot, ""), String.class);
+            if (raw == null || raw.isEmpty() || raw.size()>3661) throw new IllegalArgumentException();
+            List<LocalDate> parsed = raw.stream().map(LocalDate::parse).toList();
+            SortedSet<LocalDate> originals = new TreeSet<>(parsed);
+            if (!originals.first().equals(date(row.get("startDate"))) || !originals.last().equals(date(row.get("endDate")))) throw new IllegalArgumentException();
+            return customDates(originals, adjustments);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("自定义排课日期或调课记录异常，请核对", e);
+        }
+    }
 
     /** 全部合法的上课模式，按前端下拉顺序排列 */
     public static final List<String> ALL =
@@ -125,6 +156,29 @@ public final class ScheduleCalendar {
         if (pattern == null) return null;
         if (WEEKLY.equals(pattern) && weekday(periodName) == 0) return null;
         return pattern;
+    }
+
+    public static SortedSet<LocalDate> customDates(Collection<LocalDate> originalDates,
+                                                    List<Map<String, Object>> adjustments) {
+        if (originalDates == null || originalDates.isEmpty() || originalDates.stream().anyMatch(Objects::isNull))
+            throw new IllegalArgumentException("自定义上课日期不能为空");
+        SortedSet<LocalDate> originals = new TreeSet<>(originalDates);
+        Map<LocalDate, LocalDate> moved = new HashMap<>();
+        for (Map<String, Object> adjustment : adjustments) {
+            LocalDate original = date(adjustment.get("originalDate"));
+            Object value = adjustment.get("adjustedDate");
+            LocalDate target = date(value);
+            if (original == null || (value != null && target == null) || moved.containsKey(original))
+                throw new IllegalArgumentException("调课日期异常，请核对");
+            moved.put(original, target);
+        }
+        SortedSet<LocalDate> result = new TreeSet<>();
+        for (LocalDate original : originals) {
+            LocalDate actual = moved.containsKey(original) ? moved.get(original) : original;
+            if (actual != null && !result.add(actual))
+                throw new IllegalArgumentException("调课后同一课程存在重叠课次");
+        }
+        return result;
     }
 
     public static SortedSet<LocalDate> dates(LocalDate start, LocalDate end, String pattern,

@@ -49,10 +49,10 @@ public class TimetableCalendarService
         for (EduCourseSchedule s : rows)
         {
             List<Map<String, Object>> changes = adjustments.getOrDefault(s.getScheduleId(), List.of());
-            SortedSet<LocalDate> dates = ScheduleCalendar.dates(
-                    ScheduleCalendar.date(s.getStartDate()), ScheduleCalendar.date(s.getEndDate()),
-                    StringUtils.trimToEmpty(s.getClassPattern()), StringUtils.trimToEmpty(s.getPeriodName()),
-                    changes);
+            SortedSet<LocalDate> dates = ScheduleCalendar.CUSTOM_DATES.equals(s.getClassPattern())
+                    ? ScheduleCalendar.dates(s, changes)
+                    : ScheduleCalendar.dates(ScheduleCalendar.date(s.getStartDate()), ScheduleCalendar.date(s.getEndDate()),
+                            StringUtils.trimToEmpty(s.getClassPattern()), StringUtils.trimToEmpty(s.getPeriodName()), changes);
             if (dates.isEmpty()) continue;   // 没设起止日期（待排）或规则认不出的，不猜日期
 
             Map<String, Object> item = item(s, roomById.get(s.getClassroomId()));

@@ -594,7 +594,7 @@ public class EduTimetableController extends BaseController
         }
 
         // 原始课次（不叠加调课），保证停课日仍然出现在列表里
-        SortedSet<LocalDate> base = ScheduleCalendar.dates(start, end, s.getClassPattern(), s.getPeriodName(), List.of());
+        SortedSet<LocalDate> base = ScheduleCalendar.dates(s, List.of());
         List<Map<String, Object>> items = new ArrayList<>();
         int cancelled = 0;
         for (LocalDate d : base)

@@ -1,3 +1,4 @@
+const customCalendar = require('../../utils/course-calendar')
 const { request } = require('../../utils/request')
 const devSession = require('../../utils/dev-session')
 const courseState = require('../../utils/teacher-course-state')
@@ -137,6 +138,12 @@ function weekdayShort(d) {
 
 // 按排课信息计算下一次上课日期（与 timetable 页面算法一致）
 function computeNextDate(item) {
+  if(item.classPattern === 'CUSTOM_DATES' && !item.classDate) {
+    const dates=customCalendar.expandCourse(item).dates
+    if(!dates.length)return null
+    const future=dates.map(customCalendar.parseDate).find(d=>{const clock=String(item.startTime||'').split(':');d.setHours(Number(clock[0])||0,Number(clock[1])||0,0,0);return d>new Date()})
+    return future ? {date:fmtDate(future),weekday:weekdayShort(future)} : {date:'已结课',weekday:''}
+  }
   if(item.classDate){const d=parseDate(item.classDate);if(!d)return null;const clock=String(item.startTime||'').split(':');d.setHours(Number(clock[0])||0,Number(clock[1])||0,0,0);return d>new Date()?{date:fmtDate(d),weekday:weekdayShort(d)}:{date:'已结课',weekday:''}}
   const start = parseDate(item.startDate)
   const end = parseDate(item.endDate)

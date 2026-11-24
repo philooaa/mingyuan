@@ -19,6 +19,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="startDate"    column="start_date"    />
         <result property="endDate"    column="end_date"    />
         <result property="classPattern"    column="class_pattern"    />
+        <result property="scheduleRuleId" column="schedule_rule_id" />
+        <result property="scheduleRuleName" column="schedule_rule_name" />
+        <result property="scheduleRuleVersion" column="schedule_rule_version" />
+        <result property="customDatesJson" column="custom_dates" />
         <result property="gradeName"    column="grade_name"    />
         <result property="subjectName"    column="subject_name"    />
         <result property="teacherName"    column="teacher_name"    />
@@ -43,7 +47,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectEduCourseScheduleVo">
-        select schedule_id, schedule_code, campus_name, classroom_id, lesson_location, course_year, term_name, period_name, time_slot, start_time, end_time, start_date, end_date, class_pattern, grade_name, subject_name, teacher_name, teacher_id, class_type, class_mode, enrolled_count, enroll_limit, unit_price, recruit_status, course_class_name, source_sheet, source_row, source_col, status, del_flag, create_by, create_time, update_by, update_time, remark from edu_course_schedule
+        select schedule_id, schedule_code, campus_name, classroom_id, lesson_location, course_year, term_name, period_name, time_slot, start_time, end_time, start_date, end_date, class_pattern, schedule_rule_id, schedule_rule_name, schedule_rule_version, custom_dates, grade_name, subject_name, teacher_name, teacher_id, class_type, class_mode, enrolled_count, enroll_limit, unit_price, recruit_status, course_class_name, source_sheet, source_row, source_col, status, del_flag, create_by, create_time, update_by, update_time, remark from edu_course_schedule
     </sql>
 
     <select id="selectEduCourseScheduleList" parameterType="EduCourseSchedule" resultMap="EduCourseScheduleResult">
@@ -215,7 +219,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 可视化课表：按 年+学期+期次 查询所有排课，可联教室表按校区过滤 -->
     <select id="selectTimetableGrid" parameterType="EduCourseSchedule" resultMap="EduCourseScheduleResult">
         SELECT s.schedule_id, s.schedule_code, COALESCE(NULLIF(s.campus_name,''),c.campus_name) AS campus_name, s.classroom_id, s.lesson_location, s.course_year, s.term_name, s.period_name,
-               s.time_slot, s.start_time, s.end_time, s.start_date, s.end_date, s.class_pattern,
+               s.time_slot, s.start_time, s.end_time, s.start_date, s.end_date, s.class_pattern, s.schedule_rule_id, s.schedule_rule_name, s.schedule_rule_version, s.custom_dates,
                s.grade_name, s.subject_name, s.teacher_name, s.teacher_id,
                s.class_type, s.class_mode, s.enrolled_count, s.enroll_limit, s.recruit_status, s.course_class_name,
                s.status, s.del_flag, s.create_by, s.create_time, s.update_by, s.update_time, s.remark

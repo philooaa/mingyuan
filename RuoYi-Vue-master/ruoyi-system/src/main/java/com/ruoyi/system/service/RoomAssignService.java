@@ -187,12 +187,11 @@ public class RoomAssignService
     private List<Map<String, Object>> occurringCourses(LocalDate date)
     {
         List<Map<String, Object>> rows = db.rows("SELECT schedule_id,classroom_id,campus_name,time_slot,start_time,end_time,"
-                + "start_date,end_date,class_pattern,period_name,grade_name,subject_name,teacher_name,teacher_id,"
+                + "start_date,end_date,class_pattern,custom_dates,period_name,grade_name,subject_name,teacher_name,teacher_id,"
                 + "course_class_name,class_mode,enrolled_count,term_name "
                 + "FROM edu_course_schedule WHERE del_flag='0' AND status='0' "
                 + "AND start_date IS NOT NULL AND end_date IS NOT NULL "
-                + "AND start_date<=? AND end_date>=? ORDER BY time_slot,schedule_id",
-                java.sql.Date.valueOf(date), java.sql.Date.valueOf(date));
+                + "ORDER BY time_slot,schedule_id");
 
         Map<String, List<Map<String, Object>>> changes = adjustments();
         Map<String, List<Map<String, Object>>> assignments = assignments();
@@ -202,9 +201,7 @@ public class RoomAssignService
         {
             Long scheduleId = id(row.get("scheduleId"));
             String key = String.valueOf(scheduleId);
-            SortedSet<LocalDate> dates = ScheduleCalendar.dates(
-                    ScheduleCalendar.date(row.get("startDate")), ScheduleCalendar.date(row.get("endDate")),
-                    str(row.get("classPattern")), str(row.get("periodName")),
+            SortedSet<LocalDate> dates = ScheduleCalendar.dates(row,
                     changes.getOrDefault(key, List.of()));
             if (!dates.contains(date)) continue;
 
@@ -292,10 +289,9 @@ public class RoomAssignService
 
     private SortedSet<LocalDate> datesOf(Map<String, Object> schedule)
     {
-        Map<String, Object> full = db.one("SELECT start_date,end_date,class_pattern,period_name "
+        Map<String, Object> full = db.one("SELECT start_date,end_date,class_pattern,custom_dates,period_name "
                 + "FROM edu_course_schedule WHERE schedule_id=?", id(schedule.get("scheduleId")));
-        return ScheduleCalendar.dates(ScheduleCalendar.date(full.get("startDate")),
-                ScheduleCalendar.date(full.get("endDate")), str(full.get("classPattern")), str(full.get("periodName")),
+        return ScheduleCalendar.dates(full,
                 db.rows("SELECT a.original_date,a.adjusted_date FROM edu_schedule_adjustment a "
                         + "JOIN edu_course_schedule s ON s.schedule_id=? "
                         + "WHERE a.schedule_id=s.schedule_id OR (a.schedule_id=0 AND a.term_name=s.term_name "

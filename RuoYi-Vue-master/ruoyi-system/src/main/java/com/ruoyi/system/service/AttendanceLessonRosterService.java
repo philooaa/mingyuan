@@ -46,7 +46,7 @@ public class AttendanceLessonRosterService {
         db.one("SELECT schedule_id FROM edu_course_schedule WHERE schedule_id=? FOR UPDATE",schedule);
         var c=course(schedule);
         if("2".equals(text(c.get("classMode"))))return List.of();
-        var originals=ScheduleCalendar.dates(ScheduleCalendar.date(c.get("startDate")),ScheduleCalendar.date(c.get("endDate")),text(c.get("classPattern")),text(c.get("periodName")),List.of());
+        var originals=ScheduleCalendar.dates(c,List.of());
         var adjustments=db.rows("SELECT a.original_date,a.adjusted_date FROM edu_schedule_adjustment a WHERE a.schedule_id=? OR (a.schedule_id=0 AND a.term_name=? AND a.period_name=? AND NOT EXISTS(SELECT 1 FROM edu_schedule_adjustment x WHERE x.schedule_id=? AND x.original_date=a.original_date)) ORDER BY a.original_date",schedule,c.get("termName"),c.get("periodName"),schedule);
         var moved=new HashMap<LocalDate,LocalDate>();
         for(var a:adjustments){LocalDate original=ScheduleCalendar.date(a.get("originalDate"));require(original!=null&&!moved.containsKey(original),"调课日期冲突，请先完善排课");moved.put(original,ScheduleCalendar.date(a.get("adjustedDate")));}

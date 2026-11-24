@@ -16,11 +16,17 @@
         <span class="dim-tip">学期跟随课表筛选条件；上课模式及星期或期次可在下方修改</span>
       </div>
 
+      <schedule-rule-picker :form="form" />
+      <el-form-item label="课时单价" required>
+        <el-select v-model="priceChoice" placeholder="选择单价" @change="form.unitPrice = priceChoice === 'custom' ? null : priceChoice"><el-option v-for="price in [220,250,280]" :key="price" :label="String(price)" :value="price" /><el-option label="手动填写" value="custom" /></el-select>
+        <el-input-number v-model="form.unitPrice" :min="0.01" :precision="2" :controls="false" />
+      </el-form-item>
+      <el-form-item v-if="!form.scheduleId && form.classMode !== '2'" label="计费课次数"><el-input-number v-model="form.requestedLessonCount" :min="1" :max="3661" :precision="0" /></el-form-item>
       <el-row :gutter="16">
         <el-col :span="12">
           <el-form-item label="上课模式" prop="classPattern">
             <el-select v-model="form.classPattern" @change="onClassPatternChange" :disabled="form.classMode === '2'" placeholder="请选择上课模式" style="width:100%">
-              <el-option label="每周一次" value="WEEKLY" />
+              <el-option label="自定义日期规则" value="CUSTOM_DATES" /><el-option label="每周一次" value="WEEKLY" />
               <el-option label="连上无假期（每天上课）" value="DAILY" />
               <el-option label="上5天休1天" value="DAILY_5_1" />
               <el-option label="上6天休1天" value="DAILY_6_1" />
@@ -110,12 +116,12 @@
 
         <el-col :span="12">
           <el-form-item label="开课日期" prop="startDate">
-            <el-date-picker v-model="form.startDate" type="date" value-format="yyyy-MM-dd" placeholder="开课日期" style="width:100%" />
+            <el-date-picker :disabled="form.classPattern === 'CUSTOM_DATES'" v-model="form.startDate" type="date" value-format="yyyy-MM-dd" placeholder="开课日期" style="width:100%" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
           <el-form-item label="结课日期" prop="endDate">
-            <el-date-picker v-model="form.endDate" type="date" value-format="yyyy-MM-dd" placeholder="结课日期" style="width:100%" />
+            <el-date-picker :disabled="form.classPattern === 'CUSTOM_DATES'" v-model="form.endDate" type="date" value-format="yyyy-MM-dd" placeholder="结课日期" style="width:100%" />
           </el-form-item>
         </el-col>
 
@@ -173,6 +179,7 @@
 </template>
 
 <script>
+import ScheduleRulePicker from "@/components/ScheduleRulePicker"
 import { addTimetableSchedule, updateTimetableSchedule, getTimetableSchedule } from '@/api/system/timetable'
 import { recognizeAndFill } from '@/utils/course-name-recognition'
 import { classPeriodOptions, isWeekday } from '@/utils/class-period'
@@ -180,6 +187,7 @@ import { updateAutomaticCourseName } from '@/utils/auto-course-name'
 
 export default {
   name: 'TimetableDialog',
+  components: { ScheduleRulePicker },
   props: {
     dims: { type: Object, required: true },
     preset: { type: Object, default: null }
@@ -187,13 +195,14 @@ export default {
   data() {
     return {
       visible: false,
+      priceChoice: null,
       submitting: false,
       recognizing: false,
       detailLoading: false,
       detailError: false,
       form: this.buildEmptyForm(),
       rules: {
-        periodName: [{ validator: (rule, value, callback) => value && (this.form.classMode === '2' || isWeekday(value) === (this.form.classPattern === 'WEEKLY')) ? callback() : callback(new Error(this.form.classPattern === 'WEEKLY' ? '请选择上课星期' : '请选择期次')), trigger: 'change' }],
+        periodName: [{ validator: (rule, value, callback) => value && (this.form.classMode === '2' || this.form.classPattern === 'CUSTOM_DATES' || isWeekday(value) === (this.form.classPattern === 'WEEKLY')) ? callback() : callback(new Error(this.form.classPattern === 'WEEKLY' ? '请选择上课星期' : '请选择期次')), trigger: 'change' }],
         gradeName:    [{ required: true, message: '请选择年级', trigger: 'change' }],
         subjectName:  [{ required: true, message: '请选择科目', trigger: 'change' }],
         teacherId:    [{ required: true, message: '请选择/填写教师', trigger: 'change' }],
@@ -224,11 +233,15 @@ export default {
   },
   methods: {
     onClassPatternChange() {
+      this.$set(this.form, "applyScheduleRule", false)
+      this.$set(this.form, "clearScheduleRule", this.form.classPattern !== "CUSTOM_DATES")
       if (!this.formPeriodOptions.some(item => item.value === this.form.periodName)) this.form.periodName = ''
       this.$nextTick(() => this.$refs.form && this.$refs.form.clearValidate('periodName'))
     },
     syncSingleDay() {
       if (this.form.classMode !== '2') return
+      this.$set(this.form, 'applyScheduleRule', false)
+      this.$set(this.form, 'clearScheduleRule', true)
       this.form.classPattern = 'WEEKLY'
       const date = String(this.form.startDate || '').slice(0,10)
       this.form.periodName = date ? ['周日','周一','周二','周三','周四','周五','周六'][new Date(date.replace(/-/g,'/')+' 12:00:00').getDay()] : ''
@@ -254,7 +267,7 @@ export default {
         timeSlot: '',
         gradeName: '', subjectName: '', teacherName: '', teacherId: null, classType: '', classMode: this.dims.isTeacher && !this.dims.isAdmin ? '2' : '1', status: '0',
         startTime: '', endTime: '',
-        startDate: null, endDate: null, classPattern: 'DAILY_5_1',
+        startDate: null, endDate: null, classPattern: 'DAILY_5_1', unitPrice: null, requestedLessonCount: null,
         recruitStatus: '0',
         enrolledCount: 0,
         courseClassName: '',
@@ -311,12 +324,14 @@ export default {
       this.autoCourseName()
     },
     async submit() {
+      if (this.form.ruleSelectionLoading) { this.$message.warning('请等待排课规则读取完成'); return }
       if (this.submitting || this.detailLoading || this.detailError) return
       const valid = await new Promise(res => this.$refs.form.validate(ok => res(ok)))
       if (!valid) return
       this.autoFillClassName()
       this.submitting = true
       try {
+        if (this.form.classPattern === 'CUSTOM_DATES' && !(this.form.customDates || []).length) { this.$message.error('请选择排课规则'); return }
         const payload = { ...this.form }
         // 后端只认 classroomId，去掉 classroomName/campusName 这两个前端辅助字段
         delete payload.classroomName

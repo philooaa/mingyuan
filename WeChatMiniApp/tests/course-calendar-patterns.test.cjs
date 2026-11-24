@@ -2,6 +2,14 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const calendar = require('../utils/course-calendar')
 
+test('custom dates use the saved dates and apply cancellations and moves', () => {
+  const c = { classPattern: 'CUSTOM_DATES', startDate: '2027-01-27', endDate: '2027-02-01', customDates: ['2027-02-01', '2027-01-27', '2027-01-30', '2027-01-30'], adjustments: [{ originalDate: '2027-01-27', adjustedDate: null }, { originalDate: '2027-02-01', adjustedDate: '2027-02-03' }] }
+  assert.deepEqual(calendar.expandCourse(c), { dates: ['2027-01-30', '2027-02-03'], reason: '' })
+  assert.equal(calendar.expandCourse({ ...c, customDates: [] }).reason, '自定义上课日期待核对')
+  assert.equal(calendar.expandCourse({ ...c, endDate: '2027-02-02' }).reason, '自定义上课日期待核对')
+  assert.equal(calendar.expandCourse({ ...c, adjustments: [{ originalDate: '2027-01-27', adjustedDate: '2027-01-30' }] }).reason, '调课后同一课程存在重叠课次，请核对')
+})
+
 // 与后端 ScheduleCalendar 保持一致：模式 → 一轮天数 / 上课天数
 const cases = [
   { pattern: 'DAILY', cycle: 1, study: 1 },
