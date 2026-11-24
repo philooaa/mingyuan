@@ -55,6 +55,13 @@ public class ScheduleCrudTest {
         var patch=new EduCourseSchedule();patch.setScheduleId(10L);patch.setCourseClassName("不允许覆盖");
         assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch));assertNull(captured);
     }
+    @Test void attendanceOnlyMakeupCannotBeChangedThroughOrdinaryScheduleCrud() {
+        principal(1,"admin");db.makeupSession=true;
+        var patch=new EduCourseSchedule();patch.setScheduleId(10L);patch.setStatus("1");
+        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));
+        assertThrows(ServiceException.class,()->service.deleteEduCourseScheduleByScheduleIds(new Long[]{10L}));
+        assertThrows(ServiceException.class,()->service.removeConfirmedSchedule(10L));assertNull(captured);assertNull(deleted);
+    }
     @Test void teacherReadAndWriteIsolation() {
         principal(21,"teacher");
         EduCourseSchedule query = new EduCourseSchedule(); query.getParams().put("teacherUserId", 22L);
@@ -278,6 +285,15 @@ public class ScheduleCrudTest {
         patch.setApplyScheduleRule(true);patch.setScheduleRuleId(7L);patch.setScheduleRuleVersion(1L);db.attendance=1;
         assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));
     }
+    @Test void replacingSnapshotCannotInvalidateMaterializedLectureNumbers() {
+        current.setClassMode("1");current.setClassPattern("CUSTOM_DATES");current.setCustomDatesJson("[\"2026-12-26\"]");
+        db.materializedLesson=true;
+        var patch=new EduCourseSchedule();patch.setScheduleId(10L);patch.setApplyScheduleRule(true);patch.setScheduleRuleId(7L);patch.setScheduleRuleVersion(1L);
+        var error=assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));
+        assertTrue(error.getMessage().contains("讲次"));assertNull(captured);
+        patch.setApplyScheduleRule(false);patch.setClearScheduleRule(true);patch.setClassPattern("WEEKLY");
+        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));assertNull(captured);
+    }
     static EduCourseSchedule course() {
         var s = new EduCourseSchedule(); s.setUnitPrice(new java.math.BigDecimal("100.00")); s.setTeacherId(21L); s.setClassroomId(1L); s.setCampusName("万达"); s.setScheduleCode("TEST"); s.setCourseYear(2026L);
         s.setTermName("秋季"); s.setPeriodName("周六"); s.setTimeSlot("8:00-10:00"); s.setGradeName("一年级"); s.setSubjectName("数学"); s.setCourseClassName("班次");
@@ -294,11 +310,13 @@ public class ScheduleCrudTest {
     static void inject(Object target, String field, Object value) throws Exception { var f = target.getClass().getDeclaredField(field); f.setAccessible(true); f.set(target,value); }
     @SuppressWarnings("unchecked") static <T> T proxy(Class<T> type, InvocationHandler handler) { return (T) Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},handler); }
     static class FakeDb extends ShopRepository {
-        boolean ruleEnabled=true; List<String> ruleDates=List.of("2026-12-26","2027-01-02");
-        long attendance, references, activeEnrollments; boolean canceledEnrollment, activeEnrollment, enrollmentArrivesOnLock;
+        boolean materializedLesson; boolean ruleEnabled=true; List<String> ruleDates=List.of("2026-12-26","2027-01-02");
+        long attendance, references, activeEnrollments; boolean makeupSession, canceledEnrollment, activeEnrollment, enrollmentArrivesOnLock;
         List<Map<String,Object>> conflicts = List.of(); List<String> locks = new ArrayList<>();
         FakeDb() { super(new DriverManagerDataSource()); }
         @Override public List<Map<String,Object>> rows(String sql,Object... args) {
+            if (sql.contains("FROM edu_attendance_makeup_session")) return makeupSession ? List.of(Map.of("scheduleId",10)) : List.of();
+            if (sql.contains("SELECT lesson_id FROM edu_attendance_lesson")) return materializedLesson && !sql.contains("locked=1") ? List.of(Map.of("lessonId",1)) : List.of();
             if (sql.contains("FROM edu_schedule_rule WHERE")) return ruleEnabled?List.of(Map.of("ruleName","测试规则","version",1L)):List.of();
             if (sql.contains("FROM edu_schedule_rule_date")) return ruleDates.stream().map(d->Map.<String,Object>of("classDate",d)).toList();
             if (sql.contains("SELECT DISTINCT campus_name")) return "万达".equals(args[0]) ? List.of(Map.of("campusName","万达")) : List.of();

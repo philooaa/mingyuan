@@ -119,6 +119,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     public int updateEduCourseSchedule(EduCourseSchedule input, boolean force) {
         requirePlanningStaff();
         require(input != null && input.getScheduleId() != null, "请选择排课");
+        requireOrdinarySchedule(input.getScheduleId());
         if (input.getUnitPrice() != null) {
             EduCourseSchedule existing = selectEduCourseScheduleByScheduleId(input.getScheduleId());
             if (existing.getUnitPrice() == null || input.getUnitPrice().compareTo(existing.getUnitPrice()) != 0) requireValidUnitPrice(input.getUnitPrice());
@@ -156,7 +157,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         }
         require(!ScheduleCalendar.CUSTOM_DATES.equals(effective.getClassPattern()) || ScheduleCalendar.CUSTOM_DATES.equals(current.getClassPattern()) || Boolean.TRUE.equals(input.getApplyScheduleRule()), "请选择排课规则");
         if ((Boolean.TRUE.equals(input.getApplyScheduleRule()) || Boolean.TRUE.equals(input.getClearScheduleRule())) && !Objects.equals(current.getCustomDatesJson(), effective.getCustomDatesJson())) {
-            require(db.rows("SELECT lesson_id FROM edu_attendance_lesson WHERE schedule_id=? AND locked=1 FOR UPDATE",current.getScheduleId()).isEmpty(), "已有锁定讲次，请使用调课管理");
+            require(db.rows("SELECT lesson_id FROM edu_attendance_lesson WHERE schedule_id=? FOR UPDATE",current.getScheduleId()).isEmpty(), "已生成讲次，请使用调课管理，避免打乱讲次与名单");
             require(parentMapper.selectScheduleAdjustments(current.getScheduleId()).isEmpty(), "已有调课记录，请使用调课管理或先核对调课记录");
         }
         validate(effective);
@@ -202,6 +203,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         List<EduCourseSchedule> courses = Arrays.stream(ids).distinct().sorted().map(this::selectEduCourseScheduleByScheduleId).toList();
         lockResources(courses);
         for (EduCourseSchedule course : courses) {
+            requireOrdinarySchedule(course.getScheduleId());
             EduCourseSchedule locked = eduCourseScheduleMapper.lockSchedule(course.getScheduleId());
             own(locked);
             requireNoActiveEnrollments(locked);
@@ -213,9 +215,14 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     @Override @Transactional(rollbackFor = Exception.class)
     public int deleteEduCourseScheduleByScheduleId(Long id) { return deleteEduCourseScheduleByScheduleIds(new Long[]{id}); }
 
+    private void requireOrdinarySchedule(Long schedule) {
+        require(db.rows("SELECT schedule_id FROM edu_attendance_makeup_session WHERE schedule_id=?",schedule).isEmpty(),"出勤专用补课请由原任课教师在请假记录中维护");
+    }
+
     @Override @Transactional(rollbackFor = Exception.class)
     public int removeConfirmedSchedule(Long id) {
         requirePlanningStaff();
+        requireOrdinarySchedule(id);
         EduCourseSchedule before = selectEduCourseScheduleByScheduleId(id);
         lockResources(List.of(before));
         EduCourseSchedule current = eduCourseScheduleMapper.lockSchedule(id);

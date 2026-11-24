@@ -1,0 +1,31 @@
+<view class="makeup-panel" wx:if="{{accountId}}">
+  <view class="panel-heading">
+    <view class="panel-heading-main"><view class="panel-title">{{mode === 'timetable' ? '补课安排' : '请假与补课'}}</view><view class="panel-caption">{{rows.length ? rows[0].studentName : (mode === 'timetable' ? '查看额外的补课安排' : '跟进孩子的请假课次')}}</view></view>
+    <view class="panel-count" wx:if="{{rows.length}}">{{rows.length}} 条记录</view>
+  </view>
+
+  <view class="loading-card" wx:if="{{loading}}"><view class="skeleton skeleton-title"></view><view class="skeleton skeleton-line"></view><view class="skeleton skeleton-block"></view><view class="loading-label">正在加载记录</view></view>
+  <view class="error-card" wx:if="{{error}}"><view class="message-title">暂时无法加载</view><view class="message-caption">{{error}}</view><button class="retry" bindtap="refresh">重新加载</button></view>
+
+  <view wx:for="{{rows}}" wx:key="rowKey" class="record {{item.state}}">
+    <view class="record-top"><view class="lecture-tag">第 {{item.lessonNo || '—'}} 讲</view><view class="badge {{item.state}}"><view class="status-dot"></view>{{item.statusLabel}}</view></view>
+    <view class="course-name">{{item.courseName}}</view>
+    <view class="original"><text class="original-label">原请假</text><text>{{item.classDate}}</text></view>
+
+    <view class="target {{item.state === 'completed' ? 'target-completed' : ''}}" wx:if="{{item.makeup}}">
+      <view class="target-heading"><view class="target-label">{{item.state === 'completed' ? '已完成补课' : item.state === 'failed' ? '上次补课安排' : '补课时间'}}</view><view class="target-lecture">第 {{item.makeup.lessonNo}} 讲</view></view>
+      <view class="target-date">{{item.makeup.classDate || '日期待确认'}}</view>
+      <view class="target-time" wx:if="{{item.makeup.startTime || item.makeup.endTime}}">{{item.makeup.startTime}}{{item.makeup.startTime && item.makeup.endTime ? '–' : ''}}{{item.makeup.endTime}}</view>
+      <view class="target-course">{{item.makeup.courseName}}</view>
+      <view class="target-meta"><text class="meta-label">教师</text><text>{{item.makeup.teacherName || '待确认'}}</text></view>
+      <view class="target-meta"><text class="meta-label">地点</text><text class="place-text">{{item.makeup.placeText || '待确认'}}</text></view>
+    </view>
+    <view class="status-hint {{item.state}}" wx:if="{{item.statusHint}}">{{item.statusHint}}</view>
+
+    <view class="history" wx:if="{{mode !== 'timetable' && item.history.length}}">
+      <button class="history-toggle" data-key="{{item.rowKey}}" bindtap="toggleHistory" aria-expanded="{{item.historyExpanded}}"><text>安排记录<text class="history-count">{{item.history.length}}</text></text><text class="history-chevron">{{item.historyExpanded ? '收起 ⌃' : '展开 ⌄'}}</text></button>
+      <view class="history-list" wx:if="{{item.historyExpanded}}"><view wx:for="{{item.history}}" wx:for-item="plan" wx:key="rowKey" class="history-row"><view class="history-dot {{plan.cancelled ? 'cancelled' : ''}}"></view><view class="history-content"><view class="history-top"><text>{{plan.classDate}}</text><text class="history-state {{plan.cancelled ? 'cancelled' : ''}}">{{plan.cancelled ? '已取消' : '已安排'}}</text></view><view class="history-time">{{plan.startTime}}{{plan.startTime && plan.endTime ? '–' : ''}}{{plan.endTime}}</view><view class="history-course">{{plan.courseName}} · {{plan.teacherName || '教师待确认'}}</view></view></view></view>
+    </view>
+  </view>
+  <view class="empty-card" wx:if="{{!loading && !error && !rows.length}}"><view class="empty-mark">—</view><view class="message-title">{{mode === 'timetable' ? '暂无补课安排' : '暂无已确认的请假'}}</view><view class="message-caption">{{mode === 'timetable' ? '有新的补课安排时，会显示在这里' : '请假及后续补课进度会显示在这里'}}</view></view>
+</view>

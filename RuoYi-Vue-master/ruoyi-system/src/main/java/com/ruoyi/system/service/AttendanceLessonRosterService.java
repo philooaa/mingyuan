@@ -32,7 +32,7 @@ public class AttendanceLessonRosterService {
     private Map<String,Object> course(long schedule) { return db.one("SELECT * FROM edu_course_schedule WHERE schedule_id=? AND del_flag='0'",schedule); }
     public List<Map<String,Object>> courses(String keyword) {
         staff();String like="%"+text(keyword)+"%";
-        return db.rows("SELECT c.schedule_id,c.course_class_name course_name,c.course_year year,c.term_name,c.grade_name,c.subject_name,COALESCE(NULLIF(TRIM(u.nick_name),''),u.user_name) teacher_name FROM edu_course_schedule c LEFT JOIN sys_user u ON u.user_id=c.teacher_id WHERE c.del_flag='0' AND COALESCE(c.class_mode,'1')<>'2' AND c.course_class_name LIKE ? ORDER BY c.course_year DESC,c.schedule_id DESC",like);
+        return db.rows("SELECT c.schedule_id,c.course_class_name course_name,c.course_year year,c.term_name,c.grade_name,c.subject_name,COALESCE(NULLIF(TRIM(u.nick_name),''),u.user_name) teacher_name FROM edu_course_schedule c LEFT JOIN sys_user u ON u.user_id=c.teacher_id WHERE c.del_flag='0' AND COALESCE(c.class_mode,'1')<>'2' AND NOT EXISTS(SELECT 1 FROM edu_attendance_makeup_session ms WHERE ms.schedule_id=c.schedule_id) AND c.course_class_name LIKE ? ORDER BY c.course_year DESC,c.schedule_id DESC",like);
     }
     public List<Map<String,Object>> students(String keyword) {
         staff();
@@ -43,9 +43,9 @@ public class AttendanceLessonRosterService {
     }
     /** Called inside a transaction; locking the course serializes materialization and roster edits. */
     private List<Map<String,Object>> sync(long schedule) {
-        db.one("SELECT schedule_id FROM edu_course_schedule WHERE schedule_id=? FOR UPDATE",schedule);
-        var c=course(schedule);
+        var c=db.one("SELECT * FROM edu_course_schedule WHERE schedule_id=? AND del_flag='0' FOR UPDATE",schedule);
         if("2".equals(text(c.get("classMode"))))return List.of();
+        if(!db.rows("SELECT schedule_id FROM edu_attendance_makeup_session WHERE schedule_id=?",schedule).isEmpty())return lessonRows(schedule);
         var originals=ScheduleCalendar.dates(c,List.of());
         var adjustments=db.rows("SELECT a.original_date,a.adjusted_date FROM edu_schedule_adjustment a WHERE a.schedule_id=? OR (a.schedule_id=0 AND a.term_name=? AND a.period_name=? AND NOT EXISTS(SELECT 1 FROM edu_schedule_adjustment x WHERE x.schedule_id=? AND x.original_date=a.original_date)) ORDER BY a.original_date",schedule,c.get("termName"),c.get("periodName"),schedule);
         var moved=new HashMap<LocalDate,LocalDate>();
@@ -79,6 +79,9 @@ public class AttendanceLessonRosterService {
             var snapshot=db.rows("SELECT r.enrollment_id,COALESCE(r.student_id,e.student_id) student_id,r.student_name,e.contact_phone,1 start_lesson,NULL end_lesson,CASE r.source_type WHEN '2' THEN 'TRIAL' WHEN '3' THEN 'TRANSFER' ELSE 'ENROLLED' END source,CASE WHEN r.enrollment_id IS NULL THEN 'HISTORICAL' ELSE 'ENROLLMENT' END payment_status,NULL membership_id FROM edu_class_sign_in r LEFT JOIN edu_enrollment e ON e.enrollment_id=r.enrollment_id WHERE r.schedule_id=? AND r.class_date=? AND r.del_flag='0' ORDER BY r.sign_in_id",schedule,legacy.get("classDate"));
             db.jdbc().update("UPDATE edu_attendance_lesson SET locked=1,roster_snapshot=? WHERE lesson_id=? AND locked=0",JSON.toJSONString(snapshot),legacy.get("lessonId"));
         }
+        return lessonRows(schedule);
+    }
+    private List<Map<String,Object>> lessonRows(long schedule) {
         return db.rows("SELECT lesson_id,schedule_id,lesson_no,DATE_FORMAT(original_date,'%Y-%m-%d') original_date,DATE_FORMAT(class_date,'%Y-%m-%d') class_date,course_year year,term_name,teacher_id,course_name,TIME_FORMAT(start_time,'%H:%i') start_time,TIME_FORMAT(end_time,'%H:%i') end_time,cancelled,locked FROM edu_attendance_lesson WHERE schedule_id=? ORDER BY lesson_no",schedule);
     }
     private boolean hasSubmission(long schedule,String date) { if(date==null||date.isBlank())return false;return !db.rows("SELECT sign_in_id FROM edu_class_sign_in WHERE schedule_id=? AND class_date=? AND del_flag='0' LIMIT 1",schedule,date).isEmpty(); }
@@ -89,6 +92,10 @@ public class AttendanceLessonRosterService {
         require(rows.size()==1,"课次日期不明确，请先完善排课");return rows.get(0);
     }
     @Transactional public List<Map<String,Object>> roster(long schedule,long lessonId) { staff();return rosterFor(lesson(schedule,lessonId)); }
+    List<Map<String,Object>> syncedRoster(Map<String,Object> lesson) { staff();return rosterFor(lesson); }
+    // Package-only trusted calls; the makeup service validates source ownership before use.
+    List<Map<String,Object>> makeupLessons(long schedule) { return sync(schedule); }
+    List<Map<String,Object>> makeupRoster(Map<String,Object> lesson) { return rosterFor(lesson); }
     private List<Map<String,Object>> rosterFor(Map<String,Object> lesson) {
         if(lesson.get("rosterSnapshot")!=null)return JSON.parseObject(text(lesson.get("rosterSnapshot")),new com.alibaba.fastjson2.TypeReference<List<Map<String,Object>>>(){});
         long schedule=id(lesson.get("scheduleId"));int no=((Number)lesson.get("lessonNo")).intValue();
@@ -118,7 +125,11 @@ public class AttendanceLessonRosterService {
         if(editable){require("0".equals(text(course(schedule).get("status"))),"课程已停用");guestMutable(lesson);}
         return lesson;
     }
+    private void requireOrdinaryRoster(long schedule) {
+        require(db.rows("SELECT schedule_id FROM edu_attendance_makeup_session WHERE schedule_id=?",schedule).isEmpty(),"自定义补课名单只能由原任课教师通过请假补课安排维护");
+    }
     private void guestMutable(Map<String,Object> lesson) {
+        requireOrdinaryRoster(id(lesson.get("scheduleId")));
         require(!yes(lesson.get("cancelled"))&&!yes(lesson.get("locked"))&&!hasSubmission(id(lesson.get("scheduleId")),text(lesson.get("classDate"))),
                 "课次已提交或锁定，请联系教务处理临时名单");
     }
@@ -187,7 +198,7 @@ public class AttendanceLessonRosterService {
         var lesson=guestLesson(schedule,date,false);
         return db.rows("SELECT st.student_name,c.course_class_name course_name,l.lesson_no,l.class_date FROM edu_attendance_lesson_guest g "
                 +"JOIN edu_student st ON st.student_id=g.student_id JOIN edu_attendance_lesson l ON l.lesson_id=g.lesson_id "
-                +"JOIN edu_course_schedule c ON c.schedule_id=l.schedule_id WHERE g.source_lesson_id=?",lesson.get("lessonId"));
+                +"JOIN edu_course_schedule c ON c.schedule_id=l.schedule_id WHERE g.source_lesson_id=? AND NOT EXISTS (SELECT 1 FROM edu_attendance_makeup mp WHERE mp.guest_id=g.guest_id AND mp.cancelled=0)",lesson.get("lessonId"));
     }
     public record MembershipRequest(Long scheduleId,Long studentId,Long enrollmentId,Integer startLesson,Integer endLesson,String source,String paymentStatus,String reason) {}
     public List<Map<String,Object>> pendingParentBindings() {
@@ -227,6 +238,7 @@ public class AttendanceLessonRosterService {
         String name = text(input.studentName()).strip();
         require(!name.isEmpty() && name.length() <= 30, "请输入30字以内的学生姓名");
         long schedule = input.scheduleId();
+        requireOrdinaryRoster(schedule);
         db.one("SELECT schedule_id FROM edu_course_schedule WHERE schedule_id=? AND del_flag='0' AND COALESCE(class_mode,'1')<>'2' FOR UPDATE", schedule);
         require(db.rows("SELECT m.membership_id FROM edu_attendance_membership m JOIN edu_student st "
                 + "ON st.student_id=m.student_id WHERE m.schedule_id=? AND st.student_name=?", schedule, name).isEmpty()
@@ -315,6 +327,7 @@ public class AttendanceLessonRosterService {
     private String reason(String value){require(value!=null&&!value.isBlank()&&value.length()<=255,"请填写255字以内的名单变更原因");return value.trim();}
     private Map<String,Object> numbered(long schedule,int no) { return db.one("SELECT * FROM edu_attendance_lesson WHERE schedule_id=? AND lesson_no=?",schedule,no); }
     private void mutableFrom(long schedule,int no) {
+        requireOrdinaryRoster(schedule);
         var l=numbered(schedule,no);require(!yes(l.get("cancelled")),"请选择有效课次");
         require(ScheduleCalendar.date(l.get("classDate"))!=null,"请选择有效课次");
         require(db.rows("SELECT lesson_id FROM edu_attendance_lesson l WHERE schedule_id=? AND lesson_no>=? AND (locked=1 OR EXISTS(SELECT 1 FROM edu_class_sign_in r WHERE r.schedule_id=l.schedule_id AND r.class_date=l.class_date AND r.del_flag='0'))",schedule,no).isEmpty(),"生效范围包含已提交课次，请选择更后的讲次");
@@ -429,12 +442,37 @@ public class AttendanceLessonRosterService {
         return Map.of("count",count);
     }
 
+    /** Review queues come from submitted sheets, not the full school calendar. */
+    private List<Map<String,Object>> pendingReviewSheets(String role) {
+        var stages="education".equals(role)?List.of("PENDING_FIRST"):"business_admin".equals(role)?List.of("PENDING_FINAL"):List.of("PENDING_FIRST","PENDING_FINAL");
+        return db.rows("SELECT sheet.schedule_id,DATE_FORMAT(sheet.class_date,'%Y-%m-%d') class_date,l.lesson_id,l.lesson_no,COALESCE(l.course_year,c.course_year) year,COALESCE(l.term_name,c.term_name) term_name,COALESCE(l.course_name,c.course_class_name) course_name,TIME_FORMAT(COALESCE(l.start_time,c.start_time),'%H:%i') start_time,TIME_FORMAT(COALESCE(l.end_time,c.end_time),'%H:%i') end_time,c.status schedule_status,COALESCE(l.teacher_id,c.teacher_id) teacher_id,c.grade_name,c.subject_name,COALESCE(NULLIF(TRIM(u.nick_name),''),u.user_name) teacher_name,COALESCE(r.review_stage,CASE WHEN r.review_status='1' THEN 'FINAL' WHEN r.review_status='2' THEN 'RETURNED' ELSE 'PENDING_FIRST' END) stage,l.locked,l.roster_snapshot,c.class_mode,c.del_flag course_deleted,sheet.record_count "
+                +"FROM (SELECT schedule_id,class_date,MIN(sign_in_id) first_id,COUNT(*) record_count FROM edu_class_sign_in WHERE del_flag='0' GROUP BY schedule_id,class_date) sheet "
+                +"JOIN edu_class_sign_in r ON r.sign_in_id=sheet.first_id JOIN edu_course_schedule c ON c.schedule_id=sheet.schedule_id "
+                +"LEFT JOIN edu_attendance_lesson l ON l.lesson_id=(SELECT MIN(z.lesson_id) FROM edu_attendance_lesson z WHERE z.schedule_id=sheet.schedule_id AND z.class_date=sheet.class_date) "
+                +"LEFT JOIN sys_user u ON u.user_id=COALESCE(l.teacher_id,c.teacher_id) "
+                +"WHERE COALESCE(r.review_stage,CASE WHEN r.review_status='1' THEN 'FINAL' WHEN r.review_status='2' THEN 'RETURNED' ELSE 'PENDING_FIRST' END) IN ("+String.join(",",Collections.nCopies(stages.size(),"?"))+") ORDER BY sheet.class_date,sheet.schedule_id",stages.toArray());
+    }
+    private Map<String,Object> reviewTodos(String role) {
+        var rows=pendingReviewSheets(role);
+        // Old imports may not yet have a stable occurrence/snapshot. Repair only queued courses that need it.
+        var legacy=new LinkedHashSet<Long>();
+        for(var row:rows)if("0".equals(text(row.get("courseDeleted")))&&!"2".equals(text(row.get("classMode")))&&(row.get("lessonId")==null||!yes(row.get("locked"))))legacy.add(id(row.get("scheduleId")));
+        if(!legacy.isEmpty()){for(long schedule:legacy)sync(schedule);rows=pendingReviewSheets(role);}
+        for(var row:rows) {
+            Object snapshot=row.remove("rosterSnapshot"),count=row.remove("recordCount");
+            row.put("expectedCount",snapshot==null?Integer.parseInt(text(count)):JSON.parseArray(text(snapshot)).size());
+            row.remove("courseDeleted");row.remove("classMode");row.put("upcoming",false);row.put("overdue",false);
+        }
+        return Map.of("courses",List.of(),"count",rows.size(),"overdueCount",0L,"items",rows);
+    }
+
     @Transactional public Map<String,Object> todos(String role) { return todos(role,false); }
     @Transactional public Map<String,Object> todos(String role, boolean allTeacherLessons) {
         var roles=roles();if("admin".equals(role)&&!roles.contains("admin")&&roles.contains("business_admin"))role="business_admin";require(Set.of("teacher","education","business_admin","admin").contains(role),"请选择有效身份");require(roles.contains("admin")||roles.contains(role),"当前身份无权查看待办");
+        if(!"teacher".equals(role))return reviewTodos(role);
         var items=new ArrayList<Map<String,Object>>();var now=LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
         var candidates=new ArrayList<Map<String,Object>>();
-        var courses=db.rows("SELECT schedule_id,status,course_class_name course_name,course_year year,term_name,grade_name FROM edu_course_schedule WHERE del_flag='0' AND COALESCE(class_mode,'1')<>'2'"+("teacher".equals(role)?" AND (teacher_id=? OR EXISTS(SELECT 1 FROM edu_attendance_lesson owned WHERE owned.schedule_id=edu_course_schedule.schedule_id AND owned.locked=1 AND owned.teacher_id=?))":""),"teacher".equals(role)?new Object[]{SecurityUtils.getUserId(),SecurityUtils.getUserId()}:new Object[]{});
+        var courses=db.rows("SELECT schedule_id,status,course_class_name course_name,course_year year,term_name,period_name,CONCAT(TIME_FORMAT(start_time,'%H:%i'),'–',TIME_FORMAT(end_time,'%H:%i')) time_slot,grade_name FROM edu_course_schedule WHERE del_flag='0' AND COALESCE(class_mode,'1')<>'2'"+("teacher".equals(role)?" AND (teacher_id=? OR EXISTS(SELECT 1 FROM edu_attendance_lesson owned WHERE owned.schedule_id=edu_course_schedule.schedule_id AND owned.locked=1 AND owned.teacher_id=?))":""),"teacher".equals(role)?new Object[]{SecurityUtils.getUserId(),SecurityUtils.getUserId()}:new Object[]{});
         for(var c:courses)for(var l:sync(id(c.get("scheduleId")))) { l.put("scheduleStatus",c.get("status"));candidates.add(l); }
         // Existing sheets, including pre-migration dates and single lessons, remain actionable.
         String teacherFilter="teacher".equals(role)?" AND COALESCE(l.teacher_id,c.teacher_id)=?":"";
@@ -472,7 +510,7 @@ public class AttendanceLessonRosterService {
             item.put("stage",stage);item.put("upcoming",upcoming);item.put("overdue",overdue&&Set.of("UNSUBMITTED","RETURNED").contains(stage));items.add(item);
         }
         items.sort(Comparator.comparing(r->text(r.get("classDate"))));return Map.of("courses","teacher".equals(role)&&allTeacherLessons?db.rows("SELECT schedule_id,course_class_name course_name,"
-                +"course_year year,term_name,grade_name FROM edu_course_schedule "
+                +"course_year year,term_name,period_name,CONCAT(TIME_FORMAT(start_time,'%H:%i'),'–',TIME_FORMAT(end_time,'%H:%i')) time_slot,grade_name FROM edu_course_schedule "
                 +"WHERE del_flag='0' AND (teacher_id=? OR EXISTS(SELECT 1 FROM edu_attendance_lesson owned WHERE owned.schedule_id=edu_course_schedule.schedule_id AND owned.locked=1 AND owned.teacher_id=?)) ORDER BY course_year DESC,schedule_id DESC",SecurityUtils.getUserId(),SecurityUtils.getUserId()):List.of(),"count",items.size(),"overdueCount",items.stream().filter(r->Boolean.TRUE.equals(r.get("overdue"))).count(),"items",items);
     }
     @Transactional

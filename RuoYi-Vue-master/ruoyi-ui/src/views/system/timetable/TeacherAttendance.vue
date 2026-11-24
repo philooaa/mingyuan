@@ -1,6 +1,8 @@
 <template>
   <div>
     <el-button v-hasRole="['teacher']" size="small" icon="el-icon-tickets" @click="open">课程出勤</el-button>
+    <el-button v-hasRole="['teacher']" size="small" icon="el-icon-date" @click="leaveVisible=true">学生请假</el-button>
+    <el-dialog title="学生请假" :visible.sync="leaveVisible" append-to-body width="92%" destroy-on-close><leave-report v-if="leaveVisible" :teacher-only="true"/></el-dialog>
     <el-dialog title="课程出勤" :visible.sync="visible" append-to-body width="860px">
       <el-alert v-if="error" :title="error" type="error" :closable="false"/>
       <el-form v-if="!courseId" inline size="small">
@@ -14,7 +16,8 @@
         <el-form-item><el-button @click="reset">重置</el-button></el-form-item>
       </el-form>
       <el-table v-if="!courseId && queried" v-loading="loading" :data="filteredCourses" empty-text="没有符合条件的班级">
-        <el-table-column label="课程" prop="courseName"/>
+        <el-table-column label="课程" min-width="220"><template slot-scope="{row}"><span>{{row.courseName}}</span><el-tag v-if="row.periodName" size="mini" style="margin-left:8px">{{row.periodName}}</el-tag></template></el-table-column>
+        <el-table-column label="时段" prop="timeSlot" width="130"/>
         <el-table-column label="年份" prop="year"/>
         <el-table-column label="季度" prop="termName"/>
         <el-table-column label="年级" prop="gradeName"/>
@@ -33,7 +36,7 @@
           <template slot-scope="{ row }">{{ [row.startTime,row.endTime].filter(Boolean).join('–') }}</template>
         </el-table-column>
         <el-table-column label="状态" width="86">
-          <template slot-scope="{ row }">{{ ({FINAL:'已终审',PENDING_FIRST:'待初审',PENDING_FINAL:'待终审'})[row.stage] || (row.upcoming ? '未开课' : row.overdue ? '已逾期' : '待点名') }}</template>
+          <template slot-scope="{ row }"><el-tag size="mini" :type="row.stage==='FINAL'?'success':['PENDING_FIRST','PENDING_FINAL'].includes(row.stage)?'':'info'">{{ ({FINAL:'已确认',PENDING_FIRST:'已签到',PENDING_FINAL:'已签到'})[row.stage] || '待签到' }}</el-tag></template>
         </el-table-column>
       </el-table>
     </el-dialog>
@@ -41,6 +44,7 @@
 </template>
 
 <script>
+import LeaveReport from '../signReview/LeaveReport.vue'
 import request from '@/utils/request'
 import { getToken } from '@/utils/auth'
 
@@ -50,9 +54,10 @@ const fields = [
 ]
 
 export default {
+  components:{LeaveReport},
   dicts: ['edu_grade'],
   data() {
-    return { fields, visible: false, loading: false, error: '', rows: [], courses: [], courseId: '', selected: {}, applied: {}, queried: false }
+    return { leaveVisible:false, fields, visible: false, loading: false, error: '', rows: [], courses: [], courseId: '', selected: {}, applied: {}, queried: false }
   },
   computed: {
     filteredCourses() {

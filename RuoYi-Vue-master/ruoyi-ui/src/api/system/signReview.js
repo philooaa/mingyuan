@@ -30,3 +30,9 @@ export function confirmReview(scheduleId, classDate, images, options = {}) {
 export function attendanceCourses(keyword = '') { return request({url:'/miniapp/admin/sign/courses',method:'get',params:{keyword}}) }
 export function attendanceOverview(scheduleId,from,to) { return request({url:'/miniapp/admin/sign/overview',method:'get',params:{scheduleId,from,to}}) }
 export function attendanceStudent(params) { return request({url:'/miniapp/admin/sign/student-summary',method:'get',params}) }
+
+export function attendanceLeaveReport(params) { return request({url:'/miniapp/attendance/leave-report',method:'get',params}) }
+
+export function attendanceMakeupOptions(params) { return request({url:'/miniapp/attendance/leave-report/makeup/options',method:'get',params}) }
+export function arrangeAttendanceMakeup(data) { return request({url:'/miniapp/attendance/leave-report/makeup',method:'post',data}) }
+export function cancelAttendanceMakeup(data) { return request({url:'/miniapp/attendance/leave-report/makeup/cancel',method:'post',data}) }

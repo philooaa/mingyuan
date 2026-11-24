@@ -11,6 +11,7 @@ Page({
   current(visit) { return this._active && visit === this._visit && this._token === wx.getStorageSync('token') },
   currentOwner(token){return !this._unloaded&&this._visible&&s.isStaff()&&wx.getStorageSync('token')===token},
   chooseMode(e){this.setData({mode:e.currentTarget.dataset.mode});this.closeSummary();if(this.data.mode==='overview')this.loadCourses();else this.loadList()},
+  openLeaveReport(){if(s.isStaff())wx.navigateTo({url:'/pages/attendance-leave-report/attendance-leave-report'})},
   courseInput(e){this.setData({courseKeyword:e.detail.value})},
   studentInput(e){const studentKeyword=e.detail.value;this.setData({studentKeyword,shownStudents:overview.filter(this.data.students,studentKeyword)})},
   async loadCourses(){

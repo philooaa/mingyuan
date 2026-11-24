@@ -30,6 +30,10 @@ public class LessonCreditMysqlTest {
         String url=System.getenv("MINGYUAN_TEST_DB_URL");
         if(url == null || !url.matches("jdbc:mysql://127\\.0\\.0\\.1:3306/mingyuan_single_test_[A-Za-z0-9_]+(?:\\?.*)?")) throw new IllegalStateException("Only an isolated mingyuan_single_test_ database is allowed");
         var source=new DriverManagerDataSource(url,"root",System.getenv("MYSQL_PWD"));db=new ShopRepository(source);
+        db.transactions().execute(status->{
+            try {for(String file:List.of("20261122_attendance_makeup.sql","20261123_teacher_led_makeup.sql"))for(String sql:java.nio.file.Files.readString(java.nio.file.Path.of("../../database/migrations/"+file)).split(";"))if(!sql.isBlank())db.jdbc().execute(sql);}
+            catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}return null;
+        });
         db.transactions().setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_READ_COMMITTED);
         var factory=new SqlSessionFactoryBean();factory.setDataSource(source);factory.setTypeAliasesPackage("com.ruoyi.system.domain,com.ruoyi.common.core.domain.entity");
         factory.setMapperLocations(new ClassPathResource("mapper/system/EduCourseScheduleMapper.xml"),new ClassPathResource("mapper/system/EduEnrollmentMapper.xml"),new ClassPathResource("mapper/system/MiniAppParentMapper.xml"),new ClassPathResource("mapper/system/EduScheduleAdjustmentMapper.xml"),new ClassPathResource("mapper/system/EduClassroomMapper.xml"),new ClassPathResource("mapper/system/SysUserMapper.xml"));

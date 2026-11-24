@@ -59,9 +59,9 @@ public class ScheduleAvailabilityService {
         // 该排课自己的单条记录 + 同学期期次的日期级记录（schedule_id=0，一条管整天）
         return db.rows("SELECT a.adjustment_id,a.original_date,a.adjusted_date FROM edu_schedule_adjustment a "
                 + "JOIN edu_course_schedule s ON s.schedule_id=? "
-                + "WHERE a.schedule_id=s.schedule_id OR (a.schedule_id=0 AND a.term_name=s.term_name "
+                + "WHERE NOT EXISTS(SELECT 1 FROM edu_attendance_makeup_session ms WHERE ms.schedule_id=s.schedule_id) AND (a.schedule_id=s.schedule_id OR (a.schedule_id=0 AND a.term_name=s.term_name "
                 + "AND a.period_name=s.period_name AND NOT EXISTS (SELECT 1 FROM edu_schedule_adjustment x "
-                + "WHERE x.schedule_id=s.schedule_id AND x.original_date=a.original_date)) "
+                + "WHERE x.schedule_id=s.schedule_id AND x.original_date=a.original_date))) "
                 + "ORDER BY a.adjustment_id"+(locked ? " FOR UPDATE" : ""),id);
     }
     public SortedSet<LocalDate> dates(EduCourseSchedule s, List<Map<String,Object>> changes) {
@@ -98,11 +98,11 @@ public class ScheduleAvailabilityService {
         for(var change : db.rows("SELECT s.schedule_id AS schedule_id,a.original_date,a.adjusted_date "
                 + "FROM edu_schedule_adjustment a JOIN edu_course_schedule s "
                 + "ON s.term_name=a.term_name AND s.period_name=a.period_name "
-                + "WHERE a.schedule_id=0 AND s.del_flag='0' AND s.status='0' "
+                + "WHERE NOT EXISTS(SELECT 1 FROM edu_attendance_makeup_session ms WHERE ms.schedule_id=s.schedule_id) AND a.schedule_id=0 AND s.del_flag='0' AND s.status='0' "
                 + "AND NOT EXISTS (SELECT 1 FROM edu_schedule_adjustment x WHERE x.schedule_id=s.schedule_id "
                 + "AND x.original_date=a.original_date) "
                 + "UNION ALL SELECT schedule_id,original_date,adjusted_date FROM edu_schedule_adjustment "
-                + "WHERE schedule_id<>0 ORDER BY 1"))
+                + "WHERE schedule_id<>0 AND NOT EXISTS(SELECT 1 FROM edu_attendance_makeup_session ms WHERE ms.schedule_id=edu_schedule_adjustment.schedule_id) ORDER BY 1"))
             changes.computeIfAbsent(id(change.get("scheduleId")),ignored -> new ArrayList<>()).add(change);
         int pending = 0;
         for (var row : rows) {

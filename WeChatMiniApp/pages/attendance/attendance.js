@@ -3,6 +3,7 @@ const { request } = require('../../utils/request')
 
 Page(childContext.page({
   data: {
+    accountId:'',
     loading: false,
     courses: [],
     details: [],
@@ -14,11 +15,14 @@ Page(childContext.page({
   },
 
   onLoad(options={}) {
-    this.accountId=options.accountId?String(options.accountId):'';this.setData({childScoped:!!this.accountId})
+    this.accountId=options.accountId?String(options.accountId):'';this.setData({childScoped:!!this.accountId,accountId:this.accountId})
     this.loadSummary()
   },
 
+  onShow(){this.selectComponent?.('#parentMakeup')?.refresh()},
+
   onPullDownRefresh() {
+    this.selectComponent?.('#parentMakeup')?.refresh()
     this.loadSummary().finally(() => wx.stopPullDownRefresh())
   },
 

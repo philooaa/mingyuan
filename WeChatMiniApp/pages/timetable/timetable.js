@@ -39,6 +39,7 @@ Page(childContext.page({
   data: {
     advisorWechat: 'myedu666888',
     advisorQrImage: '/images/course-advisor-wechat.png',
+    accountId:'',
     loading: false,
     loadError: '',
     loadSucceeded: false,
@@ -51,7 +52,7 @@ Page(childContext.page({
   },
 
   onLoad(options={}) {
-    this.accountId=options.accountId?String(options.accountId):''
+    this.accountId=options.accountId?String(options.accountId):'';this.setData({accountId:this.accountId})
     this._unloaded = false
     if (this.redirectTeacher()) return
     this.loadTimetable()
@@ -59,6 +60,7 @@ Page(childContext.page({
 
   onShow() {
     if (this.redirectTeacher()) return
+    this.selectComponent?.('#parentMakeup')?.refresh()
     if (this._hasShown || this._scheduleDirty || this._loadedToken !== wx.getStorageSync('token')) {
       this._scheduleDirty = false
       this.setData({ timetable: [], groupedTimetable: [], timetableCount: 0 })
@@ -97,6 +99,7 @@ Page(childContext.page({
   onUnload() { this._unloaded = true; this._loadVersion = (this._loadVersion || 0) + 1 },
 
   onPullDownRefresh() {
+    this.selectComponent?.('#parentMakeup')?.refresh()
     this.loadTimetable().finally(() => wx.stopPullDownRefresh())
   },
 

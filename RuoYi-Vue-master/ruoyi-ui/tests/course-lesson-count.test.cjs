@@ -13,7 +13,7 @@ test('reason and positive integer are required before confirmation',async()=>{co
 test('reset automatic uses the calculated count and teachers cannot mutate',async()=>{const {p,calls}=setup();p.countMode='AUTO';await p.saveLessonCount();assert.equal(calls[0].data.mode,'AUTO');assert.equal(calls[0].data.confirmMismatch,false);const denied=setup(true,['teacher']);await denied.p.saveLessonCount();assert.equal(denied.calls.length,0)})
 test('schedule entry waits for the editor ref before opening the selected course',async()=>{
  const source=fs.readFileSync(path.join(__dirname,'../src/views/system/schedule/index.vue'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1].replace(/^import .*$/gm,'').replace('export default','module.exports=')
- const context={module:{exports:{}},OneToOneManager:{},CourseLessonCountEditor:{}};vm.createContext(context);vm.runInContext(source,context)
+ const context={module:{exports:{}},ScheduleRulePicker: {}, OneToOneManager:{},CourseLessonCountEditor:{}};vm.createContext(context);vm.runInContext(source,context)
  const opened=[],p={form:{scheduleId:12},$refs:{},$modal:{msgError:m=>assert.fail(m)}}
  p.$nextTick=async()=>{p.$refs.lessonCounts={openLessonCount:async row=>opened.push(row)}}
  await context.module.exports.methods.openLessonCountEditor.call(p)

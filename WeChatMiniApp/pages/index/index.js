@@ -44,6 +44,7 @@ const roleProfiles = {
       { key: 'teacherSinglePending', label: '一对一事务', value: '—', suffix: '项', linkText: '去处理', route: '/pages/teacher-single-transactions/teacher-single-transactions?tab=bookings' }
     ],
     actions: [
+      { key:'teacherStudentLeave', title:'学生请假', icon:'假', tone:'orange', route:'/pages/attendance-leave-report/attendance-leave-report' },
       { key:'teacherAttendance', title: '教师点名', icon: '签', tone: 'blue', route: '/pages/attendance-todos/attendance-todos' },
       { key: 'teacherCourses', title: '我的课程', icon: '课', tone: 'orange', route: '/pages/teacher-single-transactions/teacher-single-transactions' },
       { key: 'teacherLeave', title: '请假审核', icon: '假', tone: 'violet', route: '/pages/teacher-leave/teacher-leave' },

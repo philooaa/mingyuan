@@ -1,7 +1,7 @@
 <import src="../../utils/attendance-filters.wxml"/>
 <view class="page">
   <view class="header">
-    <view class="header-title">学生出勤</view>
+    <view class="header-heading"><view class="header-title">学生出勤</view><button class="leave-report-entry" bindtap="openLeaveReport">请假课时表 ›</button></view>
     <view class="header-subtitle">教师点名 → 教务初审 → 业务终审；按课程查看正式与待核实统计</view>
   </view>
   <view class="attendance-modes"><view class="attendance-mode {{mode==='overview'?'active':''}}" data-mode="overview" bindtap="chooseMode">出勤总览</view><view class="attendance-mode {{mode==='review'?'active':''}}" data-mode="review" bindtap="chooseMode">出勤复核</view></view>

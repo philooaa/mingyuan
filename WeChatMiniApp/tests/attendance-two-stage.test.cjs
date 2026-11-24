@@ -21,10 +21,11 @@ test('roster editor selects same-name children by stable ID and removes from a f
 })
 test('todos load current workspace and navigate the exact occurrence',async()=>{
  let page,role='education';const navigations=[],calls=[];const wx={getStorageSync:()=> 'token',navigateTo:o=>navigations.push(o.url)}
- const module={exports:{}};vm.runInNewContext(fs.readFileSync(path.join(root,'utils/attendance-workflow.js'),'utf8'),{module,require:()=>({request:async o=>{calls.push(o);return {data:{count:1,courses:[{scheduleId:'99',courseName:'班级'}],items:[{scheduleId:'99',lessonId:'12',lessonNo:14,classDate:'2026-11-06',overdue:true},{scheduleId:'99',lessonId:'10',lessonNo:2,classDate:'2026-11-08',stage:'PENDING_FIRST',overdue:true}]}}}})})
+ const module={exports:{}};vm.runInNewContext(fs.readFileSync(path.join(root,'utils/attendance-workflow.js'),'utf8'),{module,require:()=>({request:async o=>{calls.push(o);return {data:{count:1,courses:[{scheduleId:'99',courseName:'班级',periodName:'周日',timeSlot:'08:00–10:00'}],items:[{scheduleId:'99',lessonId:'12',lessonNo:14,classDate:'2026-11-06',overdue:true},{scheduleId:'99',lessonId:'10',lessonNo:2,classDate:'2026-11-08',stage:'PENDING_FIRST',overdue:true}]}}}})})
  vm.runInNewContext(fs.readFileSync(path.join(root,'pages/attendance-todos/attendance-todos.js'),'utf8'),{Page:p=>page=p,require:id=>id.endsWith('/attendance-filters')?require('../utils/attendance-filters'):id.endsWith('/access')?{selected:()=>role}:module.exports,wx})
  const p={...page,data:structuredClone(page.data),setData(v){Object.assign(this.data,v)}};await p.onShow();assert.equal(calls[0].data.role,'education');p.open({currentTarget:{dataset:{index:0}}});assert.match(navigations[0],/sign-review-detail.*scheduleId=99&classDate=2026-11-06/);role='teacher';p.open({currentTarget:{dataset:{index:0}}});assert.equal(navigations.length,1);await p.onShow();assert.equal(p.data.items.length,0);p.queryCourses();assert.equal(p.data.matchedCourses.length,1);p.chooseCourse({currentTarget:{dataset:{index:0}}});
- assert.deepEqual(Array.from(p.data.items, item => [item.lessonNo, item.shortClassDate, item.attendanceLabel]), [[2,'11-08','待初审'],[14,'11-06','已逾期']])
+ assert.equal(p.data.coursePeriod,'周日');assert.equal(p.data.courseTime,'08:00–10:00');assert.equal(p.data.courseTitle,'班级')
+ assert.deepEqual(Array.from(p.data.items, item => [item.lessonNo, item.shortClassDate, item.attendanceLabel]), [[2,'11-08','已签到'],[14,'11-06','待签到']])
  p.open({currentTarget:{dataset:{index:1}}})
  assert.match(navigations[1],/sign-in-edit.*classDate=2026-11-06.*lessonId=12/)
 })
@@ -62,4 +63,13 @@ test('upload uses bounded timeout and reports network failure',async()=>{
  const module={exports:{}};let upload;const wx={getStorageSync:()=> 'token',uploadFile:o=>upload=o}
  vm.runInNewContext(fs.readFileSync(path.join(root,'utils/attendance-workflow.js'),'utf8'),{module,require:()=>({}),wx,getApp:()=>({globalData:{baseUrl:'http://localhost:8080'}})})
  const pending=module.exports.uploadImage('/tmp/a.png');assert.equal(upload.timeout,30000);upload.fail({errMsg:'uploadFile:fail timeout'});await assert.rejects(pending,/超时/)
+})
+
+test('teacher lesson status follows submission and final review, independent of class time',()=>{
+ let page;vm.runInNewContext(fs.readFileSync(path.join(root,'pages/attendance-todos/attendance-todos.js'),'utf8'),{Page:p=>page=p,require:id=>id.endsWith('/attendance-filters')?require('../utils/attendance-filters'):id.endsWith('/access')?{selected:()=> 'teacher'}:{request:async()=>({data:{}})},wx:{getStorageSync:()=> 'token'}})
+ const p={...page,data:{...structuredClone(page.data),role:'teacher',courseId:'99'},setData(v){Object.assign(this.data,v)}}
+ const stages=['UNSUBMITTED','RETURNED','PENDING_FIRST','PENDING_FINAL','FINAL',undefined];p._items=stages.map((stage,i)=>({scheduleId:'99',lessonNo:i+1,stage,classDate:'2026-11-24',upcoming:i%2===0,overdue:i%2===1}));p.applyFilters()
+ assert.deepEqual(Array.from(p.data.items,x=>x.attendanceLabel),['待签到','待签到','已签到','已签到','已确认','待签到'])
+ assert.equal(p.data.pendingSignCount,3);assert.equal(p.data.signedCount,2);assert.equal(p.data.confirmedCount,1)
+ assert.equal(p.data.items[2].attendanceTone,'lesson-signed');assert.equal(p.data.items[4].attendanceTone,'lesson-confirmed')
 })

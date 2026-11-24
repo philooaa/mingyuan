@@ -1,0 +1,60 @@
+<view class="page">
+  <view class="header"><view class="title">学生请假</view><view class="subtitle">{{readOnly ? "查看学生请假、补课与安排记录" : "为本人任课学生安排补课，跟进到课情况"}}</view></view>
+  <view class="filters">
+    <view class="search-row"><input placeholder="学生 / 课程 / 老师 / 联系电话" value="{{query.keyword}}" bindinput="keywordInput" bindconfirm="search" maxlength="100"/><button bindtap="search" loading="{{loading}}" disabled="{{loading}}">查询</button></view>
+    <view class="filter-grid"><picker wx:for="{{fields}}" wx:key="key" range="{{filterOptions[item.key]}}" value="{{filterIndexes[item.key]}}" data-field="{{item.key}}" bindchange="chooseFilter"><view>{{query[item.key] || '全部' + item.label}} ▾</view></picker></view>
+    <picker range="{{stateOptions}}" value="{{stateIndex}}" bindchange="chooseState"><view class="state-picker">{{stateOptions[stateIndex]}} ▾</view></picker>
+    <view class="dates"><picker mode="date" value="{{query.from}}" data-field="from" bindchange="chooseDate"><view>{{query.from || '开始日期'}}</view></picker><text>至</text><picker mode="date" value="{{query.to}}" data-field="to" bindchange="chooseDate"><view>{{query.to || '结束日期'}}</view></picker><text class="reset" bindtap="reset">重置</text></view>
+  </view>
+  <view class="note">仅统计已终审请假；明确关联且已终审到课的补课才抵扣。录播和历史未到课不计入。</view>
+  <view class="metrics"><view><text>{{report.studentCount || 0}}</text>学员</view><view><text>{{report.leaveCount || 0}}</text>请假课次</view><view><text>{{report.makeupCount || 0}}</text>已补课</view><view><text>{{report.scheduledCount || 0}}</text>待补课</view><view class="pending"><text>{{report.pendingCount || 0}}</text>未完成</view></view>
+  <view class="warning" wx:if="{{report.conflictCount}}">{{report.conflictCount}} 课次存在重复记录，待核对后再统计。</view>
+  <view class="list-heading"><text>学生课程清单 · {{report.total || 0}}</text></view>
+  <view class="error" wx:if="{{error}}">{{error}}<text bindtap="search"> 重新查询</text></view>
+  <view wx:for="{{rows}}" wx:key="rowKey" class="card">
+    <view class="student"><text>{{item.studentName}}</text><text class="pending-label">未完成 {{item.pendingCount}} 讲</text></view>
+    <view class="course">{{item.courseName}}</view><view class="meta">{{item.year}} {{item.termName}} · {{item.gradeName}} · {{item.teacherName}}</view>
+    <view class="meta">联系电话：{{item.contactPhone || '未留电话'}}</view>
+    <view class="card-footer"><text>请假 {{item.leaveCount}} · 已补 {{item.makeupCount}} · 待补 {{item.scheduledCount || 0}}<text wx:if="{{item.conflictCount}}"> · 待核对 {{item.conflictCount}}</text></text><text class="detail" data-key="{{item.rowKey}}" bindtap="toggle">{{item.expanded ? '收起讲次 ▴' : '查看讲次 ▾'}}</text></view>
+    <view wx:if="{{item.expanded}}" class="lessons"><view wx:for="{{item.lessons}}" wx:for-item="lesson" wx:key="signInId" class="lesson"><view><text>{{lesson.lessonNo ? '第 ' + lesson.lessonNo + ' 讲' : '历史课次'}} · {{lesson.classDate}}</text><text class="state {{lesson.state}}">{{lesson.stateText}}</text></view><view wx:if="{{lesson.makeup}}" class="meta">补课：{{lesson.makeup.courseName}} · {{lesson.makeup.arrangeType === "CUSTOM" ? "自定义补课" : "第 " + lesson.makeup.lessonNo + " 讲"}} · {{lesson.makeup.classDate}}<text wx:if="{{lesson.makeup.startTime}}"> {{lesson.makeup.startTime}}—{{lesson.makeup.endTime}}</text><text wx:if="{{lesson.makeup.location}}"> · 地点：{{lesson.makeup.location}}</text></view><view wx:if="{{lesson.arrangeBlockedReason}}" class="meta">{{lesson.arrangeBlockedReason}}</view><view class="lesson-actions"><button wx:if="{{!readOnly && lesson.canArrange}}" data-sign-in-id="{{lesson.signInId}}" data-mode="arrange" bindtap="openMakeup">{{lesson.makeup ? '重新安排' : '安排补课'}}</button><button wx:if="{{!readOnly && lesson.canCancel && lesson.makeup.planId}}" class="cancel-link" data-sign-in-id="{{lesson.signInId}}" data-mode="cancel" bindtap="openMakeup">取消安排</button><button class="history-link" data-sign-in-id="{{lesson.signInId}}" data-mode="history" bindtap="openMakeup">安排记录</button></view></view></view>
+  </view>
+  <view class="empty" wx:if="{{!loading && !error && !rows.length}}">没有符合条件的请假记录</view>
+  <button class="more" wx:if="{{more}}" loading="{{loading}}" bindtap="more">加载更多</button>
+  <view class="empty" wx:elif="{{loading}}">正在加载…</view>
+</view>
+
+<view wx:if="{{makeupOpen}}" class="sheet-mask" bindtap="closeMakeup">
+  <view class="makeup-sheet" catchtap="stopTap">
+    <view class="sheet-heading"><text>{{makeupMode === 'cancel' ? '取消补课安排' : makeupMode === 'history' ? '补课安排记录' : '安排补课'}}</text><button bindtap="closeMakeup" aria-label="关闭补课窗口">关闭</button></view>
+    <scroll-view scroll-y class="sheet-content">
+      <view class="sheet-source">{{makeupSource.studentName}} {{makeupSource.courseName}} · 第 {{makeupSource.lessonNo}} 讲 · {{makeupSource.classDate}}</view>
+      <view wx:if="{{makeupMode === 'arrange' && !readOnly}}">
+        <view class="mode-tabs"><button class="{{makeupType === 'CLASS' ? 'active' : ''}}" data-type="CLASS" bindtap="chooseMakeupType" disabled="{{makeupWriting}}">插班补课</button><button class="{{makeupType === 'CUSTOM' ? 'active' : ''}}" data-type="CUSTOM" bindtap="chooseMakeupType" disabled="{{makeupWriting}}">自定义补课</button></view>
+        <view class="meta">安排后立即加入课表和点名名单。课后教师点名，经教务初审、管理员终审到课后抵扣原请假。不新增学费。</view>
+        <view wx:if="{{makeupType === 'CLASS'}}">
+        <view class="field-label">选择补课班级</view>
+        <view class="search-row"><input placeholder="搜索课程 / 教师" value="{{makeupKeyword}}" bindinput="makeupKeywordInput" bindconfirm="searchMakeupCourses" maxlength="100" disabled="{{makeupWriting}}"/><button bindtap="searchMakeupCourses" disabled="{{makeupWriting}}">搜索</button></view>
+        <picker range="{{makeupCourses}}" range-key="label" value="{{makeupCourseIndex < 0 ? 0 : makeupCourseIndex}}" bindchange="chooseMakeupCourse" disabled="{{makeupWriting || !makeupCourses.length}}"><view class="choice">{{makeupCourseIndex < 0 ? '请选择班级' : makeupCourses[makeupCourseIndex].label}} ▾</view></picker>
+        <view wx:if="{{!makeupLoading && !makeupCourses.length}}" class="meta">暂无可安排班级，可更换关键词搜索。</view>
+        <view class="field-label">选择补课讲次</view>
+        <picker range="{{makeupLessons}}" range-key="label" value="{{makeupLessonIndex < 0 ? 0 : makeupLessonIndex}}" bindchange="chooseMakeupLesson" disabled="{{makeupWriting || makeupLoading || makeupCourseIndex < 0 || !makeupLessons.length}}"><view class="choice">{{makeupLessonIndex < 0 ? '请选择讲次' : makeupLessons[makeupLessonIndex].label}} ▾</view></picker>
+        <view wx:if="{{!makeupLoading && makeupCourseIndex >= 0 && !makeupLessons.length}}" class="meta">该班级暂无可安排讲次。</view>
+        </view>
+        <view wx:else>
+          <view class="field-label">补课日期</view><picker mode="date" value="{{makeupDate}}" start="{{makeupToday}}" data-field="makeupDate" bindchange="makeupCustomInput" disabled="{{makeupWriting}}"><view class="choice">{{makeupDate || '请选择日期'}} ▾</view></picker>
+          <view class="time-fields"><view><view class="field-label">开始时间</view><picker mode="time" value="{{makeupStartTime}}" data-field="makeupStartTime" bindchange="makeupCustomInput" disabled="{{makeupWriting}}"><view class="choice">{{makeupStartTime || '请选择时间'}} ▾</view></picker></view><view><view class="field-label">结束时间</view><picker mode="time" value="{{makeupEndTime}}" data-field="makeupEndTime" bindchange="makeupCustomInput" disabled="{{makeupWriting}}"><view class="choice">{{makeupEndTime || '请选择时间'}} ▾</view></picker></view></view>
+          <view class="field-label">补课地点</view><input class="location-input" value="{{makeupLocation}}" data-field="makeupLocation" bindinput="makeupCustomInput" maxlength="200" placeholder="请填写地点，最多200字" disabled="{{makeupWriting}}"/>
+        </view>
+        <view class="field-label">安排备注（选填）</view><textarea value="{{makeupRemark}}" bindinput="makeupRemarkInput" maxlength="500" placeholder="可填写调课说明，最多500字" disabled="{{makeupWriting}}"/>
+      </view>
+      <view wx:if="{{makeupMode === 'cancel' && !readOnly}}"><view class="field-label">取消原因</view><textarea value="{{makeupReason}}" bindinput="makeupReasonInput" maxlength="500" placeholder="请填写取消原因，最多500字" disabled="{{makeupWriting}}"/></view>
+      <view class="error" wx:if="{{makeupError}}">{{makeupError}}</view>
+      <button wx:if="{{makeupUncertain}}" class="refresh-makeup" bindtap="refreshMakeupReport">刷新请假记录</button>
+      <view class="meta" wx:if="{{makeupLoading}}">正在加载补课选项…</view>
+      <view class="history-title">安排历史</view>
+      <view wx:for="{{makeupHistory}}" wx:key="planId" class="history-entry"><view>{{item.courseName}} · {{item.arrangeType === "CUSTOM" ? "自定义补课" : "第 " + item.lessonNo + " 讲"}} · {{item.classDate}}<text wx:if="{{item.startTime}}"> {{item.startTime}}—{{item.endTime}}</text><text wx:if="{{item.location}}"> · 地点：{{item.location}}</text><text wx:if="{{item.cancelled}}" class="cancelled"> 已取消</text></view><view class="meta">{{item.operatorName || '未记录操作人'}} · {{item.createTime}}</view><view wx:if="{{item.remark}}" class="meta">备注：{{item.remark}}</view><view wx:if="{{item.cancelReason}}" class="meta">取消原因：{{item.cancelReason}}</view></view>
+      <view wx:if="{{!makeupLoading && !makeupHistory.length}}" class="meta">暂无安排记录</view>
+    </scroll-view>
+    <view wx:if="{{makeupMode !== 'history' && !readOnly}}" class="sheet-footer"><button class="submit-makeup" bindtap="submitMakeup" loading="{{makeupWriting}}" disabled="{{makeupUncertain || makeupWriting || makeupLoading || (makeupMode === 'arrange' && makeupType === 'CLASS' && makeupLessonIndex < 0)}}">{{makeupMode === 'cancel' ? '确认取消安排' : '确认安排补课'}}</button></view>
+  </view>
+</view>
