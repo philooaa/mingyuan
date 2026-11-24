@@ -54,6 +54,13 @@ public class ScheduleCrudTest {
         var patch=new EduCourseSchedule();patch.setScheduleId(10L);patch.setCourseClassName("不允许覆盖");
         assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch));assertNull(captured);
     }
+    @Test void attendanceOnlyMakeupCannotBeChangedThroughOrdinaryScheduleCrud() {
+        principal(1,"admin");db.makeupSession=true;
+        var patch=new EduCourseSchedule();patch.setScheduleId(10L);patch.setStatus("1");
+        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(patch,true));
+        assertThrows(ServiceException.class,()->service.deleteEduCourseScheduleByScheduleIds(new Long[]{10L}));
+        assertThrows(ServiceException.class,()->service.removeConfirmedSchedule(10L));assertNull(captured);assertNull(deleted);
+    }
     @Test void teacherReadAndWriteIsolation() {
         principal(21,"teacher");
         EduCourseSchedule query = new EduCourseSchedule(); query.getParams().put("teacherUserId", 22L);
@@ -252,10 +259,11 @@ public class ScheduleCrudTest {
     static void inject(Object target, String field, Object value) throws Exception { var f = target.getClass().getDeclaredField(field); f.setAccessible(true); f.set(target,value); }
     @SuppressWarnings("unchecked") static <T> T proxy(Class<T> type, InvocationHandler handler) { return (T) Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},handler); }
     static class FakeDb extends ShopRepository {
-        long attendance, references, activeEnrollments; boolean canceledEnrollment, activeEnrollment, enrollmentArrivesOnLock;
+        long attendance, references, activeEnrollments; boolean makeupSession, canceledEnrollment, activeEnrollment, enrollmentArrivesOnLock;
         List<Map<String,Object>> conflicts = List.of(); List<String> locks = new ArrayList<>();
         FakeDb() { super(new DriverManagerDataSource()); }
         @Override public List<Map<String,Object>> rows(String sql,Object... args) {
+            if (sql.contains("FROM edu_attendance_makeup_session")) return makeupSession ? List.of(Map.of("scheduleId",10)) : List.of();
             if (sql.contains("SELECT DISTINCT campus_name")) return "万达".equals(args[0]) ? List.of(Map.of("campusName","万达")) : List.of();
             if (sql.contains("SELECT u.nick_name")) return List.of(Map.of("nickName","Teacher A","userName","teacher21"));
             if (sql.contains("information_schema")) return List.of(Map.of("tableName","edu_homework"));

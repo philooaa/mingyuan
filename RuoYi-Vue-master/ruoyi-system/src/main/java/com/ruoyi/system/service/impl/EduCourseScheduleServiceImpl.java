@@ -114,6 +114,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     public int updateEduCourseSchedule(EduCourseSchedule input, boolean force) {
         requirePlanningStaff();
         require(input != null && input.getScheduleId() != null, "请选择排课");
+        requireOrdinarySchedule(input.getScheduleId());
         if (input.getUnitPrice() != null) {
             EduCourseSchedule existing = selectEduCourseScheduleByScheduleId(input.getScheduleId());
             if (existing.getUnitPrice() == null || input.getUnitPrice().compareTo(existing.getUnitPrice()) != 0) requireValidUnitPrice(input.getUnitPrice());
@@ -174,6 +175,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         List<EduCourseSchedule> courses = Arrays.stream(ids).distinct().sorted().map(this::selectEduCourseScheduleByScheduleId).toList();
         lockResources(courses);
         for (EduCourseSchedule course : courses) {
+            requireOrdinarySchedule(course.getScheduleId());
             EduCourseSchedule locked = eduCourseScheduleMapper.lockSchedule(course.getScheduleId());
             own(locked);
             requireNoActiveEnrollments(locked);
@@ -185,9 +187,14 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     @Override @Transactional(rollbackFor = Exception.class)
     public int deleteEduCourseScheduleByScheduleId(Long id) { return deleteEduCourseScheduleByScheduleIds(new Long[]{id}); }
 
+    private void requireOrdinarySchedule(Long schedule) {
+        require(db.rows("SELECT schedule_id FROM edu_attendance_makeup_session WHERE schedule_id=?",schedule).isEmpty(),"出勤专用补课请由原任课教师在请假记录中维护");
+    }
+
     @Override @Transactional(rollbackFor = Exception.class)
     public int removeConfirmedSchedule(Long id) {
         requirePlanningStaff();
+        requireOrdinarySchedule(id);
         EduCourseSchedule before = selectEduCourseScheduleByScheduleId(id);
         lockResources(List.of(before));
         EduCourseSchedule current = eduCourseScheduleMapper.lockSchedule(id);

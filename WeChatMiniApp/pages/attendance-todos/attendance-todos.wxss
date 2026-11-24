@@ -57,7 +57,6 @@
 .course-back-button::after, .lesson-button::after { border: 0; }
 .selected-course-title { color: #193b63; font-size: 34rpx; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
 .selected-course-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 16rpx; margin-top: 12rpx; color: #5b7390; font-size: 24rpx; }
-.selected-course-overdue { color: #8c571c; }
 .lesson-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14rpx; margin-top: 22rpx; }
 .lesson-button { width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 18rpx 12rpx 16rpx; border: 1rpx solid #e0e8f3; border-radius: 16rpx; background: #fff; line-height: 1.4; text-align: left; }
 .lesson-button-pressed { opacity: .7; }
@@ -66,7 +65,11 @@
 .lesson-date { margin-top: 3rpx; color: #5e728a; font-size: 22rpx; font-variant-numeric: tabular-nums; }
 .lesson-status { display: flex; align-items: center; gap: 7rpx; margin-top: 12rpx; color: #576e87; font-size: 20rpx; white-space: nowrap; }
 .lesson-dot { width: 8rpx; height: 8rpx; flex: 0 0 8rpx; border-radius: 50%; background: currentColor; }
-.lesson-ready { border-color: #b7d1f6; background: #ecf4ff; }
-.lesson-ready .lesson-status { color: #2157a1; font-weight: 600; }
-.lesson-overdue { border-color: #efdac2; background: #fff8ee; }
-.lesson-overdue .lesson-status { color: #8c571c; font-weight: 600; }
+.lesson-signed {border-color:#c4d7f5;background:#f0f6ff}
+.lesson-signed .lesson-status {color:#2d62aa;font-weight:600}
+.lesson-confirmed {border-color:#d0e9dd;background:#f0f9f4}
+.lesson-confirmed .lesson-status {color:#29815b;font-weight:600}
+.selected-course-status {display:flex;flex-wrap:wrap;gap:18rpx;margin-top:18rpx;padding-top:16rpx;border-top:1rpx solid #dfe8f5;font-size:23rpx;color:#73859d}
+.signed-summary {color:#3567a9}.confirmed-summary {color:#29815b}
+
+.course-tags text.period-tag,.selected-course-meta .selected-period-tag{background:#e8f0ff;color:#315fa2;font-weight:600;border-radius:7rpx;padding:5rpx 12rpx;font-size:22rpx;line-height:1.5}

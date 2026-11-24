@@ -62,7 +62,8 @@
     "pages/admin-referral-grant/admin-referral-grant",
     "pages/admin-course-price/admin-course-price",
     "pages/attendance-roster/attendance-roster",
-    "pages/attendance-todos/attendance-todos"
+    "pages/attendance-todos/attendance-todos",
+    "pages/attendance-leave-report/attendance-leave-report"
   ],
   "permission": {
     "scope.userLocation": {

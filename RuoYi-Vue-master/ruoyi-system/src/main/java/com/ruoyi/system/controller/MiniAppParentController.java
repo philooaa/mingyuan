@@ -29,6 +29,7 @@ public class MiniAppParentController extends BaseController
     @Autowired private com.ruoyi.system.service.OneToOneEnrollmentService singleService;
     @Autowired private com.ruoyi.system.service.LessonCreditService lessonCredits;
     @Autowired private com.ruoyi.system.service.ParentAccountService personal;
+    @Autowired private com.ruoyi.system.service.AttendanceLeaveReportService leaveReport;
     @Autowired private com.ruoyi.system.finance.CourseOrderService orders;
 
     @PreAuthorize("@ss.hasRole('parent')") @GetMapping("/account")
@@ -84,6 +85,9 @@ public class MiniAppParentController extends BaseController
     {
         return success(accountId==null?miniAppParentService.selectMyAttendanceSummary():personal.childAttendanceSummary(accountId));
     }
+
+    @PreAuthorize("@ss.hasRole('parent')") @GetMapping("/attendance/makeup")
+    public AjaxResult makeup(@RequestParam Long accountId) { return success(leaveReport.parentReport(accountId)); }
 
     @PreAuthorize("@ss.hasAnyRoles('parent')")
     @GetMapping("/attendance/details")

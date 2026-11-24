@@ -12,6 +12,8 @@
     <button wx:if="{{!teacherMode}}" class="summary-btn" bindtap="goEnrollment">继续报名</button>
   </view>
 
+  <parent-makeup id="parentMakeup" account-id="{{accountId}}" mode="timetable" wx:if="{{!teacherMode}}"/>
+
   <view class="load-status" wx:if="{{loading}}">正在加载课表…</view>
   <view class="calendar-warning load-error" wx:if="{{loadError && !loading}}">
     <view>{{loadError}}</view>

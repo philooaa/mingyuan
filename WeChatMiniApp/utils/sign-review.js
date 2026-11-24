@@ -1,12 +1,12 @@
 const { request } = require('./request')
 const access = require('./access')
 const base = '/miniapp/education/sign'
-async function authorize(current) {
+async function authorize(current, allowTeacher=false) {
   if (!wx.getStorageSync('token')) { wx.reLaunch({ url: '/pages/register/register' }); throw new Error('请先登录') }
   const info = await request({ url: '/getInfo' })
   if (!current()) return false
   Object.assign(getApp().globalData, { roles: info.roles || [], permissions: info.permissions || [] })
-  if (!access.staff()) throw new Error('仅教务或管理员可审核出勤')
+  if (!access.staff() && !(allowTeacher && access.has('teacher'))) throw new Error('仅教务或管理员可审核出勤')
   return true
 }
 function canReviewStage(stage) { return access.selected() === (stage === 'initial' ? 'education' : 'admin') }

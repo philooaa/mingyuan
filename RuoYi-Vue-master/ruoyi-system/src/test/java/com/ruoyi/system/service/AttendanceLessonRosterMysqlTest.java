@@ -30,7 +30,7 @@ public class AttendanceLessonRosterMysqlTest {
         db.jdbc().execute("CREATE TABLE sys_user(user_id BIGINT PRIMARY KEY,user_name VARCHAR(64),nick_name VARCHAR(64),phonenumber VARCHAR(20),status CHAR(1) DEFAULT '0',del_flag CHAR(1) DEFAULT '0')");
         db.jdbc().execute("CREATE TABLE sys_role(role_id BIGINT PRIMARY KEY,role_key VARCHAR(30),status CHAR(1) DEFAULT '0',del_flag CHAR(1) DEFAULT '0')");
         db.jdbc().execute("CREATE TABLE sys_user_role(user_id BIGINT,role_id BIGINT)");
-        db.jdbc().execute("CREATE TABLE edu_course_schedule(schedule_id BIGINT PRIMARY KEY,course_class_name VARCHAR(100),grade_name VARCHAR(64) DEFAULT '一年级',subject_name VARCHAR(64) DEFAULT '数学',course_year INT,term_name VARCHAR(64),period_name VARCHAR(30),class_pattern VARCHAR(30),start_date DATE,end_date DATE,start_time TIME,end_time TIME,teacher_id BIGINT,class_mode CHAR(1),status CHAR(1) DEFAULT '0',del_flag CHAR(1) DEFAULT '0')");
+        db.jdbc().execute("CREATE TABLE edu_course_schedule(schedule_id BIGINT PRIMARY KEY AUTO_INCREMENT,schedule_code VARCHAR(32),time_slot VARCHAR(30),recruit_status CHAR(1),enrolled_count INT,lesson_location VARCHAR(200),course_class_name VARCHAR(100),grade_name VARCHAR(64) DEFAULT '一年级',subject_name VARCHAR(64) DEFAULT '数学',course_year INT,term_name VARCHAR(64),period_name VARCHAR(30),class_pattern VARCHAR(30),start_date DATE,end_date DATE,start_time TIME,end_time TIME,teacher_id BIGINT,class_mode CHAR(1),status CHAR(1) DEFAULT '0',del_flag CHAR(1) DEFAULT '0')");
         db.jdbc().execute("CREATE TABLE edu_student(student_id BIGINT PRIMARY KEY AUTO_INCREMENT,parent_id BIGINT,student_name VARCHAR(64),grade_code VARCHAR(30),create_by VARCHAR(64),update_by VARCHAR(64),update_time DATETIME,del_flag CHAR(1) DEFAULT '0')");
         db.jdbc().execute("CREATE TABLE edu_enrollment(enrollment_id BIGINT PRIMARY KEY,schedule_id BIGINT,student_id BIGINT,parent_id BIGINT,student_name VARCHAR(64),contact_phone VARCHAR(20),class_date DATE,enrollment_status CHAR(1) DEFAULT '1',del_flag CHAR(1) DEFAULT '0')");
         db.jdbc().execute("CREATE TABLE edu_schedule_adjustment(adjustment_id BIGINT PRIMARY KEY AUTO_INCREMENT,schedule_id BIGINT,term_name VARCHAR(64),period_name VARCHAR(64),original_date DATE,adjusted_date DATE,reason VARCHAR(255))");
@@ -47,7 +47,7 @@ public class AttendanceLessonRosterMysqlTest {
     @Test void runRoster() throws Exception {
         String schema=db.jdbc().queryForObject("SELECT DATABASE()",String.class);
         assertTrue(schema.matches("codex_[a-zA-Z0-9_]+"),"Disposable schema required");
-        String migration=Files.readString(Path.of("../../database/migrations/20261106_attendance_lesson_roster.sql"))+Files.readString(Path.of("../../database/migrations/20261118_attendance_lesson_guests.sql"));
+        String migration=Files.readString(Path.of("../../database/migrations/20261106_attendance_lesson_roster.sql"))+Files.readString(Path.of("../../database/migrations/20261118_attendance_lesson_guests.sql"))+Files.readString(Path.of("../../database/migrations/20261122_attendance_makeup.sql"))+Files.readString(Path.of("../../database/migrations/20261123_teacher_led_makeup.sql"));
         for(int repeat=0;repeat<2;repeat++)tx(()->{for(String statement:migration.split(";"))if(!statement.isBlank())db.jdbc().execute(statement);return null;});
         var service=new AttendanceLessonRosterService(db);
         db.jdbc().update("UPDATE edu_course_schedule SET class_pattern='DAILY',start_date=?,end_date=?,start_time='00:00:00',end_time='00:01:00' WHERE schedule_id=?",date.toString(),date.plusDays(5).toString(),course);
@@ -120,6 +120,9 @@ public class AttendanceLessonRosterMysqlTest {
         db.jdbc().update("UPDATE sys_user SET nick_name='王老师' WHERE user_id=?",teacher);
         principal(teacher,"teacher");assertEquals(2,((Number)tx(()->service.todos("teacher")).get("count")).intValue());
         var todoRows=(List<Map<String,Object>>)tx(()->service.todos("teacher")).get("items");
+        var courseOptions=(List<Map<String,Object>>)tx(()->service.todos("teacher",true)).get("courses");
+        var classTwo=courseOptions.stream().filter(c->"2".equals(String.valueOf(c.get("scheduleId")))).findFirst().orElseThrow();
+        assertEquals("周一",classTwo.get("periodName"));assertEquals("00:00–00:00",classTwo.get("timeSlot"));
         assertEquals("一年级",todoRows.get(0).get("gradeName"));assertEquals("数学",todoRows.get(0).get("subjectName"));assertEquals("王老师",todoRows.get(0).get("teacherName"));assertEquals(2L,tx(()->service.todos("teacher")).get("overdueCount"));
         db.jdbc().update("INSERT INTO edu_class_sign_in(schedule_id,class_date,student_name,source_type,review_stage) VALUES(2,?,'旧点名','2','PENDING_FIRST')",today.minusDays(1).toString());
         principal(20,"education");assertEquals(1,tx(()->service.todos("education")).get("count"));

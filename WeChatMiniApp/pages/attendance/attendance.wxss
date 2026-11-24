@@ -195,3 +195,9 @@ page {
   background: #eaf7f1;
   color: #15875d;
 }
+
+/* Parent pages share the same restrained card header. */
+.header{margin:24rpx;padding:30rpx 28rpx;border:1rpx solid #e5edf7;border-radius:24rpx;background:#fff;box-shadow:none}
+.header .title{margin-top:0;color:#243b5b;font-size:40rpx;font-weight:600;line-height:1.4}
+.header-eyebrow{margin-bottom:10rpx;color:#7992b4;font-size:22rpx;letter-spacing:2rpx}
+.header .ui-caption{margin-top:12rpx;color:#8a99ae;font-size:24rpx;line-height:1.6}

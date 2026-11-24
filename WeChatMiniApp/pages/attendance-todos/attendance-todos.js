@@ -1,19 +1,19 @@
 const { request, todoRoute } = require('../../utils/attendance-workflow')
 const access = require('../../utils/access')
 const filters = require('../../utils/attendance-filters')
-const submittedLabels = { FINAL: '已终审', PENDING_FINAL: '待终审', PENDING_FIRST: '待初审' }
+const submittedLabels = { FINAL: '已确认', PENDING_FINAL: '已签到', PENDING_FIRST: '已签到' }
 
 function teacherLesson(item) {
   const submittedLabel = submittedLabels[item.stage]
   return {
     ...item,
     shortClassDate: (item.classDate || '').slice(5),
-    attendanceLabel: submittedLabel || (item.upcoming ? '未开课' : item.overdue ? '已逾期' : '待点名'),
-    attendanceTone: submittedLabel || item.upcoming ? '' : item.overdue ? 'lesson-overdue' : 'lesson-ready'
+    attendanceLabel: submittedLabel || '待签到',
+    attendanceTone: item.stage === 'FINAL' ? 'lesson-confirmed' : submittedLabel ? 'lesson-signed' : 'lesson-pending'
   }
 }
 Page({
-  data: { ...filters.state(), reviewByLesson:true, courseId:'', matchedCourses:[], queried:false, appliedFilters:{}, attendanceFilters: {}, filterDate: '', items: [], count: 0, totalCount: 0, overdueCount: 0, error: '', loading: false, role: '' },
+  data: { ...filters.state(), reviewByLesson:true, courseId:'', matchedCourses:[], queried:false, appliedFilters:{}, attendanceFilters: {}, filterDate: '', items: [], count: 0, totalCount: 0, overdueCount: 0,pendingSignCount:0,signedCount:0,confirmedCount:0, error: '', loading: false, role: '' },
   onShow() { this._active = true; return this.load() },
   onHide() { this._active = false },
   onUnload() { this._active = false },
@@ -47,7 +47,10 @@ Page({
       : all.filter(item=>filters.matches(item,selected,false,true))
     this.setData({...filters.state(teacher ? this._courses||[] : all,selected,teacher,true),
       matchedCourses,items,count:items.length,totalCount:teacher?items.length:all.length,
-      overdueCount:items.filter(item=>item.overdue).length})
+      overdueCount:items.filter(item=>item.overdue).length,
+      pendingSignCount:teacher?items.filter(item=>item.attendanceLabel==='待签到').length:0,
+      signedCount:teacher?items.filter(item=>item.attendanceLabel==='已签到').length:0,
+      confirmedCount:teacher?items.filter(item=>item.attendanceLabel==='已确认').length:0})
   },
   queryCourses() {
     if(this.data.loading)return
@@ -57,7 +60,7 @@ Page({
   chooseCourse(e) {
     const course=this.data.matchedCourses[Number(e.currentTarget.dataset.index)]
     if(!course)return
-    this.setData({courseId:String(course.scheduleId),courseTitle:course.courseName})
+    this.setData({courseId:String(course.scheduleId),courseTitle:course.courseName,coursePeriod:course.periodName||'',courseTime:course.timeSlot||''})
     this.applyFilters()
   },
   backToCourses() {

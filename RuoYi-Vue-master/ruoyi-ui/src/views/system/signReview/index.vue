@@ -1,42 +1,59 @@
 <template>
-  <div class="app-container">
-    <h2>学生出勤</h2>
-    <el-tabs v-model="mode" @tab-click="changeMode"><el-tab-pane label="出勤总览" name="overview"/><el-tab-pane label="出勤复核" name="review"/></el-tabs>
-    <div v-if="mode==='overview'">
-      <el-form inline size="small"><el-form-item><el-input v-model="courseKeyword" maxlength="100" placeholder="搜索课程、老师、年级或学科" @keyup.enter.native="loadCourses"/></el-form-item><el-form-item><el-button @click="loadCourses">查询课程</el-button></el-form-item><el-form-item><el-select v-model="courseId" filterable placeholder="选择课程" style="width:420px" @change="loadOverview"><el-option v-for="c in courses" :key="c.scheduleId" :value="c.scheduleId" :label="courseLabel(c)"/></el-select></el-form-item><el-form-item><el-date-picker v-model="dateRange" type="daterange" value-format="yyyy-MM-dd" start-placeholder="开始日期" end-placeholder="结束日期" @change="loadOverview"/></el-form-item></el-form>
+  <div class="app-container attendance-page">
+    <header class="attendance-page-header">
+      <div><h2>学生出勤</h2><p>核对课程出勤，处理审核与请假课时</p></div>
+      <div class="attendance-flow"><span>教师点名</span><i class="el-icon-arrow-right"/><span>教务初审</span><i class="el-icon-arrow-right"/><span>管理员终审</span></div>
+    </header>
+    <el-tabs class="attendance-tabs" v-model="mode" @tab-click="changeMode"><el-tab-pane label="出勤总览" name="overview"/><el-tab-pane label="出勤复核" name="review"/><el-tab-pane label="请假课时表" name="leave"/></el-tabs>
+    <leave-report v-if="mode==='leave'"/>
+    <div v-if="mode==='overview'" class="attendance-panel">
+      <el-form class="attendance-filter-form" label-position="top" size="small" @submit.native.prevent="loadCourses">
+        <el-form-item label="搜索课程"><div class="course-search-row"><el-input v-model="courseKeyword" maxlength="100" clearable placeholder="课程、老师、年级或学科" @keyup.enter.native="loadCourses"/><el-button type="primary" icon="el-icon-search" :loading="overviewLoading" @click="loadCourses">查询</el-button></div></el-form-item>
+        <el-form-item label="选择课程" class="course-filter"><el-select v-model="courseId" filterable placeholder="选择要查看的课程" @change="loadOverview"><el-option v-for="c in courses" :key="c.scheduleId" :value="c.scheduleId" :label="courseLabel(c)"/></el-select></el-form-item>
+        <el-form-item label="统计日期范围"><el-date-picker v-model="dateRange" type="daterange" value-format="yyyy-MM-dd" start-placeholder="开始日期" end-placeholder="结束日期" @change="loadOverview"/></el-form-item>
+      </el-form>
       <el-alert v-if="overviewError" :title="overviewError" type="error" :closable="false"/>
       <div v-loading="overviewLoading">
         <template v-if="overview">
-          <div class="overview-summary"><span><b>{{overview.occurrenceCount}}</b> 范围内课次</span><span><b>{{overview.stats.attended}}</b> 正式实到人次</span><span><b>{{overview.stats.leave}}</b> 请假人次</span><span>{{overview.rows.length}}位学员</span></div>
-          <p class="overview-note">展示计划课次及历史记录；— 表示未记录。正式汇总只含已终审；待核实汇总不计入正式人数及课酬。</p>
-          <p>季度／当前日期范围计划应到 {{overview.plannedExpectedCount || 0}} 人次</p>
-          <p>正式应到 {{overview.stats.expectedCount || 0}} 人次 · 正式实到 {{overview.stats.attended || 0}} 人次</p>
-          <p v-if="overview.pendingStats">待核实应到 {{overview.pendingStats.expectedCount || 0}} 人次 · 实到 {{overview.pendingStats.attended || 0}} 人次；正常 {{overview.pendingStats.normal || 0}} · 试听 {{overview.pendingStats.trial || 0}} · 调课 {{overview.pendingStats.transfer || 0}} · 请假 {{overview.pendingStats.leave || 0}} · 录播 {{overview.pendingStats.video || 0}} · 缺席 {{overview.pendingStats.absent || 0}} · 尚未点名 {{overview.pendingStats.unmarked || 0}}</p>
+          <div class="overview-summary">
+            <div class="metric-card"><span>范围内课次</span><b>{{overview.occurrenceCount}}</b><small>当前所选日期范围</small></div>
+            <div class="metric-card metric-attended"><span>正式实到人次</span><b>{{overview.stats.attended}}</b><small>已终审确认的出勤</small></div>
+            <div class="metric-card metric-leave"><span>请假人次</span><b>{{overview.stats.leave}}</b><small>已终审确认的请假</small></div>
+            <div class="metric-card"><span>班级学员</span><b>{{overview.rows.length}}</b><small>当前课程学员人数</small></div>
+          </div>
+          <div class="overview-calculation">
+            <div class="calculation-line"><span>计划应到 <b>{{overview.plannedExpectedCount || 0}}</b> 人次</span><span>正式应到 <b>{{overview.stats.expectedCount || 0}}</b> 人次</span><span>正式实到 <b>{{overview.stats.attended || 0}}</b> 人次</span><span class="calculation-hint">正式统计仅包含已终审记录</span></div>
+            <el-collapse class="calculation-details"><el-collapse-item title="查看待核实统计与计算口径" name="statistics">
+              <p class="overview-note">展示计划课次及历史记录；— 表示未记录。正式汇总只含已终审；待核实汇总不计入正式人数及课酬。</p>
+              <p v-if="overview.pendingStats" class="pending-breakdown">待核实应到 {{overview.pendingStats.expectedCount || 0}} 人次 · 实到 {{overview.pendingStats.attended || 0}} 人次；正常 {{overview.pendingStats.normal || 0}} · 试听 {{overview.pendingStats.trial || 0}} · 调课 {{overview.pendingStats.transfer || 0}} · 请假 {{overview.pendingStats.leave || 0}} · 录播 {{overview.pendingStats.video || 0}} · 缺席 {{overview.pendingStats.absent || 0}} · 尚未点名 {{overview.pendingStats.unmarked || 0}}</p>
+            </el-collapse-item></el-collapse>
+          </div>
           <el-alert v-if="overview.stats.conflicts" :title="overview.stats.conflicts+'个学员课次有多条记录，需核对，未计入确定出勤结果'" type="warning" :closable="false"/>
-          <el-input v-model="studentKeyword" size="small" placeholder="查找本课学生姓名或家长手机号" clearable style="width:320px;margin:12px 0"/>
-          <el-table :data="visibleStudents" row-key="studentKey" height="480" border><el-table-column label="学生 / 统计" fixed="left" width="200"><template slot-scope="r"><el-button type="text" @click="openStudent(r.row)">{{r.row.studentName}}</el-button><div class="overview-note">{{r.row.temporary?'临时学员记录':r.row.parentPhone?'家长尾号 '+String(r.row.parentPhone).slice(-4):'未留家长电话'}}</div><div class="overview-note">到课{{r.row.stats.attended}} · 请假{{r.row.stats.leave}}</div></template></el-table-column><el-table-column v-for="(date,index) in overview.dates" :key="date" :label="lessonLabel(date)" width="155" align="center"><template slot-scope="r"><div :class="'cell-status status-'+r.row.cells[index].status" @click="openCell(r.row,index)">{{r.row.cells[index].text}}</div><div v-if="r.row.cells[index].recorded && r.row.cells[index].review !== '1'" class="overview-note">{{reviewLabel(r.row.cells[index].review)}}</div></template></el-table-column></el-table>
+          <div class="attendance-table-toolbar"><div><h3>班级出勤明细</h3><p>左右滚动查看课次，点击学员或出勤记录查看详情</p></div><el-input v-model="studentKeyword" class="student-search" size="small" prefix-icon="el-icon-search" placeholder="学生姓名 / 家长手机号" clearable/></div>
+          <el-table class="attendance-table" :data="visibleStudents" row-key="studentKey" height="480" border><el-table-column label="学生 / 统计" fixed="left" width="200"><template slot-scope="r"><el-button type="text" @click="openStudent(r.row)">{{r.row.studentName}}</el-button><div class="overview-note">{{r.row.temporary?'临时学员记录':r.row.parentPhone?'家长尾号 '+String(r.row.parentPhone).slice(-4):'未留家长电话'}}</div><div class="overview-note">到课{{r.row.stats.attended}} · 请假{{r.row.stats.leave}}</div></template></el-table-column><el-table-column v-for="(date,index) in overview.dates" :key="date" :label="lessonLabel(date)" width="155" align="center"><template slot-scope="r"><div :class="'cell-status status-'+r.row.cells[index].status" @click="openCell(r.row,index)">{{r.row.cells[index].text}}</div><div v-if="r.row.cells[index].recorded && r.row.cells[index].review !== '1'" class="overview-note">{{reviewLabel(r.row.cells[index].review)}}</div></template></el-table-column></el-table>
           <p class="overview-note">点击学生查看统计；点击已登记单元格查看该课次明细。到课包含普通、试听与调课到课。</p>
         </template><el-empty v-else-if="!overviewLoading && !overviewError" description="请选择课程查看出勤总览"/>
       </div>
     </div>
-    <div v-if="mode==='review'">
-    <el-form inline size="small">
+    <div v-if="mode==='review'" class="attendance-panel">
+    <el-form class="review-filter-form" label-position="top" inline size="small">
       <el-form-item v-for="field in reviewFields" :key="field.key" :label="field.label">
-        <el-select v-model="reviewFilters[field.key]" clearable filterable :placeholder="'全部' + field.label" style="width:110px">
+        <el-select v-model="reviewFilters[field.key]" clearable filterable :placeholder="'全部' + field.label" style="width:100%">
           <el-option v-for="value in reviewOptions(field.key)" :key="value" :value="value"
             :label="field.key === 'lessonNo' ? '第 ' + value + ' 讲' : value"/>
         </el-select>
       </el-form-item>
-      <el-form-item><el-select v-model="state"><el-option label="待复核" value="0"/><el-option label="待更正" value="2"/><el-option label="已复核" value="1"/></el-select></el-form-item>
-      <el-button size="small" type="primary" @click="load">查询</el-button>
+      <el-form-item label="审核状态"><el-select v-model="state"><el-option label="待复核" value="0"/><el-option label="待更正" value="2"/><el-option label="已复核" value="1"/></el-select></el-form-item>
+      <el-button size="small" class="review-search-button" type="primary" icon="el-icon-search" :loading="loading" @click="load">查询</el-button>
     </el-form>
     <el-alert v-if="error" :title="error" type="error" :closable="false"/>
-    <el-table :data="displayList" v-loading="loading">
+    <div class="attendance-table-toolbar review-list-title"><div><h3>课次审核</h3><p>共 {{displayList.length}} 个符合条件的课次</p></div><span class="table-guidance">初审核对截图，终审核对结果</span></div>
+    <el-table class="attendance-table" :data="displayList" v-loading="loading" border empty-text="暂无符合条件的课次">
       <el-table-column label="讲次" prop="lessonNo" width="75"/><el-table-column label="日期" prop="classDate" width="120"/><el-table-column label="课程" prop="courseClassName" min-width="200"/><el-table-column label="教师" prop="teacherName" width="120"/>
       <el-table-column label="时间" prop="timeSlot" width="120"/><el-table-column label="教室" prop="classroomName" width="150"/>
       <el-table-column label="到课 / 名单" width="120"><template slot-scope="s"><b>{{s.row.actualCount || 0}}</b> / {{s.row.totalCount}}</template></el-table-column>
-      <el-table-column label="状态" width="100"><template slot-scope="s"><el-tag :type="s.row.reviewStatus==='1'?'success':'warning'">{{s.row.stageText || label(s.row.reviewStatus)}}</el-tag></template></el-table-column>
-      <el-table-column label="操作" width="100"><template slot-scope="s"><el-button type="text" @click="open(s.row)">{{s.row.reviewStatus==='0'?'去复核':'查看'}}</el-button></template></el-table-column>
+      <el-table-column label="审核状态" width="180"><template slot-scope="s"><el-tag :type="s.row.reviewStatus==='1'?'success':'warning'">{{s.row.stageText || label(s.row.reviewStatus)}}</el-tag></template></el-table-column>
+      <el-table-column label="操作" fixed="right" width="110"><template slot-scope="s"><el-button type="text" @click="open(s.row)">{{s.row.reviewStatus==='0'?'去复核':'查看'}}</el-button></template></el-table-column>
     </el-table>
     </div>
     <el-dialog :title="row ? row.courseClassName + ' · ' + row.classDate : '学生出勤'" :visible.sync="opened" width="760px" :close-on-click-modal="!busy" @closed="close">
@@ -64,8 +81,10 @@
 <script>
 import {listReview,getDetail,confirmReview,attendanceCourses,attendanceOverview,attendanceStudent} from '@/api/system/signReview'
 import {getToken} from '@/utils/auth'
+import LeaveReport from './LeaveReport'
 export default {
   name:'SignReview',
+  components:{LeaveReport},
   dicts:['edu_grade'],
   data(){return {mode:'overview',courseKeyword:'',courses:[],courseId:'',dateRange:null,studentKeyword:'',overview:null,overviewLoading:false,overviewError:'',studentDialog:false,selectedStudent:null,studentScope:'course',studentStats:{},studentPendingStats:{},studentRows:[],studentPage:1,studentTotal:0,studentLoading:false,studentError:'',reviewFields:[{key:'courseYear',label:'年份'},{key:'termName',label:'季度'},{key:'teacherName',label:'教师'},{key:'lessonNo',label:'讲次'},{key:'gradeName',label:'年级'}],
     reviewFilters:{courseYear:'',termName:'',teacherName:'',lessonNo:'',gradeName:''},state:'0',list:[],loading:false,error:'',opened:false,row:null,detail:{details:[],review:{}},detailLoading:false,detailError:'',ready:false,busy:false,pendingImages:''}},
@@ -84,7 +103,7 @@ export default {
     lessonLabel(date){const l=(this.overview?.lessons||[]).find(l=>String(l.classDate).slice(0,10)===date);return date+' · 应到 '+(l?l.expectedCount:'—')+'人'},
     courseLabel(c){return [c.courseClassName||[c.gradeName,c.subjectName].filter(Boolean).join(''),c.teacherName,[c.courseYear,c.termName,c.periodName].filter(Boolean).join(' '),c.timeSlot].filter(Boolean).join(' · ')},
     reviewLabel(v){return {'0':'待审核','1':'已终审 / 历史已确认','2':'待更正'}[v]||''},
-    changeMode(){if(this.mode==='overview')this.loadCourses();else this.load()},
+    changeMode(){if(this.mode==='overview')this.loadCourses();else if(this.mode==='review')this.load()},
     async loadCourses(){const token=getToken(),version=this._coursesVersion=(this._coursesVersion||0)+1;this._overviewVersion=(this._overviewVersion||0)+1;this.closeStudent();this.overview=null;this.overviewLoading=true;this.overviewError='';try{const r=await attendanceCourses(this.courseKeyword);if(!this._alive||token!==getToken()||version!==this._coursesVersion)return;this.courses=r.data||[];if(!this.courses.some(c=>c.scheduleId===this.courseId))this.courseId=this.courses[0]?.scheduleId||'';if(this.courseId)await this.loadOverview()}catch(e){if(token===getToken()&&version===this._coursesVersion)this.overviewError=e.message||'课程加载失败'}finally{if(version===this._coursesVersion)this.overviewLoading=false}},
     async loadOverview(){this.closeStudent();const token=getToken(),version=this._overviewVersion=(this._overviewVersion||0)+1;this.overview=null;this.overviewError='';if(!this.courseId){this.overviewLoading=false;return}this.overviewLoading=true;try{const r=await attendanceOverview(this.courseId,this.dateRange?.[0],this.dateRange?.[1]);if(this._alive&&token===getToken()&&version===this._overviewVersion)this.overview=r.data}catch(e){if(token===getToken()&&version===this._overviewVersion)this.overviewError=e.message||'总览加载失败'}finally{if(version===this._overviewVersion)this.overviewLoading=false}},
     openCell(student,index){if(!student.cells[index].recorded)return;this.open({...this.overview.course,classDate:this.overview.dates[index]})},
@@ -116,4 +135,70 @@ export default {
   }
 }
 </script>
-<style scoped>.overview-summary{display:flex;gap:32px;align-items:center;padding:16px 0;color:#7b889a}.overview-summary b{font-size:28px;color:#263650}.overview-note{font-size:12px;color:#8a95a6;line-height:1.6}.cell-status{cursor:pointer;padding:8px 0}.status-1{color:#27856e}.status-3{color:#b58336}.status-2{color:#8792a3}.status-4{color:#416eaf}.status-5{color:#8562b4}.status-conflict{color:#bd5b56}.status-empty{color:#c6cdd7}.event{padding:12px 0;border-bottom:1px solid #eef0f5}.event p{color:#606b7e;line-height:1.6}.review-image{width:90px;height:90px;margin:8px}.el-alert{margin:12px 0}</style>
+<style scoped>
+.attendance-page {min-height:calc(100vh - 84px);padding:24px;background:#f5f7fb;color:#293c56;}
+.attendance-page-header {display:flex;align-items:center;justify-content:space-between;gap:24px;margin:0 0 24px;}
+.attendance-page-header h2 {margin:0;font-size:25px;line-height:1.5;font-weight:700;letter-spacing:.5px;color:#243a58;}
+.attendance-page-header p {margin:7px 0 0;color:#8795a9;font-size:13px;line-height:1.7;}
+.attendance-flow {display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#8798b0;}
+.attendance-flow span {padding:8px 13px;background:#fff;border:1px solid #e6ecf5;border-radius:8px;color:#5b7290;}
+.attendance-tabs {margin-bottom:20px;}
+.attendance-tabs ::v-deep .el-tabs__header {margin:0;}
+.attendance-tabs ::v-deep .el-tabs__nav-wrap::after,.attendance-tabs ::v-deep .el-tabs__active-bar {display:none;}
+.attendance-tabs ::v-deep .el-tabs__nav {padding:5px;background:#eaf0f8;border-radius:12px;}
+.attendance-tabs ::v-deep .el-tabs__item {height:40px;padding:0 25px!important;line-height:40px;border-radius:8px;font-weight:500;color:#71839c;}
+.attendance-tabs ::v-deep .el-tabs__item.is-active {background:#fff;color:#315fb5;font-weight:600;box-shadow:0 2px 8px rgba(39,69,111,.07);}
+.attendance-panel {padding:24px;border:1px solid #e6ecf5;border-radius:16px;background:#fff;}
+.attendance-filter-form {display:grid;grid-template-columns:minmax(230px,1.15fr) minmax(290px,1.5fr) minmax(260px,1fr);gap:18px;padding:20px;background:#f7f9fc;border:1px solid #eaf0f6;border-radius:12px;}
+.attendance-filter-form ::v-deep .el-form-item {margin:0;min-width:0;}
+.attendance-page ::v-deep .el-form--label-top .el-form-item__label {padding-bottom:9px;line-height:18px;color:#61758e;font-size:13px;font-weight:500;}
+.attendance-filter-form ::v-deep .el-select,.attendance-filter-form ::v-deep .el-date-editor {width:100%;min-width:0;}
+.course-search-row {display:flex;gap:10px;}
+.course-search-row .el-input {flex:1;min-width:0;}
+.course-search-row .el-button {flex-shrink:0;padding:9px 14px;}
+.attendance-page ::v-deep .el-input__inner {border-color:#dfe7f1;border-radius:8px;}
+.attendance-page ::v-deep .el-button--small {border-radius:8px;}
+.attendance-page ::v-deep .el-button--primary {background:#315fb5;border-color:#315fb5;}
+.overview-summary {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:22px 0;}
+.metric-card {display:flex;flex-direction:column;gap:10px;padding:20px 22px;border:1px solid #e7edf5;border-radius:12px;background:#fff;}
+.metric-card span {color:#7d8da3;font-size:13px;}
+.metric-card b {color:#2c4b76;font-size:31px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums;}
+.metric-card small {font-size:12px;color:#98a5b6;}
+.metric-attended {background:#f5faf8;border-color:#e0eee7;}.metric-attended b {color:#29856b;}
+.metric-leave {background:#fffbf3;border-color:#f1e9d9;}.metric-leave b {color:#b18235;}
+.overview-calculation {padding:0 18px;border:1px solid #e9eef6;border-radius:10px;background:#fafbfd;}
+.calculation-line {display:flex;flex-wrap:wrap;gap:12px 28px;padding:16px 0;font-size:13px;color:#75869e;line-height:1.7;}
+.calculation-line b {color:#455f81;margin:0 4px;}
+.calculation-hint {margin-left:auto;color:#94a2b5;font-size:12px;}
+.calculation-details {border:none;border-top:1px solid #edf1f7;}
+.calculation-details ::v-deep .el-collapse-item__header {height:40px;line-height:40px;background:transparent;color:#8292a8;font-size:12px;border:0;}
+.calculation-details ::v-deep .el-collapse-item__wrap {background:transparent;border:none;}
+.calculation-details ::v-deep .el-collapse-item__content {padding-bottom:12px;}
+.pending-breakdown {margin:0;font-size:12px;color:#8795a9;line-height:1.9;}
+.attendance-table-toolbar {display:flex;align-items:center;justify-content:space-between;gap:20px;margin:24px 0 16px;}
+.attendance-table-toolbar h3 {margin:0;font-size:16px;font-weight:600;color:#334e70;}
+.attendance-table-toolbar p {margin:7px 0 0;font-size:12px;color:#94a2b6;line-height:1.6;}
+.student-search {width:290px;flex-shrink:0;}
+.table-guidance {font-size:12px;color:#94a2b6;}
+.attendance-page ::v-deep .el-table {border-color:#e4ebf4;border-radius:10px;color:#4f637e;font-size:13px;}
+.attendance-page ::v-deep .el-table th.el-table__cell {background:#f3f6fb;color:#647995;font-size:12px;font-weight:600;padding:14px 0;border-color:#e5ecf5;}
+.attendance-page ::v-deep .el-table td.el-table__cell {padding:15px 0;border-color:#edf1f7;}
+.attendance-page ::v-deep .el-table--border::after,.attendance-page ::v-deep .el-table::before {background:#e4ebf4;}
+.attendance-page ::v-deep .el-table .el-button--text {font-weight:600;}
+.attendance-page ::v-deep .el-tag {border:0;border-radius:6px;}
+.overview-note {font-size:12px;color:#91a0b3;line-height:1.7;}
+.cell-status {display:inline-flex;align-items:center;justify-content:center;min-width:64px;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:12px;transition:filter .15s;}
+.cell-status:hover {filter:brightness(.96);}.status-1 {background:#eaf6f0;color:#27856e;}.status-3 {background:#fcf4e5;color:#b58336;}.status-2 {background:#f0f3f7;color:#8792a3;}.status-4 {background:#edf3fc;color:#416eaf;}.status-5 {background:#f3effa;color:#8562b4;}.status-conflict {background:#fff0ec;color:#bd5b56;}.status-empty {color:#c6cdd7;cursor:default;}
+.review-filter-form {display:flex;align-items:flex-end;flex-wrap:wrap;gap:16px;padding:20px;border:1px solid #eaf0f6;border-radius:12px;background:#f7f9fc;}
+.review-filter-form ::v-deep .el-form-item {flex:1 1 115px;min-width:0;margin:0;}
+.review-filter-form ::v-deep .el-form-item__content,.review-filter-form ::v-deep .el-select {display:block;width:100%;}
+.review-search-button {flex-shrink:0;height:32px;min-width:88px;}
+.event {padding:16px 0;border-bottom:1px solid #eef0f5;}.event p {color:#728198;line-height:1.7;}.review-image {width:90px;height:90px;margin:8px;border-radius:8px;}.el-alert {margin:12px 0;border-radius:8px;}
+.attendance-page ::v-deep .el-dialog {max-width:calc(100vw - 40px);border-radius:14px;}
+.attendance-page ::v-deep .el-dialog__header {padding:22px 24px;border-bottom:1px solid #edf1f6;}
+.attendance-page ::v-deep .el-dialog__body {padding:22px 24px;}
+.attendance-page ::v-deep .el-dialog__footer {padding:16px 24px;border-top:1px solid #edf1f6;}
+@media(max-width:1280px) {.attendance-filter-form {grid-template-columns:repeat(2,minmax(0,1fr));}.course-filter {grid-row:2;grid-column:1 / -1;}.attendance-flow {gap:8px;}.attendance-flow span {padding:7px 9px;}}
+@media(max-width:900px) {.attendance-page {padding:16px;}.attendance-page-header {align-items:flex-start;flex-direction:column;gap:16px;}.attendance-panel {padding:16px;}.overview-summary {grid-template-columns:repeat(2,minmax(0,1fr));}.calculation-hint {margin-left:0;}.attendance-table-toolbar {flex-wrap:wrap;}.student-search {width:100%;}.table-guidance {display:none;}}
+@media(max-width:600px) {.attendance-filter-form {grid-template-columns:minmax(0,1fr);}.course-filter {grid-row:auto;grid-column:auto;}.attendance-tabs ::v-deep .el-tabs__item {padding:0 16px!important;}.metric-card {padding:16px;}}
+</style>

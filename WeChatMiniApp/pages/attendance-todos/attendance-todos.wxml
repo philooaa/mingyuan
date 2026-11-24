@@ -24,7 +24,7 @@
   <block wx:if="{{role === 'teacher' && !courseId}}">
     <view class="todo-card" wx:for="{{matchedCourses}}" wx:key="scheduleId" data-index="{{index}}" bindtap="chooseCourse">
       <view class="course-heading"><view class="course-name">{{item.courseName}}</view><text class="action-arrow">›</text></view>
-      <view class="course-tags"><text>{{item.year}} {{item.termName}}</text><text>{{item.gradeName}}</text></view>
+      <view class="course-tags"><text class="period-tag" wx:if="{{item.periodName}}">{{item.periodName}}</text><text>{{item.year}} {{item.termName}}</text><text>{{item.gradeName}}</text><text wx:if="{{item.timeSlot}}">{{item.timeSlot}}</text></view>
     </view>
     <view class="empty-state" wx:if="{{queried && !loading && !error && !matchedCourses.length}}">没有符合条件的班级</view>
   </block>
@@ -32,9 +32,10 @@
     <button class="course-back-button" size="mini" bindtap="backToCourses">‹ 返回班级</button>
     <view class="selected-course-title">{{courseTitle}}</view>
     <view class="selected-course-meta">
-      <text>共 {{totalCount}} 讲</text>
-      <text wx:if="{{overdueCount}}" class="selected-course-overdue">{{overdueCount}} 讲待补点名</text>
+      <text class="selected-period-tag" wx:if="{{coursePeriod}}">{{coursePeriod}}</text><text wx:if="{{courseTime}}">{{courseTime}}</text><text>共 {{totalCount}} 讲</text>
+
     </view>
+    <view class="selected-course-status"><text>待签到 {{pendingSignCount}}</text><text class="signed-summary">已签到 {{signedCount}}</text><text class="confirmed-summary">已确认 {{confirmedCount}}</text></view>
   </view>
   <block wx:if="{{role !== 'teacher' || courseId}}">
   <view wx:if="{{role !== 'teacher'}}" class="todo-list-heading">

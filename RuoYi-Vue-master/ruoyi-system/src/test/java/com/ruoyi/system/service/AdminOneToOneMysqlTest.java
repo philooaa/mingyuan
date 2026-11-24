@@ -28,6 +28,10 @@ class AdminOneToOneMysqlTest {
         }
         var ds=new DriverManagerDataSource("jdbc:mysql://127.0.0.1:3306/"+schema+"?serverTimezone=Asia/Shanghai","root","");
         db=new ShopRepository(ds);
+        db.transactions().execute(status->{
+            try {for(String file:List.of("20261122_attendance_makeup.sql","20261123_teacher_led_makeup.sql"))for(String sql:java.nio.file.Files.readString(java.nio.file.Path.of("../../database/migrations/"+file)).split(";"))if(!sql.isBlank())db.jdbc().execute(sql);}
+            catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}return null;
+        });
         if(db.rows("SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='edu_course_schedule' AND column_name='enroll_limit'").isEmpty())db.jdbc().execute("ALTER TABLE edu_course_schedule ADD COLUMN enroll_limit INT NULL");
         for(String column:List.of("term_name","period_name")) if(db.rows("SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='edu_schedule_adjustment' AND column_name=?",column).isEmpty())db.jdbc().execute("ALTER TABLE edu_schedule_adjustment ADD COLUMN "+column+" VARCHAR(64) NULL");
         var factory=new SqlSessionFactoryBean();factory.setDataSource(ds);factory.setTypeAliasesPackage("com.ruoyi.system.domain");
