@@ -44,7 +44,7 @@ public class OneToOneEnrollmentService {
         return schedule != null && "2".equals(schedule.getClassMode());
     }
     public SortedSet<LocalDate> dates(EduCourseSchedule s) {
-        return ScheduleCalendar.dates(ScheduleCalendar.date(s.getStartDate()), ScheduleCalendar.date(s.getEndDate()), s.getClassPattern(), s.getPeriodName(), parent.selectScheduleAdjustments(s.getScheduleId()));
+        return ScheduleCalendar.dates(s, parent.selectScheduleAdjustments(s.getScheduleId()));
     }
     private boolean future(EduCourseSchedule s, LocalDate date) {
         return s.getStartTime() != null && LocalDateTime.of(date,s.getStartTime()).isAfter(LocalDateTime.now(ZONE));

@@ -65,7 +65,7 @@ public class ScheduleAvailabilityService {
                 + "ORDER BY a.adjustment_id"+(locked ? " FOR UPDATE" : ""),id);
     }
     public SortedSet<LocalDate> dates(EduCourseSchedule s, List<Map<String,Object>> changes) {
-        return ScheduleCalendar.dates(ScheduleCalendar.date(s.getStartDate()),ScheduleCalendar.date(s.getEndDate()),s.getClassPattern(),s.getPeriodName(),changes);
+        return ScheduleCalendar.dates(s,changes);
     }
     public void check(EduCourseSchedule s) { check(s,adjustments(s.getScheduleId(),true)); }
     public void check(EduCourseSchedule s,List<Map<String,Object>> changes) {
@@ -78,7 +78,7 @@ public class ScheduleAvailabilityService {
             require(moved == null || unique.add(moved),"调课后同一课程存在重叠课次，请选择其他日期");
         }
         if (dates.isEmpty()) return; // 开发阶段保留未排日期，不猜测历史占用。
-        var candidates = db.rows("SELECT schedule_id,teacher_id,classroom_id,start_time,end_time,start_date,end_date,class_pattern,period_name,course_class_name FROM edu_course_schedule WHERE schedule_id<>? AND status='0' AND del_flag='0' AND (teacher_id=? OR classroom_id=?) ORDER BY schedule_id FOR UPDATE",s.getScheduleId() == null ? -1 : s.getScheduleId(),s.getTeacherId(),s.getClassroomId());
+        var candidates = db.rows("SELECT schedule_id,teacher_id,classroom_id,start_time,end_time,start_date,end_date,class_pattern,period_name,custom_dates,course_class_name FROM edu_course_schedule WHERE schedule_id<>? AND status='0' AND del_flag='0' AND (teacher_id=? OR classroom_id=?) ORDER BY schedule_id FOR UPDATE",s.getScheduleId() == null ? -1 : s.getScheduleId(),s.getTeacherId(),s.getClassroomId());
         for (var row : candidates) {
             if (!overlaps(s.getStartTime(),s.getEndTime(),time(row.get("startTime")),time(row.get("endTime")))) continue;
             var other = rowDates(row,true);
@@ -86,13 +86,13 @@ public class ScheduleAvailabilityService {
         }
     }
     private SortedSet<LocalDate> rowDates(Map<String,Object> row,boolean locked) {
-        return ScheduleCalendar.dates(ScheduleCalendar.date(row.get("startDate")),ScheduleCalendar.date(row.get("endDate")),(String)row.get("classPattern"),(String)row.get("periodName"),adjustments(id(row.get("scheduleId")),locked));
+        return ScheduleCalendar.dates(row,adjustments(id(row.get("scheduleId")),locked));
     }
     public Map<String,Object> week(Long teacherId,LocalDate selected,Long excludeId) {
         require(selected != null && selected.getYear() >= 2000 && selected.getYear() <= 2100,"请选择有效日期");
         LocalDate first = selected.minusDays(selected.getDayOfWeek().getValue()-1);
         var rooms = db.rows("SELECT classroom_id,campus_name,classroom_name FROM edu_classroom WHERE status='0' ORDER BY campus_name,classroom_name,classroom_id");
-        var rows = db.rows("SELECT schedule_id,teacher_id,classroom_id,start_time,end_time,start_date,end_date,class_pattern,period_name FROM edu_course_schedule WHERE status='0' AND del_flag='0' AND schedule_id<>?",excludeId == null ? -1 : excludeId);
+        var rows = db.rows("SELECT schedule_id,teacher_id,classroom_id,start_time,end_time,start_date,end_date,class_pattern,period_name,custom_dates FROM edu_course_schedule WHERE status='0' AND del_flag='0' AND schedule_id<>?",excludeId == null ? -1 : excludeId);
         Map<String,SortedSet<LocalDate>> dates = new HashMap<>();
         Map<Long,List<Map<String,Object>>> changes = new HashMap<>();
         for(var change : db.rows("SELECT s.schedule_id AS schedule_id,a.original_date,a.adjusted_date "
@@ -106,7 +106,7 @@ public class ScheduleAvailabilityService {
             changes.computeIfAbsent(id(change.get("scheduleId")),ignored -> new ArrayList<>()).add(change);
         int pending = 0;
         for (var row : rows) {
-            var expanded = ScheduleCalendar.dates(ScheduleCalendar.date(row.get("startDate")),ScheduleCalendar.date(row.get("endDate")),(String)row.get("classPattern"),(String)row.get("periodName"),changes.getOrDefault(id(row.get("scheduleId")),List.of())); dates.put(String.valueOf(row.get("scheduleId")),expanded);
+            var expanded = ScheduleCalendar.dates(row,changes.getOrDefault(id(row.get("scheduleId")),List.of())); dates.put(String.valueOf(row.get("scheduleId")),expanded);
             if (row.get("startDate") == null || row.get("endDate") == null) pending++;
         }
         List<Map<String,Object>> cells = new ArrayList<>();

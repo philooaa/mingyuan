@@ -156,6 +156,7 @@ Page({
   },
   setPeriodOptions(clearInvalid=false) {
     const weekly=this.data.form.classPattern==='WEEKLY'
+    if(this.data.form.classPattern==='CUSTOM_DATES') { this.setData({fields:this.data.fields.map(f=>f.key==='periodName'?{...f,options:[{value:this.data.form.periodName,label:this.data.form.periodName}]}:f)});return }
     const options=this.data.periods.filter(p=>/^周[一二三四五六日]$/.test(p.value)===weekly)
     const change={fields:this.data.fields.map(f=>f.key==='periodName'?{...f,label:weekly?'上课星期':'期次',options}:f)}
     if(clearInvalid && !options.some(p=>p.value===this.data.form.periodName))change['form.periodName']=''
@@ -170,6 +171,7 @@ Page({
     if(!this.current() || this.data.saving)return
     const key=e.currentTarget.dataset.key, f=this.data.fields.find(f=>f.key===key)
     const options=f?f.options:({classType:this.data.classTypes,classMode:this.data.modes,classPattern:this.data.patterns,recruitStatus:this.data.recruitOptions,status:this.data.statusOptions})[key]
+    if(this.data.form.classPattern==='CUSTOM_DATES' && ['classPattern','classMode','periodName'].includes(key))return
     const row=options && options[Number(e.detail.value)];if(!row)return
     const change={['form.'+key]:row.value}
     if(key==='classMode') {
@@ -200,7 +202,7 @@ Page({
     const f=this.data.form
     if (!f.scheduleId && (!/^\d+(\.\d{1,2})?$/.test(String(f.unitPrice).trim()) || Number(f.unitPrice) <= 0)) { this.setData({formError:'课时单价须大于0且最多保留两位小数'}); return }
     if(f.classPattern==='WEEKLY' && !/^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:f.classMode==='2'?'请选择一对一上课日期':'请选择上课星期'});return}
-    if(f.classPattern!=='WEEKLY' && /^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:'请选择期次'});return}
+    if(f.classPattern!=='CUSTOM_DATES' && f.classPattern!=='WEEKLY' && /^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:'请选择期次'});return}
     if (!f.scheduleId && f.classMode !== '2' && (!/^[1-9]\d*$/.test(String(f.requestedLessonCount || '')) || Number(f.requestedLessonCount)>3661)) { this.setData({formError:'请填写1至3661的整数计费课次数'}); return }
     for(const [key,label] of [['campusName','校区'],['termName','学期'],['periodName',f.classPattern==='WEEKLY'?'上课星期':'期次'],['timeSlot','时段'],['gradeName','年级'],['subjectName','学科'],['teacherId','教师'],['courseClassName','课程名称']]) {
       if(!String(f[key] || '').trim()) {this.setData({formError:'请填写或选择'+label});return}

@@ -20,7 +20,7 @@ public class MiniAppPublicController {
     public AjaxResult courses() {
         return AjaxResult.success(db.rows("SELECT schedule_id,course_class_name,grade_name,subject_name,"
             + "campus_name,term_name,period_name,time_slot,start_date,end_date,start_time,end_time,"
-            + "class_pattern,lesson_count,tuition_price FROM edu_course_schedule "
+            + "class_pattern,custom_dates,lesson_count,tuition_price FROM edu_course_schedule "
             + "WHERE del_flag='0' AND status='0' AND recruit_status='0' "
             + "ORDER BY grade_name,subject_name,schedule_id LIMIT 500"));
     }

@@ -29,6 +29,8 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     @Autowired private com.ruoyi.system.service.ScheduleAvailabilityService availability;
     @Autowired private com.ruoyi.system.service.ISysConfigService configService;
     @Autowired private com.ruoyi.system.service.CoursePriceService coursePrices;
+    @org.springframework.beans.factory.annotation.Value("${schedule.rules.custom-enabled:false}")
+    private boolean customRulesEnabled;
 
     private boolean teacherOnly() {
         return SecurityUtils.hasRole("teacher") && !planningStaff();
@@ -90,6 +92,8 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         if (blank(schedule.getClassMode())) schedule.setClassMode("1");
         if (blank(schedule.getStatus())) schedule.setStatus("0");
         if (blank(schedule.getRecruitStatus())) schedule.setRecruitStatus("0");
+        if (Boolean.TRUE.equals(schedule.getApplyScheduleRule())) applyRule(schedule);
+        else require(!ScheduleCalendar.CUSTOM_DATES.equals(schedule.getClassPattern()), "请选择排课规则");
         schedule.setDelFlag("0");
         schedule.setEnrolledCount(0L);
         lockResources(List.of(schedule));
@@ -99,6 +103,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         schedule.setCreateBy(SecurityUtils.getUsername());
         schedule.setCreateTime(DateUtils.getNowDate());
         int changed=eduCourseScheduleMapper.insertEduCourseSchedule(schedule);
+        if (changed>0 && ScheduleCalendar.CUSTOM_DATES.equals(schedule.getClassPattern())) saveRuleSnapshot(schedule);
         if (changed>0 && !"2".equals(schedule.getClassMode()) && schedule.getRequestedLessonCount()!=null)
             db.jdbc().update("UPDATE edu_course_schedule SET lesson_count_override=?,lesson_count_override_reason=? WHERE schedule_id=?", schedule.getRequestedLessonCount(), "新增排课时填写", schedule.getScheduleId());
         if(changed>0 && !"2".equals(schedule.getClassMode())) coursePrices.syncSchedulePricing(schedule.getScheduleId());
@@ -132,6 +137,28 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
             input.setSubjectName(current.getSubjectName());
         }
         EduCourseSchedule effective = merge(current, input);
+        if (Boolean.TRUE.equals(input.getApplyScheduleRule())) {
+            require(!hasAttendance(current.getScheduleId()), "已有考勤记录，请通过调课管理调整上课日期");
+            effective.setScheduleRuleId(input.getScheduleRuleId());
+            effective.setScheduleRuleVersion(input.getScheduleRuleVersion());
+            applyRule(effective);
+            input.setClassPattern(effective.getClassPattern());
+            input.setStartDate(effective.getStartDate());
+            input.setEndDate(effective.getEndDate());
+        } else if (Boolean.TRUE.equals(input.getClearScheduleRule()) && ScheduleCalendar.CUSTOM_DATES.equals(current.getClassPattern())) {
+            require(!hasAttendance(current.getScheduleId()), "已有考勤记录，请通过调课管理调整上课日期");
+            require(!ScheduleCalendar.CUSTOM_DATES.equals(effective.getClassPattern()), "请选择原有递推模式");
+            effective.setScheduleRuleId(null); effective.setScheduleRuleName(null); effective.setScheduleRuleVersion(null); effective.setCustomDatesJson(null);
+        } else if (ScheduleCalendar.CUSTOM_DATES.equals(current.getClassPattern())) {
+            require(input.getClassPattern() == null || ScheduleCalendar.CUSTOM_DATES.equals(input.getClassPattern()), "自定义规则课程请在网页端明确选择日期规则后修改");
+            require(input.getStartDate() == null || Objects.equals(ScheduleCalendar.date(input.getStartDate()),ScheduleCalendar.date(current.getStartDate())), "请通过排课规则修改上课日期");
+            require(input.getEndDate() == null || Objects.equals(ScheduleCalendar.date(input.getEndDate()),ScheduleCalendar.date(current.getEndDate())), "请通过排课规则修改上课日期");
+        }
+        require(!ScheduleCalendar.CUSTOM_DATES.equals(effective.getClassPattern()) || ScheduleCalendar.CUSTOM_DATES.equals(current.getClassPattern()) || Boolean.TRUE.equals(input.getApplyScheduleRule()), "请选择排课规则");
+        if ((Boolean.TRUE.equals(input.getApplyScheduleRule()) || Boolean.TRUE.equals(input.getClearScheduleRule())) && !Objects.equals(current.getCustomDatesJson(), effective.getCustomDatesJson())) {
+            require(db.rows("SELECT lesson_id FROM edu_attendance_lesson WHERE schedule_id=? AND locked=1 FOR UPDATE",current.getScheduleId()).isEmpty(), "已有锁定讲次，请使用调课管理");
+            require(parentMapper.selectScheduleAdjustments(current.getScheduleId()).isEmpty(), "已有调课记录，请使用调课管理或先核对调课记录");
+        }
         validate(effective);
         input.setCampusName(effective.getCampusName());
         if ("2".equals(effective.getClassMode()) && (singleResourcesChanged(current,effective) || !"2".equals(current.getClassMode()) || (!"0".equals(current.getStatus()) && "0".equals(effective.getStatus())))) {
@@ -163,6 +190,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         input.setCreateBy(null); input.setCreateTime(null);
         input.setUpdateBy(SecurityUtils.getUsername()); input.setUpdateTime(DateUtils.getNowDate());
         int changed=eduCourseScheduleMapper.updateEduCourseSchedule(input);
+        if (changed>0 && (Boolean.TRUE.equals(input.getApplyScheduleRule()) || Boolean.TRUE.equals(input.getClearScheduleRule()))) saveRuleSnapshot(effective);
         if(changed>0 && !"2".equals(effective.getClassMode())) coursePrices.syncSchedulePricing(input.getScheduleId());
         return changed;
     }
@@ -258,6 +286,25 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
     private void requireValidUnitPrice(java.math.BigDecimal price) {
         require(price != null && price.signum() > 0 && price.stripTrailingZeros().scale() <= 2, "课时单价须大于0且最多保留两位小数");
     }
+    private void applyRule(EduCourseSchedule schedule) {
+        require(customRulesEnabled, "自定义排课尚未开放，请先完成数据库及网页、小程序版本升级");
+        require(schedule.getScheduleRuleId() != null && schedule.getScheduleRuleVersion() != null, "请选择排课规则并刷新确认");
+        var rules = db.rows("SELECT rule_name,version FROM edu_schedule_rule WHERE rule_id=? AND status='0' AND del_flag='0' FOR UPDATE", schedule.getScheduleRuleId());
+        require(!rules.isEmpty(), "排课规则不存在或已停用");
+        var rule = rules.get(0);
+        require(schedule.getScheduleRuleVersion().equals(Long.valueOf(rule.get("version").toString())), "排课规则已修改，请刷新后重新选择");
+        var rows = db.rows("SELECT DATE_FORMAT(class_date,'%Y-%m-%d') class_date FROM edu_schedule_rule_date WHERE rule_id=? ORDER BY class_date", schedule.getScheduleRuleId());
+        require(!rows.isEmpty(), "排课规则没有上课日期");
+        List<String> dates = rows.stream().map(r -> r.get("classDate").toString()).toList();
+        schedule.setScheduleRuleName(rule.get("ruleName").toString());
+        schedule.setCustomDatesJson(com.alibaba.fastjson2.JSON.toJSONString(dates));
+        schedule.setStartDate(java.sql.Date.valueOf(dates.get(0))); schedule.setEndDate(java.sql.Date.valueOf(dates.get(dates.size()-1)));
+        schedule.setClassPattern(ScheduleCalendar.CUSTOM_DATES);
+    }
+    private void saveRuleSnapshot(EduCourseSchedule schedule) {
+        db.jdbc().update("UPDATE edu_course_schedule SET schedule_rule_id=?,schedule_rule_name=?,schedule_rule_version=?,custom_dates=? WHERE schedule_id=?",
+            schedule.getScheduleRuleId(), schedule.getScheduleRuleName(), schedule.getScheduleRuleVersion(), schedule.getCustomDatesJson(), schedule.getScheduleId());
+    }
     private void validate(EduCourseSchedule s) {
         if (s.getClassType() != null) require(s.getClassType().codePointCount(0, s.getClassType().length()) <= 30, "班型不能超过30个字符");
         required(s.getScheduleCode(), 32, "排课编码"); required(s.getTermName(), 20, "学期"); required(s.getPeriodName(), 20, "期次或上课日");
@@ -274,13 +321,18 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         require(List.of("0", "1").contains(s.getStatus()), "排课状态无效");
         require(List.of("0", "1", "2").contains(s.getRecruitStatus()), "招生状态无效");
         if ("2".equals(s.getClassMode())) require(Duration.between(s.getStartTime(), s.getEndTime()).toMinutes() == 120 && s.getStartTime().getSecond() == s.getEndTime().getSecond(), "一对一每次固定2小时");
+        if (ScheduleCalendar.CUSTOM_DATES.equals(s.getClassPattern())) { require(s.getStartDate()!=null && s.getEndDate()!=null, "自定义规则缺少日期"); require(!"2".equals(s.getClassMode()), "一对一不使用多日期规则"); }
         // 「其他（暂不排课）」：允许起止日期同时留空，不展开上课日、课次按 0 计，也不参与教师冲突检测
         require((s.getStartDate() == null) == (s.getEndDate() == null), "开课、结课日期需同时填写，或同时保留待排");
         if (s.getStartDate() != null) {
             LocalDate start = ScheduleCalendar.date(s.getStartDate()), end = ScheduleCalendar.date(s.getEndDate());
             require(start != null && end != null && !start.isAfter(end), "结课日期不能早于开课日期");
             require(java.time.temporal.ChronoUnit.DAYS.between(start, end) <= 3660, "排课跨度不能超过10年");
-            require(ScheduleCalendar.isValid(s.getClassPattern()), "请明确上课模式");
+            require(ScheduleCalendar.isValid(s.getClassPattern()) || ScheduleCalendar.CUSTOM_DATES.equals(s.getClassPattern()), "请明确上课模式");
+            if (ScheduleCalendar.CUSTOM_DATES.equals(s.getClassPattern())) {
+                require(!"2".equals(s.getClassMode()), "一对一课程不能使用多日期规则");
+                ScheduleCalendar.dates(s, List.of());
+            }
             if ("WEEKLY".equals(s.getClassPattern())) require(ScheduleCalendar.weekday(s.getPeriodName()) > 0, "每周排课需明确周一至周日的上课星期");
         }
         Map<String,Object> classroom = s.getClassroomId() == null ? Map.of("status","0") : db.one("SELECT status,campus_name FROM edu_classroom WHERE classroom_id=?", s.getClassroomId());
@@ -297,19 +349,19 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         // 说明：自 2026-10-12 起，同一教室+同年+学期+期次+时段 允许存在多条排课（不再拒绝），
         // 由可视化课表前端以红色感叹号提示冲突（数据库唯一索引 uk_course_timetable_cell 已降级为普通索引）。
         if (!"0".equals(input.getStatus())) return;
-        SortedSet<LocalDate> dates = ScheduleCalendar.dates(ScheduleCalendar.date(input.getStartDate()), ScheduleCalendar.date(input.getEndDate()), input.getClassPattern(), input.getPeriodName(), input.getScheduleId() == null ? List.of() : parentMapper.selectScheduleAdjustments(input.getScheduleId()));
+        SortedSet<LocalDate> dates = ScheduleCalendar.dates(input, input.getScheduleId() == null ? List.of() : parentMapper.selectScheduleAdjustments(input.getScheduleId()));
         if (dates.isEmpty()) return;
         // 教室维度的重复排课同样允许（前端提示冲突），这里只保留「同一教师同一时间被占用」的硬校验。
         // 带上教师姓名与教室名，冲突时才能直接说清是哪位老师的哪门课。
         var candidates = db.rows("SELECT s.schedule_id,s.teacher_name,s.start_time,s.end_time,s.start_date,s.end_date,"
-            + "s.class_pattern,s.period_name,s.course_class_name,c.classroom_name,c.campus_name "
+            + "s.class_pattern,s.period_name,s.custom_dates,s.course_class_name,c.classroom_name,c.campus_name "
             + "FROM edu_course_schedule s LEFT JOIN edu_classroom c ON c.classroom_id=s.classroom_id "
             + "WHERE s.schedule_id<>? AND s.del_flag='0' AND s.status='0' AND s.teacher_id=? FOR UPDATE", id, input.getTeacherId());
         for (var other : candidates) {
             if (other.get("startTime") == null || other.get("endTime") == null) continue;
             LocalTime start = LocalTime.parse(String.valueOf(other.get("startTime"))), end = LocalTime.parse(String.valueOf(other.get("endTime")));
             if (!input.getStartTime().isBefore(end) || !start.isBefore(input.getEndTime())) continue;
-            var otherDates = ScheduleCalendar.dates(ScheduleCalendar.date(other.get("startDate")), ScheduleCalendar.date(other.get("endDate")), (String) other.get("classPattern"), (String) other.get("periodName"), parentMapper.selectScheduleAdjustments(Long.valueOf(String.valueOf(other.get("scheduleId")))));
+            var otherDates = ScheduleCalendar.dates(other, parentMapper.selectScheduleAdjustments(Long.valueOf(String.valueOf(other.get("scheduleId")))));
             // 逐个日期比对，命中即用「最早的一天 + 冲突总天数」报错，便于用户直接定位到课表上哪一格
             List<LocalDate> conflictDates = dates.stream().filter(otherDates::contains).toList();
             if (conflictDates.isEmpty()) continue;
@@ -440,6 +492,8 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
         s.setStartTime(in.getStartTime() == null ? old.getStartTime() : in.getStartTime()); s.setEndTime(in.getEndTime() == null ? old.getEndTime() : in.getEndTime());
         s.setStartDate(in.getStartDate() == null ? old.getStartDate() : in.getStartDate()); s.setEndDate(in.getEndDate() == null ? old.getEndDate() : in.getEndDate());
         s.setClassPattern(in.getClassPattern() == null ? old.getClassPattern() : in.getClassPattern());
+        s.setScheduleRuleId(old.getScheduleRuleId()); s.setScheduleRuleName(old.getScheduleRuleName());
+        s.setScheduleRuleVersion(old.getScheduleRuleVersion()); s.setCustomDatesJson(old.getCustomDatesJson());
         s.setClassMode(blank(in.getClassMode()) ? (blank(old.getClassMode()) ? "1" : old.getClassMode()) : in.getClassMode());
         s.setStatus(in.getStatus() == null ? old.getStatus() : in.getStatus()); s.setRecruitStatus(in.getRecruitStatus() == null ? old.getRecruitStatus() : in.getRecruitStatus());
         return s;

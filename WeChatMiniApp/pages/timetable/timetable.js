@@ -1,3 +1,4 @@
+const customCalendar = require('../../utils/course-calendar')
 const childContext = require('../../utils/child-context')
 const { request } = require('../../utils/request')
 const paymentProgress = require('../../utils/course-payment-progress')
@@ -215,6 +216,7 @@ Page(childContext.page({
 
   // 按上课模式 + 调课表生成全部上课日期
   buildDateList(item) {
+    if(item.classPattern === 'CUSTOM_DATES' && !item.classDate) return customCalendar.expandCourse(item).dates.map(customCalendar.parseDate)
     if (item.classDate) { const date = this.parseDate(item.classDate); return date ? [date] : [] }
     const start = this.parseDate(item.startDate)
     const end = this.parseDate(item.endDate)

@@ -4,7 +4,7 @@ const MINUTE_HEIGHT = 2.2 // rpx；两小时留足课程信息高度，时段间
 const DEFAULT_SLOTS = ['08:00-10:00','10:15-12:15','13:15-15:15','15:30-17:30','18:30-20:30','20:30-22:30']
 // 日循环模式的一轮天数与上课天数，与后端 ScheduleCalendar.cycle/studyDays 保持一致
 const DAILY_CYCLES = { DAILY: [1, 1], DAILY_5_1: [6, 5], DAILY_6_1: [7, 6], DAILY_5_2: [7, 5], DAILY_4_1: [5, 4] }
-const PATTERN_LABELS = { WEEKLY: '每周固定星期', DAILY: '连上无假期', DAILY_5_1: '上5休1', DAILY_6_1: '上6休1', DAILY_5_2: '上5休2', DAILY_4_1: '上4休1', OTHER: '其他（暂不排课）' }
+const PATTERN_LABELS = { CUSTOM_DATES: '自定义日期规则', WEEKLY: '每周固定星期', DAILY: '连上无假期', DAILY_5_1: '上5休1', DAILY_6_1: '上6休1', DAILY_5_2: '上5休2', DAILY_4_1: '上4休1', OTHER: '其他（暂不排课）' }
 
 function parseDate(value) {
   const match = String(value || '').match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:$|[ T])/)
@@ -36,7 +36,9 @@ function expandCourse(course) {
   if (pattern === 'OTHER') return { dates: [], reason: PATTERN_LABELS.OTHER }
   if (pattern === 'WEEKLY' && !DAY_NAMES.includes(course.periodName)) return { dates: [], reason: '每周上课的星期待确认' }
   const cycle = DAILY_CYCLES[pattern]
-  if (pattern !== 'WEEKLY' && !cycle) return { dates: [], reason: '重复规则待确认' }
+  const custom = pattern === 'CUSTOM_DATES'
+  if (custom && (!Array.isArray(course.customDates) || !course.customDates.length || course.customDates.some(value => !parseDate(value)))) return { dates: [], reason: '自定义上课日期待核对' }
+  if (pattern !== 'WEEKLY' && !cycle && !custom) return { dates: [], reason: '重复规则待确认' }
   const adjustments = new Map()
   for (const adjustment of course.adjustments || []) {
     const original = parseDate(adjustment.originalDate)
@@ -47,6 +49,20 @@ function expandCourse(course) {
     adjustments.set(key, adjusted)
   }
   const dates = new Set()
+  if (custom) {
+    const originals = new Set(course.customDates.map(value => formatDate(parseDate(value))))
+    const sorted = Array.from(originals).sort()
+    if (sorted[0] !== formatDate(start) || sorted[sorted.length - 1] !== formatDate(end)) return { dates: [], reason: '自定义上课日期待核对' }
+    for (const key of sorted) {
+      const actual = adjustments.has(key) ? adjustments.get(key) : parseDate(key)
+      if (actual) {
+        const value = formatDate(actual)
+        if (dates.has(value)) return { dates: [], reason: '调课后同一课程存在重叠课次，请核对' }
+        dates.add(value)
+      }
+    }
+    return { dates: Array.from(dates).sort(), reason: '' }
+  }
   for (let date = start, index = 0; date <= end; date = addDays(date, 1), index++) {
     const included = pattern === 'WEEKLY' ? date.getDay() === DAY_NAMES.indexOf(course.periodName) : index % cycle[0] < cycle[1]
     if (!included) continue
