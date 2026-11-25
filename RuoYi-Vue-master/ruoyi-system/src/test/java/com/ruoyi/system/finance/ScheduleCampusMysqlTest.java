@@ -18,7 +18,7 @@ class ScheduleCampusMysqlTest {
         try {
             fixture.setup();
             // The shared finance fixture predates the existing one-to-one and enrollment-limit upgrades.
-            fixture.db.jdbc().execute("ALTER TABLE edu_course_schedule ADD lesson_location varchar(255), ADD unit_price decimal(10,2) DEFAULT 0");
+            fixture.db.jdbc().execute("ALTER TABLE edu_course_schedule ADD lesson_location varchar(255), ADD unit_price decimal(10,2) DEFAULT 0, ADD lesson_count INT");
             fixture.runMigration("20261019_schedule_enroll_limit.sql");
             fixture.runMigration("20261028_schedule_campus_first.sql");
             fixture.runMigration("20261028_schedule_campus_first.sql");

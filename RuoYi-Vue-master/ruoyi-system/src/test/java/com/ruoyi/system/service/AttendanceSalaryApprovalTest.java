@@ -24,6 +24,11 @@ class AttendanceSalaryApprovalTest {
         var service=service(List.of(),saved);var preview=service.previewMonth("2026-11").get(0);
         assertEquals(9L,preview.getTotalLessons());assertEquals(new BigDecimal("1234.56"),preview.getTotalAmount());
     }
+    @Test void settledPreviewDoesNotRecalculateUsingNewPrices() throws Exception {
+        var saved=new EduTeacherSalaryRecord();saved.setTeacherId(10L);saved.setConfirmStatus("1");saved.setTotalAmount(new BigDecimal("10.00"));
+        var service=service(List.of(session("1","primary",10)),saved,new BigDecimal("10000000.00"),List.of());
+        assertSame(saved,service.previewMonth("2026-11").get(0));
+    }
     @Test void specialClassesUseOnlyTheirOwnHourlyRate() throws Exception {
         var special=new HashMap<>(session("1","primary",8));special.put("classType","特价课");
         var one=new HashMap<>(session("2","junior",1));one.put("classType","特价课");
