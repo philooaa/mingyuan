@@ -71,7 +71,7 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
     public List<EduTeacherSalaryRecord> previewMonth(String salaryMonth)
     {
         checkMonth(salaryMonth);
-        List<EduTeacherSalaryRecord> list = computeMonth(salaryMonth);
+        List<EduTeacherSalaryRecord> list = computeMonth(salaryMonth, true);
         // 标注已结算状态
         for (int index=0;index<list.size();index++)
         {
@@ -179,6 +179,11 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
      */
     private List<EduTeacherSalaryRecord> computeMonth(String salaryMonth)
     {
+        return computeMonth(salaryMonth, false);
+    }
+
+    private List<EduTeacherSalaryRecord> computeMonth(String salaryMonth, boolean preserveConfirmed)
+    {
         // 教师账号
         List<Map<String, Object>> teacherUsers = recordMapper.selectTeacherUsers();
         Map<Long, String> teacherNames = new HashMap<>();
@@ -241,6 +246,13 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
         List<EduTeacherSalaryRecord> result = new ArrayList<>();
         for (Long teacherId : all)
         {
+            if (preserveConfirmed) {
+                var saved = recordMapper.selectRecordByTeacherMonth(teacherId, salaryMonth);
+                if (saved != null && "1".equals(saved.getConfirmStatus())) {
+                    result.add(saved);
+                    continue;
+                }
+            }
             EduTeacherSalaryConfig cfg = configMap.get(teacherId);
             double[] hours = hoursMap.getOrDefault(teacherId, new double[6]);
             long[] counts = countMap.getOrDefault(teacherId, new long[6]);

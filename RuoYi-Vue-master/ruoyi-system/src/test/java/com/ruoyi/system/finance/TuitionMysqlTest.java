@@ -63,6 +63,8 @@ class TuitionMysqlTest {
       assertTrue(m.find());
       db.jdbc().execute(m.group());
     }
+    // Shared schedule readers now include the additive custom-rule metadata.
+    db.jdbc().execute("ALTER TABLE edu_course_schedule ADD schedule_rule_id BIGINT, ADD schedule_rule_name VARCHAR(100), ADD schedule_rule_version BIGINT, ADD custom_dates TEXT");
     db.jdbc().execute("CREATE TABLE sys_user_role(user_id bigint,role_id bigint)");
     db.jdbc()
         .execute(
