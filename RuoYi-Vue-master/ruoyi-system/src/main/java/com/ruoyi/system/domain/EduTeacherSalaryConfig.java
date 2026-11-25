@@ -35,9 +35,14 @@ public class EduTeacherSalaryConfig extends BaseEntity
     @Excel(name = "小学班课(元/小时)")
     private BigDecimal ratePrimaryClass;
 
-    /** 初高班课（元/小时） */
-    @Excel(name = "初高班课(元/小时)")
+    /** 初高中班课（元/小时） */
+    @Excel(name = "初高中班课(元/小时)")
     private BigDecimal rateJhClass;
+
+    @Excel(name = "特价课(元/小时)")
+    private BigDecimal rateSpecialClass;
+    public BigDecimal getRateSpecialClass() { return rateSpecialClass; }
+    public void setRateSpecialClass(BigDecimal value) { rateSpecialClass = value; }
 
     /** 小学一对一（元/小时） */
     @Excel(name = "小学一对一(元/小时)")

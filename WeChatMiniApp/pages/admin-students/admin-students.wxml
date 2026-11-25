@@ -20,7 +20,7 @@
         <text class="row-name">{{item.studentName}}</text>
         <text class="badge {{item.activeCount > 0 ? 'ok' : 'gray'}}">{{item.statusText}}</text>
       </view>
-      <view class="row-sub">联系电话：{{item.contactPhone || item.parentPhone || item.studentPhone || '未填写'}}　共报名 {{item.courseCount}} 门课</view>
+      <view class="row-sub">家长手机：{{item.parentPhone || '未填写'}}　共报名 {{item.courseCount}} 门课</view>
       <view class="row-sub">最近报名：{{item.latestDate || '—'}}</view>
     </view>
     <view wx:if="{{hasMore}}" class="more-tip">上拉加载更多…</view>
@@ -33,8 +33,6 @@
         <text class="sheet-title">{{detail.studentName}} · 学生档案</text>
         <text class="sheet-close" bindtap="closeDetail">关闭</text>
       </view>
-      <view class="info"><text class="info-k">学生手机</text><text class="info-v">{{detail.studentPhone || '—'}}</text></view>
-      <view class="info"><text class="info-k">联系手机</text><text class="info-v">{{detail.contactPhone || '—'}}</text></view>
       <view class="info"><text class="info-k">家长手机</text><text class="info-v">{{detail.parentPhone || '—'}}</text></view>
       <view class="info"><text class="info-k">报名课程</text><text class="info-v">{{detail.courseCount}} 门（在读 {{detail.activeCount}} 门）</text></view>
       <button wx:if="{{canManageAccounts}}" size="mini" bindtap="openStudentAccount">查看家长与课次账户</button>

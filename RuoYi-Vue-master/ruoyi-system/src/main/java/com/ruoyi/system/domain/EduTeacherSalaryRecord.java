@@ -36,6 +36,16 @@ public class EduTeacherSalaryRecord extends BaseEntity
     @Excel(name = "底薪(元)")
     private BigDecimal baseSalary;
 
+    private Long specialClassCount;
+    public Long getSpecialClassCount() { return specialClassCount; }
+    public void setSpecialClassCount(Long value) { specialClassCount=value; }
+    private BigDecimal specialClassHours;
+    public BigDecimal getSpecialClassHours() { return specialClassHours; }
+    public void setSpecialClassHours(BigDecimal value) { specialClassHours=value; }
+    private BigDecimal specialClassAmount;
+    public BigDecimal getSpecialClassAmount() { return specialClassAmount; }
+    public void setSpecialClassAmount(BigDecimal value) { specialClassAmount=value; }
+
     private Long primaryClassCount;
     private BigDecimal primaryClassHours;
     private BigDecimal primaryClassAmount;

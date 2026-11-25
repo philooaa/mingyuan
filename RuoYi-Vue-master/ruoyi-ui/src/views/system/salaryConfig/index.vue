@@ -55,9 +55,16 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="中学班课(元/时)" align="center" width="120">
+      <el-table-column label="初高中班课(元/时)" align="center" width="120">
         <template slot-scope="scope">
           <span v-if="scope.row.configId">{{ money(scope.row.rateJhClass) }}</span>
+          <span v-else class="muted">—</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="特价课(元/h)" align="center" width="120">
+        <template slot-scope="scope">
+          <span v-if="scope.row.configId">{{ money(scope.row.rateSpecialClass) }}</span>
           <span v-else class="muted">—</span>
         </template>
       </el-table-column>
@@ -159,7 +166,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="中学班课">
+            <el-form-item label="初高中班课">
               <el-input-number
                 v-model="form.rateJhClass"
                 :min="0"
@@ -173,6 +180,7 @@
           </el-col>
         </el-row>
 
+        <el-form-item label="特价课(元/h)"><el-input-number v-model="form.rateSpecialClass" :min="0" :precision="2" :step="10" /><div class="hint">班型为“特价课”的班课使用此时薪，替代对应学段班课时薪</div></el-form-item>
         <el-divider content-position="left">一对一课时费（元/小时）</el-divider>
         <el-row>
           <el-col :span="12">
@@ -258,6 +266,7 @@
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
         </el-form-item>
+        <teacher-class-attendance v-if="open" :teacher-id="form.teacherId" />
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button type="primary" @click="submitForm">确 定</el-button>
@@ -268,10 +277,12 @@
 </template>
 
 <script>
+import TeacherClassAttendance from "@/components/TeacherClassAttendance"
 import { listConfig, addConfig, updateConfig, delConfig } from "@/api/system/salaryConfig"
 
 export default {
   name: "SalaryConfig",
+  components: { TeacherClassAttendance },
   data() {
     return {
       loading: false,
@@ -320,6 +331,7 @@ export default {
         baseSalary: 0,
         ratePrimaryClass: 0,
         rateJhClass: 0,
+        rateSpecialClass: 0,
         ratePrimary1on1: 0,
         rateJunior1on1: 0,
         rateSenior1on1: 0,
@@ -341,6 +353,7 @@ export default {
         this.form.baseSalary = 0
         this.form.ratePrimaryClass = 0
         this.form.rateJhClass = 0
+        this.form.rateSpecialClass = 0
         this.form.ratePrimary1on1 = 0
         this.form.rateJunior1on1 = 0
         this.form.rateSenior1on1 = 0
@@ -364,6 +377,7 @@ export default {
           baseSalary: this.form.baseSalary,
           ratePrimaryClass: this.form.ratePrimaryClass,
           rateJhClass: this.form.rateJhClass,
+          rateSpecialClass: this.form.rateSpecialClass,
           ratePrimary1on1: this.form.ratePrimary1on1,
           rateJunior1on1: this.form.rateJunior1on1,
           rateSenior1on1: this.form.rateSenior1on1,

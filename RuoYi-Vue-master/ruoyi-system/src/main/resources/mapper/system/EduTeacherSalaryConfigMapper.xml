@@ -11,6 +11,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="baseSalary"          column="base_salary" />
         <result property="ratePrimaryClass"    column="rate_primary_class" />
         <result property="rateJhClass"         column="rate_jh_class" />
+        <result property="rateSpecialClass" column="rate_special_class" />
         <result property="ratePrimary1on1"     column="rate_primary_1on1" />
         <result property="rateJunior1on1"      column="rate_junior_1on1" />
         <result property="rateSenior1on1"      column="rate_senior_1on1" />
@@ -29,7 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
 
     <sql id="selectConfigVo">
-        select config_id, teacher_id, teacher_name, base_salary, rate_primary_class, rate_jh_class,
+        select config_id, teacher_id, teacher_name, base_salary, rate_primary_class, rate_jh_class, rate_special_class,
                rate_primary_1on1, rate_junior_1on1, rate_senior_1on1, class_hours_per_session,
                commission_amount,
                status, del_flag, create_by, create_time, update_by, update_time, remark
@@ -60,7 +61,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <select id="selectTeacherSalaryList" parameterType="EduTeacherSalaryConfig" resultMap="EduTeacherSalaryConfigResult">
         select u.user_id as teacher_id,
                coalesce(nullif(trim(u.user_name), ''), u.nick_name) as teacher_name,
-               c.config_id, c.base_salary, c.rate_primary_class, c.rate_jh_class,
+               c.config_id, c.base_salary, c.rate_primary_class, c.rate_jh_class, c.rate_special_class,
                c.rate_primary_1on1, c.rate_junior_1on1, c.rate_senior_1on1,
                c.class_hours_per_session, c.commission_amount, c.status, c.del_flag,
                c.create_by, c.create_time, c.update_by, c.update_time, c.remark,
@@ -111,6 +112,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="baseSalary != null">base_salary,</if>
             <if test="ratePrimaryClass != null">rate_primary_class,</if>
             <if test="rateJhClass != null">rate_jh_class,</if>
+            <if test="rateSpecialClass != null">rate_special_class,</if>
             <if test="ratePrimary1on1 != null">rate_primary_1on1,</if>
             <if test="rateJunior1on1 != null">rate_junior_1on1,</if>
             <if test="rateSenior1on1 != null">rate_senior_1on1,</if>
@@ -127,6 +129,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="baseSalary != null">#{baseSalary},</if>
             <if test="ratePrimaryClass != null">#{ratePrimaryClass},</if>
             <if test="rateJhClass != null">#{rateJhClass},</if>
+            <if test="rateSpecialClass != null">#{rateSpecialClass},</if>
             <if test="ratePrimary1on1 != null">#{ratePrimary1on1},</if>
             <if test="rateJunior1on1 != null">#{rateJunior1on1},</if>
             <if test="rateSenior1on1 != null">#{rateSenior1on1},</if>
@@ -147,6 +150,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="baseSalary != null">base_salary = #{baseSalary},</if>
             <if test="ratePrimaryClass != null">rate_primary_class = #{ratePrimaryClass},</if>
             <if test="rateJhClass != null">rate_jh_class = #{rateJhClass},</if>
+            <if test="rateSpecialClass != null">rate_special_class = #{rateSpecialClass},</if>
             <if test="ratePrimary1on1 != null">rate_primary_1on1 = #{ratePrimary1on1},</if>
             <if test="rateJunior1on1 != null">rate_junior_1on1 = #{rateJunior1on1},</if>
             <if test="rateSenior1on1 != null">rate_senior_1on1 = #{rateSenior1on1},</if>

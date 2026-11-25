@@ -52,6 +52,7 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
     private static final int PRIMARY_1ON1 = 2;
     private static final int JUNIOR_1ON1 = 3;
     private static final int SENIOR_1ON1 = 4;
+    private static final int SPECIAL_CLASS = 5;
 
     @Override
     public List<EduTeacherSalaryRecord> selectRecordList(EduTeacherSalaryRecord query)
@@ -219,11 +220,11 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
             }
             else
             {
-                idx = "primary".equals(stage) ? PRIMARY_CLASS : JH_CLASS;
+                idx = "特价课".equals(String.valueOf(s.get("classType")).trim()) ? SPECIAL_CLASS : ("primary".equals(stage) ? PRIMARY_CLASS : JH_CLASS);
             }
             involved.add(teacherId);
-            hoursMap.computeIfAbsent(teacherId, k -> new double[5]);
-            countMap.computeIfAbsent(teacherId, k -> new long[5]);
+            hoursMap.computeIfAbsent(teacherId, k -> new double[6]);
+            countMap.computeIfAbsent(teacherId, k -> new long[6]);
             hoursMap.get(teacherId)[idx] += sessionHours * times;
             countMap.get(teacherId)[idx] += times;
         }
@@ -237,21 +238,22 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
         for (Long teacherId : all)
         {
             EduTeacherSalaryConfig cfg = configMap.get(teacherId);
-            double[] hours = hoursMap.getOrDefault(teacherId, new double[5]);
-            long[] counts = countMap.getOrDefault(teacherId, new long[5]);
+            double[] hours = hoursMap.getOrDefault(teacherId, new double[6]);
+            long[] counts = countMap.getOrDefault(teacherId, new long[6]);
             BigDecimal[] rates = new BigDecimal[] {
                 rate(cfg, c -> c.getRatePrimaryClass()),
                 rate(cfg, c -> c.getRateJhClass()),
                 rate(cfg, c -> c.getRatePrimary1on1()),
                 rate(cfg, c -> c.getRateJunior1on1()),
-                rate(cfg, c -> c.getRateSenior1on1())
+                rate(cfg, c -> c.getRateSenior1on1()),
+                rate(cfg, c -> c.getRateSpecialClass())
             };
-            BigDecimal[] hoursBd = new BigDecimal[5];
-            BigDecimal[] amountBd = new BigDecimal[5];
+            BigDecimal[] hoursBd = new BigDecimal[6];
+            BigDecimal[] amountBd = new BigDecimal[6];
             long totalLessons = 0;
             BigDecimal totalHours = BigDecimal.ZERO;
             BigDecimal lessonAmount = BigDecimal.ZERO;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 6; i++)
             {
                 hoursBd[i] = BigDecimal.valueOf(hours[i]).setScale(1, RoundingMode.HALF_UP);
                 amountBd[i] = hoursBd[i].multiply(rates[i]).setScale(2, RoundingMode.HALF_UP);
@@ -269,6 +271,9 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
             r.setTeacherName(teacherNames.getOrDefault(teacherId, cfg != null ? cfg.getTeacherName() : ("ID:" + teacherId)));
             r.setSalaryMonth(salaryMonth);
             r.setBaseSalary(base.setScale(2, RoundingMode.HALF_UP));
+            r.setSpecialClassCount(counts[SPECIAL_CLASS]);
+            r.setSpecialClassHours(hoursBd[SPECIAL_CLASS]);
+            r.setSpecialClassAmount(amountBd[SPECIAL_CLASS]);
             r.setPrimaryClassCount(counts[PRIMARY_CLASS]);
             r.setPrimaryClassHours(hoursBd[PRIMARY_CLASS]);
             r.setPrimaryClassAmount(amountBd[PRIMARY_CLASS]);
