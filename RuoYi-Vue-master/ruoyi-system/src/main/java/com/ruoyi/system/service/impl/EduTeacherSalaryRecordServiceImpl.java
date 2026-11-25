@@ -25,6 +25,7 @@ import com.ruoyi.system.domain.EduTeacherSalaryRecord;
 import com.ruoyi.system.mapper.EduTeacherSalaryConfigMapper;
 import com.ruoyi.system.mapper.EduTeacherSalaryRecordMapper;
 import com.ruoyi.system.service.IEduTeacherSalaryRecordService;
+import com.ruoyi.system.service.TeacherClassAttendanceService;
 
 /**
  * 教师薪资结算 服务实现
@@ -196,10 +197,13 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
             configMap.put(c.getTeacherId(), c);
         }
         // Only terminally approved attendance supplies payable occurrences.
-        Map<Long, double[]> hoursMap = new HashMap<>();   // [5] 小时
-        Map<Long, long[]> countMap = new HashMap<>();     // [5] 节数
+        Map<Long, double[]> hoursMap = new HashMap<>();   // 六类小时数
+        Map<Long, long[]> countMap = new HashMap<>();     // 六类节数
+        var monthlySessions=recordMapper.selectMonthlySessions(salaryMonth);
+        var classAttendanceCounts=TeacherClassAttendanceService.effectiveCounts(
+                TeacherClassAttendanceService.automaticCounts(monthlySessions),recordMapper.selectMonthlyAttendanceOverrides(salaryMonth));
         Set<Long> involved = new HashSet<>();
-        for (Map<String, Object> s : recordMapper.selectMonthlySessions(salaryMonth))
+        for (Map<String, Object> s : monthlySessions)
         {
             Long teacherId = toLong(s.get("teacherId"));
             if (teacherId == null) continue;
@@ -265,6 +269,11 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
             // 提成：薪资标准中直接配置的固定金额（元/月），不随课时费浮动
             BigDecimal commission = cfg != null && cfg.getCommissionAmount() != null
                     ? cfg.getCommissionAmount().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            long attendanceCount=classAttendanceCounts.getOrDefault(teacherId,0L);
+            BigDecimal attendancePrice=TeacherClassAttendanceService.unitPrice(cfg==null?null:cfg.getClassAttendanceUnitPrice());
+            BigDecimal attendanceCommission=TeacherClassAttendanceService.commission(attendanceCount,attendancePrice);
+            BigDecimal totalAmount=base.add(lessonAmount).add(commission).add(attendanceCommission).setScale(2,RoundingMode.HALF_UP);
+            if(totalAmount.compareTo(new BigDecimal("99999999.99"))>0) throw new ServiceException("教师应发工资不能超过99999999.99元，请核对薪资标准");
 
             EduTeacherSalaryRecord r = new EduTeacherSalaryRecord();
             r.setTeacherId(teacherId);
@@ -293,7 +302,10 @@ public class EduTeacherSalaryRecordServiceImpl implements IEduTeacherSalaryRecor
             r.setTotalHours(totalHours.setScale(1, RoundingMode.HALF_UP));
             r.setLessonAmount(lessonAmount);
             r.setCommissionAmount(commission);
-            r.setTotalAmount(base.add(lessonAmount).add(commission).setScale(2, RoundingMode.HALF_UP));
+            r.setClassAttendanceCount(attendanceCount);
+            r.setClassAttendanceUnitPrice(attendancePrice);
+            r.setClassAttendanceCommission(attendanceCommission);
+            r.setTotalAmount(totalAmount);
             r.setDelFlag("0");
             result.add(r);
         }
