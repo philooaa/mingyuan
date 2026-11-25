@@ -24,7 +24,7 @@ Page({
     // 薪资标准编辑弹层
     editVisible: false,
     editForm: null,
-    attendanceMonth: "", attendanceInfo: null, attendanceInput: "", attendanceLoading: false, attendanceSaving: false, attendanceError: "", canAdjustAttendance: false
+    attendanceMonth: "", attendanceInfo: null, attendanceInput: "", attendanceTotal: '0.00', attendanceLoading: false, attendanceSaving: false, attendanceError: "", canAdjustAttendance: false
   },
 
   onShow() { this.load() },
@@ -119,7 +119,10 @@ Page({
     if (!base) return
     let cfg = null
     if (base.configId) {
-      try { const r = await request({ url: `/system/salaryConfig/${base.configId}` }); cfg = r.data } catch (e) {}
+      try {
+        const r = await request({ url: `/system/salaryConfig/${base.configId}` }); cfg = r.data
+        if(!cfg)throw new Error('薪资标准不存在，请刷新后重试')
+      } catch (e) {wx.showToast({title:e.message || '薪资标准加载失败，请重试',icon:'none'});return}
     }
     this.setData({
       editVisible: true,
@@ -133,6 +136,7 @@ Page({
         ratePrimaryClass: cfg ? cfg.ratePrimaryClass : '',
         rateJhClass: cfg ? cfg.rateJhClass : '',
         rateSpecialClass: cfg ? cfg.rateSpecialClass : '',
+        classAttendanceUnitPrice: cfg && cfg.classAttendanceUnitPrice != null ? cfg.classAttendanceUnitPrice : 0,
         ratePrimary1on1: cfg ? cfg.ratePrimary1on1 : '',
         rateJunior1on1: cfg ? cfg.rateJunior1on1 : '',
         rateSenior1on1: cfg ? cfg.rateSenior1on1 : '',
@@ -142,7 +146,7 @@ Page({
     })
     const now=new Date()
     const roles=typeof wx.getStorageSync==='function'?(wx.getStorageSync('roles') || []):[]
-    this.setData({attendanceMonth:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`,attendanceInfo:null,attendanceInput:'',attendanceError:'',attendanceSaving:false,canAdjustAttendance:roles.some(r=>['admin','business_admin'].includes(r))})
+    this.setData({attendanceMonth:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`,attendanceInfo:null,attendanceInput:'',attendanceTotal:'0.00',attendanceError:'',attendanceSaving:false,canAdjustAttendance:roles.some(r=>['admin','business_admin'].includes(r))})
     this.loadAttendance()
   },
   closeEdit() { this._attendanceRequest=(this._attendanceRequest || 0)+1; this.setData({ editVisible: false, editForm: null }) },
@@ -154,11 +158,19 @@ Page({
       const res=await request({url:`/system/salaryConfig/class-attendance/${id}`,data:{salaryMonth:month}})
       if(serial!==this._attendanceRequest)return
       this.setData({attendanceInfo:res.data,attendanceInput:String(res.data.count)})
+      this.recalculateAttendance()
     } catch(e) {if(serial===this._attendanceRequest)this.setData({attendanceError:e.message || '人次加载失败，请重试'})}
     finally {if(serial===this._attendanceRequest)this.setData({attendanceLoading:false})}
   },
   attendanceMonthChange(e) { if(this.data.attendanceSaving)return;this.setData({attendanceMonth:e.detail.value});this.loadAttendance() },
-  attendanceInputChange(e) {this.setData({attendanceInput:e.detail.value})},
+  attendanceInputChange(e) {this.setData({attendanceInput:e.detail.value});this.recalculateAttendance()},
+  recalculateAttendance() {
+    const form=this.data.editForm;if(!form)return
+    const price=String(form.classAttendanceUnitPrice == null?'':form.classAttendanceUnitPrice).trim(),count=String(this.data.attendanceInput).trim()
+    if((price!=='' && (!/^\d+(\.\d{1,2})?$/.test(price) || Number(price)>99999999.99)) || !/^\d+$/.test(count) || Number(count)>1000000000){this.setData({attendanceTotal:'—'});return}
+    const cents=Math.round(Number(price || 0)*100)*Number(count)
+    this.setData({attendanceTotal:Number.isSafeInteger(cents) && cents<=9999999999?(cents/100).toFixed(2):'超出金额范围'})
+  },
   saveAttendance() {return this.adjustAttendance(false)},
   resetAttendance() {return this.adjustAttendance(true)},
   async adjustAttendance(reset) {
@@ -171,15 +183,18 @@ Page({
       const res=await request({url:`/system/salaryConfig/class-attendance/${id}?salaryMonth=${month}`,method:'PUT',data:{count:reset?null:Number(value)}})
       if(serial!==this._attendanceRequest)return
       this.setData({attendanceInfo:res.data,attendanceInput:String(res.data.count)})
+      this.recalculateAttendance()
       wx.showToast({title:reset?'已恢复自动统计':'人次已保存',icon:'success'})
     } catch(e){wx.showToast({title:e.message || '保存失败',icon:'none'})}
     finally{this.setData({attendanceSaving:false})}
   },
-  onEditInput(e) { this.setData({ [`editForm.${e.currentTarget.dataset.field}`]: e.detail.value }) },
+  onEditInput(e) { this.setData({ [`editForm.${e.currentTarget.dataset.field}`]: e.detail.value });if(e.currentTarget.dataset.field==='classAttendanceUnitPrice')this.recalculateAttendance() },
 
   async saveEdit() {
     const f = this.data.editForm
     if (!f) return
+    const attendancePrice=String(f.classAttendanceUnitPrice == null?'':f.classAttendanceUnitPrice).trim()
+    if(attendancePrice!=='' && (!/^\d+(\.\d{1,2})?$/.test(attendancePrice) || Number(attendancePrice)>99999999.99)){wx.showToast({title:'每人次单价须为非负数且最多两位小数',icon:'none'});return}
     const payload = {
       teacherId: f.teacherId,
       teacherName: f.saveName || f.teacherName,
@@ -188,6 +203,8 @@ Page({
     const map = { baseSalary: 'baseSalary', ratePrimaryClass: 'ratePrimaryClass', rateJhClass: 'rateJhClass', rateSpecialClass: 'rateSpecialClass', ratePrimary1on1: 'ratePrimary1on1', rateJunior1on1: 'rateJunior1on1', rateSenior1on1: 'rateSenior1on1', classHoursPerSession: 'classHoursPerSession' }
     let hasVal = false
     Object.keys(map).forEach((k) => { if (f[k] !== '' && f[k] != null) { payload[map[k]] = num(f[k]); hasVal = true } })
+    payload.classAttendanceUnitPrice=Number(attendancePrice || 0)
+    if(attendancePrice!=='')hasVal=true
     if (f.remark) payload.remark = f.remark
     if (!hasVal) { wx.showToast({ title: '请至少填写一项标准', icon: 'none' }); return }
     try {

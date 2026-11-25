@@ -33,7 +33,7 @@ for (const configId of [null, 12]) {
   test(`salary ${configId ? 'edit' : 'create'} submits hourly rates and fractional hours from input events`, async () => {
     const { p, requests, type } = setup(configId)
     for (const field of ['baseSalary','ratePrimaryClass','rateJhClass','rateSpecialClass','ratePrimary1on1','rateJunior1on1','rateSenior1on1']) type(field, '100.50')
-    type('classHoursPerSession', '1.5'); type('remark', '按小时计薪')
+    type('classHoursPerSession', '1.5'); type('remark', '按小时计薪');type('classAttendanceUnitPrice','2.35')
     await p.saveEdit()
     assert.equal(requests.length, 1)
     assert.equal(requests[0].method, configId ? 'PUT' : 'POST')
@@ -42,6 +42,7 @@ for (const configId of [null, 12]) {
     assert.equal(requests[0].data.rateSpecialClass, 100.5)
     assert.equal(requests[0].data.rateSenior1on1, 100.5)
     assert.equal(requests[0].data.remark, '按小时计薪')
+    assert.equal(requests[0].data.classAttendanceUnitPrice,2.35)
     assert.equal(p.data.editVisible, false)
   })
 }
@@ -50,8 +51,30 @@ for (const configId of [null, 12]) {
 test('class attendance edits and reset are separate from salary and keep the selected month', async () => {
   const {p,requests}=setup(12,async o=>({data:{salaryMonth:'2026-11',automaticCount:8,count:o.data.count==null?8:o.data.count,manual:o.data.count!=null}}))
   p.data.canAdjustAttendance=true;p.data.attendanceMonth='2026-11';p.data.attendanceInfo={count:8};p.data.attendanceInput='12'
+  p.data.editForm.classAttendanceUnitPrice='2.35'
   await p.saveAttendance();assert.equal(requests[0].data.count,12);assert.match(requests[0].url,/salaryMonth=2026-11/)
+  assert.equal(p.data.attendanceTotal,'28.20')
   await p.resetAttendance();assert.equal(requests[1].data.count,null);assert.equal(p.data.attendanceInput,'8')
+  assert.equal(p.data.attendanceTotal,'18.80')
   assert.equal(p.data.editForm.ratePrimaryClass,'');assert.equal(requests.length,2)
   p.data.attendanceInput='1.5';await p.saveAttendance();assert.equal(requests.length,2)
+})
+
+test('commission preview updates immediately and clearing the unit price saves zero',async()=>{
+  const {p,requests,type}=setup(12)
+  p.attendanceInputChange({detail:{value:'3'}});type('classAttendanceUnitPrice','0.10')
+  assert.equal(p.data.attendanceTotal,'0.30')
+  p.attendanceInputChange({detail:{value:'0'}});assert.equal(p.data.attendanceTotal,'0.00')
+  type('baseSalary','100');type('classAttendanceUnitPrice','');await p.saveEdit()
+  assert.equal(requests[0].data.classAttendanceUnitPrice,0)
+})
+
+test('invalid unit prices cannot be saved and failed config reads never open a blank editor',async()=>{
+  const {p,requests,type}=setup(12);type('baseSalary','100')
+  for(const price of ['-1','1.234','100000000']){type('classAttendanceUnitPrice',price);await p.saveEdit()}
+  assert.equal(requests.length,0)
+  const failed=setup(12,()=>Promise.reject(new Error('load failed')))
+  failed.p.data.editVisible=false;failed.p._all=[{teacherId:7,configId:12}]
+  await failed.p.openEdit({currentTarget:{dataset:{id:7}}})
+  assert.equal(failed.p.data.editVisible,false)
 })

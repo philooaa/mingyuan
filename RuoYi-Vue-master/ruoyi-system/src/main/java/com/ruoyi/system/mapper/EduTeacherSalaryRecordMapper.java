@@ -37,6 +37,8 @@ public interface EduTeacherSalaryRecordMapper
      */
     public List<Map<String, Object>> selectMonthlySessions(@Param("salaryMonth") String salaryMonth);
 
+    public List<Map<String, Object>> selectMonthlyAttendanceOverrides(@Param("salaryMonth") String salaryMonth);
+
     /**
      * 寒假 / 春季排课（薪资课时来源，含起止日期与上课模式）
      */

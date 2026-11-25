@@ -61,7 +61,10 @@
       <el-table-column label="课时费合计" align="center" prop="lessonAmount" width="110">
         <template slot-scope="scope"><span class="amt">¥{{ scope.row.lessonAmount }}</span></template>
       </el-table-column>
-      <el-table-column label="提成" align="center" prop="commissionAmount" width="100">
+      <el-table-column label="班课人次提成" align="center" prop="classAttendanceCommission" min-width="155">
+        <template slot-scope="scope">{{ scope.row.classAttendanceCount || 0 }}人次 × ¥{{ scope.row.classAttendanceUnitPrice || 0 }}<br /><span class="amt">¥{{ scope.row.classAttendanceCommission || 0 }}</span></template>
+      </el-table-column>
+      <el-table-column label="固定提成" align="center" prop="commissionAmount" width="100">
         <template slot-scope="scope">
           <span class="amt">¥{{ scope.row.commissionAmount }}</span>
         </template>
@@ -113,7 +116,10 @@
         <el-table-column label="课时费" align="center" width="90">
           <template slot-scope="scope"><b>¥{{ scope.row.lessonAmount }}</b></template>
         </el-table-column>
-        <el-table-column label="提成" align="center" width="90">
+        <el-table-column label="班课人次提成" align="center" prop="classAttendanceCommission" min-width="155">
+          <template slot-scope="scope">{{ scope.row.classAttendanceCount || 0 }}人次 × ¥{{ scope.row.classAttendanceUnitPrice || 0 }}<br /><b>¥{{ scope.row.classAttendanceCommission || 0 }}</b></template>
+        </el-table-column>
+        <el-table-column label="固定提成" align="center" width="90">
           <template slot-scope="scope"><b>¥{{ scope.row.commissionAmount }}</b></template>
         </el-table-column>
         <el-table-column label="应发" align="center" width="90">
@@ -214,7 +220,7 @@ export default {
       columns.forEach((col, i) => {
         if (i === 0) { sums[i] = '合计'; return }
         const prop = col.property
-        if (['baseSalary', 'primaryClassAmount', 'jhClassAmount', 'primary1on1Amount', 'junior1on1Amount', 'senior1on1Amount', 'lessonAmount', 'commissionAmount', 'totalAmount'].includes(prop)) {
+        if (['baseSalary', 'primaryClassAmount', 'jhClassAmount', 'primary1on1Amount', 'junior1on1Amount', 'senior1on1Amount', 'lessonAmount', 'commissionAmount', 'classAttendanceCommission', 'totalAmount'].includes(prop)) {
           sums[i] = '¥' + this.sumAmount(data, prop).toFixed(2)
         } else {
           sums[i] = ''
@@ -226,7 +232,7 @@ export default {
       const sums = []
       columns.forEach((col, i) => {
         if (i === 0) { sums[i] = '合计'; return }
-        if (['baseSalary', 'lessonAmount', 'commissionAmount', 'totalAmount'].includes(col.property)) {
+        if (['baseSalary', 'lessonAmount', 'commissionAmount', 'classAttendanceCommission', 'totalAmount'].includes(col.property)) {
           sums[i] = '¥' + this.sumAmount(data, col.property).toFixed(2)
         } else {
           sums[i] = ''

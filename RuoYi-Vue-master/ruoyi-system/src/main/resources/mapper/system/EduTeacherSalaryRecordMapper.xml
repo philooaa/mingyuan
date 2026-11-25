@@ -32,6 +32,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="totalHours"           column="total_hours" />
         <result property="lessonAmount"         column="lesson_amount" />
         <result property="commissionAmount"     column="commission_amount" />
+        <result property="classAttendanceCount" column="class_attendance_count" />
+        <result property="classAttendanceUnitPrice" column="class_attendance_unit_price" />
+        <result property="classAttendanceCommission" column="class_attendance_commission" />
         <result property="totalAmount"          column="total_amount" />
         <result property="confirmStatus"        column="confirm_status" />
         <result property="confirmBy"            column="confirm_by" />
@@ -53,6 +56,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                junior_1on1_count, junior_1on1_hours, junior_1on1_amount,
                senior_1on1_count, senior_1on1_hours, senior_1on1_amount,
                total_lessons, total_hours, lesson_amount, commission_amount, total_amount,
+               class_attendance_count, class_attendance_unit_price, class_attendance_commission,
                confirm_status, confirm_by, confirm_time, del_flag,
                create_by, create_time, update_by, update_time, remark
         from edu_teacher_salary_record
@@ -89,6 +93,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          junior_1on1_count, junior_1on1_hours, junior_1on1_amount,
          senior_1on1_count, senior_1on1_hours, senior_1on1_amount,
          total_lessons, total_hours, lesson_amount, commission_amount, total_amount,
+         class_attendance_count, class_attendance_unit_price, class_attendance_commission,
          confirm_status, create_by, create_time, remark)
         values
         (#{teacherId}, #{teacherName}, #{salaryMonth}, #{baseSalary},
@@ -99,6 +104,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          #{junior1on1Count}, #{junior1on1Hours}, #{junior1on1Amount},
          #{senior1on1Count}, #{senior1on1Hours}, #{senior1on1Amount},
          #{totalLessons}, #{totalHours}, #{lessonAmount}, #{commissionAmount}, #{totalAmount},
+         #{classAttendanceCount}, #{classAttendanceUnitPrice}, #{classAttendanceCommission},
          '0', #{createBy}, sysdate(), #{remark})
     </insert>
 
@@ -129,6 +135,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="totalHours != null">total_hours = #{totalHours},</if>
             <if test="lessonAmount != null">lesson_amount = #{lessonAmount},</if>
             <if test="commissionAmount != null">commission_amount = #{commissionAmount},</if>
+            <if test="classAttendanceCount != null">class_attendance_count = #{classAttendanceCount},</if>
+            <if test="classAttendanceUnitPrice != null">class_attendance_unit_price = #{classAttendanceUnitPrice},</if>
+            <if test="classAttendanceCommission != null">class_attendance_commission = #{classAttendanceCommission},</if>
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
             <if test="confirmStatus != null and confirmStatus != ''">confirm_status = #{confirmStatus},</if>
             <if test="confirmBy != null">confirm_by = #{confirmBy},</if>
@@ -145,6 +154,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{id}
         </foreach>
     </update>
+
+    <select id="selectMonthlyAttendanceOverrides" resultType="java.util.HashMap">
+        SELECT teacher_id AS teacherId, attendance_count AS attendanceCount
+        FROM edu_teacher_class_attendance_adjustment WHERE salary_month=#{salaryMonth}
+    </select>
 
     <!-- 全部教师账号：teacherName 保持昵称（历史调用方依赖），realName 为登录名（真实姓名） -->
     <select id="selectTeacherUsers" resultType="java.util.HashMap">

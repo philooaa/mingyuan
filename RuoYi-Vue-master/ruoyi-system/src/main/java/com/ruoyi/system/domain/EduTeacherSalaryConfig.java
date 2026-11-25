@@ -60,8 +60,14 @@ public class EduTeacherSalaryConfig extends BaseEntity
     @Excel(name = "班课每次课时长(小时)")
     private BigDecimal classHoursPerSession;
 
+    /** 每名班课到课学生每节课对应的提成单价。 */
+    @Excel(name = "班课人次单价(元/人次)")
+    private BigDecimal classAttendanceUnitPrice;
+    public BigDecimal getClassAttendanceUnitPrice() { return classAttendanceUnitPrice; }
+    public void setClassAttendanceUnitPrice(BigDecimal value) { classAttendanceUnitPrice = value; }
+
     /** 固定提成金额（元/月） */
-    @Excel(name = "提成(元/月)")
+    @Excel(name = "固定提成(元/月)")
     private BigDecimal commissionAmount;
 
     /** 状态（0正常 1停用） */

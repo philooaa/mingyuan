@@ -74,11 +74,25 @@ public class EduTeacherSalaryRecord extends BaseEntity
     @Excel(name = "课时费合计(元)")
     private BigDecimal lessonAmount;
 
+    /** 人次及单价均为生成结算时的快照，后续修改标准不追溯改写。 */
+    @Excel(name = "班课人次")
+    private Long classAttendanceCount;
+    @Excel(name = "人次单价(元/人次)")
+    private BigDecimal classAttendanceUnitPrice;
+    @Excel(name = "班课人次提成(元)")
+    private BigDecimal classAttendanceCommission;
+    public Long getClassAttendanceCount() { return classAttendanceCount; }
+    public void setClassAttendanceCount(Long value) { classAttendanceCount = value; }
+    public BigDecimal getClassAttendanceUnitPrice() { return classAttendanceUnitPrice; }
+    public void setClassAttendanceUnitPrice(BigDecimal value) { classAttendanceUnitPrice = value; }
+    public BigDecimal getClassAttendanceCommission() { return classAttendanceCommission; }
+    public void setClassAttendanceCommission(BigDecimal value) { classAttendanceCommission = value; }
+
     /** 提成金额（元，取自薪资标准中配置的固定提成） */
-    @Excel(name = "提成(元)")
+    @Excel(name = "固定提成(元)")
     private BigDecimal commissionAmount;
 
-    /** 应发合计（底薪+课时费+提成） */
+    /** 应发合计（底薪+课时费+固定提成+班课人次提成） */
     @Excel(name = "应发合计(元)")
     private BigDecimal totalAmount;
 

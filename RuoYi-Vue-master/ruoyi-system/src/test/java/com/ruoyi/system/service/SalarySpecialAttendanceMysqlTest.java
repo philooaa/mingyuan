@@ -45,8 +45,10 @@ class SalarySpecialAttendanceMysqlTest {
                 jdbc.execute("INSERT INTO sys_user VALUES(10,'teacher','教师','0','0')");jdbc.execute("INSERT INTO sys_role VALUES(7,'teacher','0','0')");jdbc.execute("INSERT INTO sys_user_role VALUES(10,7)");
                 jdbc.execute("INSERT INTO edu_teacher_salary_config(teacher_id,base_salary,rate_primary_class,rate_jh_class,rate_junior_1on1,class_hours_per_session) VALUES(10,1000,100,150,200,1.5)");
                 jdbc.execute("INSERT INTO edu_teacher_salary_record(teacher_id,salary_month,total_amount,confirm_status) VALUES(10,'2026-10',1234.56,'1')");
-                String migration=Files.readString(root.resolve("database/migrations/20261125_salary_special_attendance.sql")).replaceAll("(?m)^\\s*--.*$","");
-                for(int i=0;i<2;i++)try(Connection c=source.getConnection();Statement st=c.createStatement()){for(String sql:migration.split(";"))if(!sql.isBlank())st.execute(sql);}
+                for(String file:List.of("20261125_salary_special_attendance.sql","20261125_salary_attendance_commission.sql")) {
+                    String migration=Files.readString(root.resolve("database/migrations/"+file)).replaceAll("(?m)^\\s*--.*$","");
+                    for(int i=0;i<2;i++)try(Connection c=source.getConnection();Statement st=c.createStatement()){for(String sql:migration.split(";"))if(!sql.isBlank())st.execute(sql);}
+                }
                 assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM sys_dict_data WHERE dict_type='edu_class_type' AND dict_value='特价课' AND status='0'",Integer.class));
                 assertEquals(new BigDecimal("1234.56"),jdbc.queryForObject("SELECT total_amount FROM edu_teacher_salary_record WHERE salary_month='2026-10'",BigDecimal.class));
                 jdbc.execute("UPDATE edu_teacher_salary_config SET rate_special_class=40 WHERE teacher_id=10");
@@ -69,7 +71,27 @@ class SalarySpecialAttendanceMysqlTest {
                     assertEquals(before.getTotalAmount(),payroll.previewMonth("2026-11").get(0).getTotalAmount());assertEquals(10,jdbc.queryForObject("SELECT COUNT(*) FROM edu_class_sign_in",Integer.class));
                     assertThrows(ServiceException.class,()->counts.adjust(10,"2026-11",new BigDecimal("1.5")));assertThrows(ServiceException.class,()->counts.adjust(10,"2026-11",new BigDecimal("-1")));
                     counts.adjust(10,"2026-11",null);assertEquals(5L,counts.summary(10,"2026-11").get("count"));
-                    before.setCreateBy("test");records.insertRecord(before);var saved=records.selectRecordByTeacherMonth(10L,"2026-11");assertEquals(new BigDecimal("60.00"),saved.getSpecialClassAmount());
+                    var configService=new com.ruoyi.system.service.impl.EduTeacherSalaryConfigServiceImpl();ScheduleCrudTest.inject(configService,"configMapper",configs);
+                    var price=new EduTeacherSalaryConfig();price.setConfigId(configs.selectConfigByTeacherId(10L).getConfigId());price.setClassAttendanceUnitPrice(new BigDecimal("2.35"));price.setCommissionAmount(new BigDecimal("7.50"));configService.updateConfig(price);
+                    assertEquals(new BigDecimal("2.35"),configs.selectConfigByTeacherId(10L).getClassAttendanceUnitPrice());
+                    assertEquals(new BigDecimal("11.75"),counts.summary(10,"2026-11").get("totalCommission"));
+                    assertEquals(new BigDecimal("1829.25"),payroll.previewMonth("2026-11").get(0).getTotalAmount());
+                    counts.adjust(10,"2026-11",new BigDecimal("12"));
+                    assertEquals(new BigDecimal("28.20"),counts.summary(10,"2026-11").get("totalCommission"));
+                    assertEquals(1,payroll.generateMonth("2026-11"));
+                    var saved=records.selectRecordByTeacherMonth(10L,"2026-11");assertEquals(new BigDecimal("60.00"),saved.getSpecialClassAmount());
+                    assertEquals(12L,saved.getClassAttendanceCount());assertEquals(new BigDecimal("2.35"),saved.getClassAttendanceUnitPrice());assertEquals(new BigDecimal("28.20"),saved.getClassAttendanceCommission());
+                    assertEquals(new BigDecimal("7.50"),saved.getCommissionAmount());assertEquals(new BigDecimal("1845.70"),saved.getTotalAmount());
+                    counts.adjust(10,"2026-11",BigDecimal.ZERO);payroll.generateMonth("2026-11");
+                    assertEquals(new BigDecimal("0.00"),records.selectRecordByTeacherMonth(10L,"2026-11").getClassAttendanceCommission());
+                    counts.adjust(10,"2026-11",null);payroll.generateMonth("2026-11");payroll.confirmRecord(saved.getRecordId());
+                    price.setClassAttendanceUnitPrice(new BigDecimal("6"));configService.updateConfig(price);counts.adjust(10,"2026-11",new BigDecimal("8"));
+                    assertEquals(new BigDecimal("48.00"),counts.summary(10,"2026-11").get("totalCommission"));
+                    var confirmed=payroll.previewMonth("2026-11").get(0);assertEquals(new BigDecimal("1829.25"),confirmed.getTotalAmount());assertEquals(5L,confirmed.getClassAttendanceCount());assertEquals(new BigDecimal("2.35"),confirmed.getClassAttendanceUnitPrice());
+                    assertThrows(ServiceException.class,()->payroll.generateMonth("2026-11"));
+                    assertEquals(new BigDecimal("1234.56"),payroll.previewMonth("2026-10").get(0).getTotalAmount());
+                    price.setClassAttendanceUnitPrice(new BigDecimal("0.001"));assertThrows(ServiceException.class,()->configService.updateConfig(price));
+                    assertEquals(new BigDecimal("6.00"),configs.selectConfigByTeacherId(10L).getClassAttendanceUnitPrice());assertEquals(10,jdbc.queryForObject("SELECT COUNT(*) FROM edu_class_sign_in",Integer.class));
                 }
             } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext();admin.createStatement().execute("DROP DATABASE "+schema); }
         }

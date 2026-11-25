@@ -442,10 +442,20 @@ public class TuitionService {
         where += " AND " + f.getValue() + " LIKE ?";
         a.add("%" + q.get(f.getKey()) + "%");
       }
+    // Match the miniapp's workflow labels before LIMIT/OFFSET so later pages retain
+    // the same priority order. Parent/web callers keep their existing default sort.
+    String orderBy = "e.enrollment_id DESC";
+    if (admin && "WORKFLOW".equals(str(q,"sortBy"))) {
+      orderBy = "CASE WHEN e.billing_status='HISTORY_PENDING' THEN 3"
+          + " WHEN e.billing_status='CLOSED' OR e.enrollment_status IN ('2','已取消','3','已拒绝') THEN 4"
+          + " WHEN success_count>0 OR e.pay_status IN ('已支付','部分退款','已退款','已减免','1','2') THEN 4"
+          + " WHEN pending_payment_count>0 THEN 2"
+          + " WHEN e.billing_status='OPEN' THEN 1 ELSE 0 END, e.create_time DESC,e.enrollment_id DESC";
+    }
     Map<String, Object> page =
         CouponService.page(
             db,
-            BILL_SELECT + BILL_FROM + where + " ORDER BY e.enrollment_id DESC",
+            BILL_SELECT + BILL_FROM + where + " ORDER BY " + orderBy,
             "SELECT COUNT(*)" + BILL_FROM + where,
             a,
             q);

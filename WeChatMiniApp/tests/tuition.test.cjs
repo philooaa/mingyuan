@@ -521,6 +521,18 @@ test('education keeps billing filters while administrator list has no redundant 
  assert.match(markup,/<picker wx:if="{{!confirmationOnly}}"/)
 })
 
+test('staff billing list requests global workflow ordering on every page and retains status filters',async()=>{
+ storage=new Map()
+ env(o=>o.url.endsWith('/getInfo')?o.success({statusCode:200,data:{code:200,roles:['education'],permissions:['*:*:*']}}):o.success({statusCode:200,data:{code:200,rows:[{...bill,enrollmentId:String(o.data.pageNum)}],total:2}}),'education')
+ const p=page('admin-tuition');p.onLoad({});await p.onShow();await p.onReachBottom()
+ const reads=calls.filter(c=>c.url.endsWith('/list'))
+ assert.deepEqual(reads.map(r=>r.data.sortBy),['WORKFLOW','WORKFLOW'])
+ assert.deepEqual(reads.map(r=>r.data.pageNum),[1,2])
+ assert.deepEqual(p.data.rows.map(r=>r.enrollmentId),['1','2'])
+ p.setData({filterIndex:1});await p.search()
+ assert.equal(calls.at(-1).data.sortBy,'WORKFLOW');assert.equal(calls.at(-1).data.billingStatus,'PENDING_PRICE')
+})
+
 test('education and administrator billing details show every course without changing money',async()=>{
  for(const role of ['education','business_admin']) {
   storage=new Map()

@@ -85,7 +85,8 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="提成(元/月)" align="center" width="105">
+      <el-table-column label="人次单价(元/人次)" align="center" width="145"><template slot-scope="scope">{{ money(scope.row.classAttendanceUnitPrice) }}</template></el-table-column>
+      <el-table-column label="固定提成(元/月)" align="center" width="120">
         <template slot-scope="scope">
           <span v-if="scope.row.configId">{{ money(scope.row.commissionAmount) }}</span>
           <span v-else class="muted">—</span>
@@ -226,8 +227,8 @@
           </el-col>
         </el-row>
 
-        <el-divider content-position="left">提成</el-divider>
-        <el-form-item label="提成（元/月）">
+        <el-divider content-position="left">固定提成</el-divider>
+        <el-form-item label="固定提成（元/月）">
           <el-input-number
             v-model="form.commissionAmount"
             :min="0"
@@ -266,7 +267,8 @@
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
         </el-form-item>
-        <teacher-class-attendance v-if="open" :teacher-id="form.teacherId" />
+        <el-form-item label="每人次单价"><el-input-number v-model="form.classAttendanceUnitPrice" :min="0" :max="99999999.99" :precision="2" :step="1" /> 元/人次<div class="hint">0表示不计班课人次提成，随薪资标准保存</div></el-form-item>
+        <teacher-class-attendance v-if="open" :teacher-id="form.teacherId" :unit-price="form.classAttendanceUnitPrice" />
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button type="primary" @click="submitForm">确 定</el-button>
@@ -337,6 +339,7 @@ export default {
         rateSenior1on1: 0,
         classHoursPerSession: 2.0,
         commissionAmount: 0,
+        classAttendanceUnitPrice: 0,
         status: "0",
         remark: null,
         primaryClassCount: 0,
@@ -359,6 +362,7 @@ export default {
         this.form.rateSenior1on1 = 0
         this.form.classHoursPerSession = 2.0
         this.form.commissionAmount = 0
+        this.form.classAttendanceUnitPrice = 0
         this.form.status = "0"
         this.form.remark = null
       }
@@ -383,6 +387,7 @@ export default {
           rateSenior1on1: this.form.rateSenior1on1,
           classHoursPerSession: this.form.classHoursPerSession,
           commissionAmount: this.form.commissionAmount,
+          classAttendanceUnitPrice: this.form.classAttendanceUnitPrice == null ? 0 : this.form.classAttendanceUnitPrice,
           status: this.form.status,
           remark: this.form.remark
         }
