@@ -35,7 +35,6 @@ public class MiniAppStaffScheduleController extends BaseController {
     @PostMapping
     @Log(title="教务管理员新增排课",businessType=BusinessType.INSERT)
     public AjaxResult create(@RequestBody EduCourseSchedule input) {
-        if (Boolean.TRUE.equals(input.getApplyScheduleRule()) || "CUSTOM_DATES".equals(input.getClassPattern())) throw new ServiceException("请在网页端选择排课规则");
         if (input.getClassroomId()!=null) throw new ServiceException("排课时只选择校区，教室稍后统一分配");
         if (!"2".equals(input.getClassMode()) && (input.getRequestedLessonCount()==null || input.getRequestedLessonCount()<1 || input.getRequestedLessonCount()>3661))
             throw new ServiceException("请填写1至3661的整数计费课次数");
@@ -49,10 +48,10 @@ public class MiniAppStaffScheduleController extends BaseController {
             throw new ServiceException("请通过后续教室分配功能调整教室");
         if (old.getClassroomId()!=null && input.getCampusName()!=null && !Objects.equals(input.getCampusName(),old.getCampusName()))
             throw new ServiceException("已分配教室的课程需通过教室分配功能调整校区");
-        if (Boolean.TRUE.equals(input.getApplyScheduleRule()) || Boolean.TRUE.equals(input.getClearScheduleRule())) throw new ServiceException("请在网页端修改排课规则");
-        if ("CUSTOM_DATES".equals(old.getClassPattern())) {
+        // Ordinary edits keep the saved date snapshot; applying/replacing a rule is explicit
+        // and goes through the same version, conflict and history checks as the web form.
+        if ("CUSTOM_DATES".equals(old.getClassPattern()) && !Boolean.TRUE.equals(input.getApplyScheduleRule()) && !Boolean.TRUE.equals(input.getClearScheduleRule())) {
             input.setClassPattern(old.getClassPattern()); input.setStartDate(old.getStartDate()); input.setEndDate(old.getEndDate());
-            input.setPeriodName(old.getPeriodName()); input.setClassMode(old.getClassMode());
         }
         input.setClassroomId(old.getClassroomId());
         return toAjax(schedules.updateEduCourseSchedule(input, force));
