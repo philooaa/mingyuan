@@ -10,13 +10,12 @@
     <view class="stat"><text class="num">{{stats.expectedCount || stats.totalCount}}</text><text class="label">应到名单</text></view>
     <view class="stat main"><text class="num">{{stats.actualCount}}</text><text class="label">实际到课</text></view>
     <view class="stat"><text class="num">{{stats.leave}}</text><text class="label">请假</text></view>
-    <view class="stat"><text class="num">{{stats.attended}}</text><text class="label">正常到课</text></view>
     <view class="stat"><text class="num">{{stats.recorded}}</text><text class="label">录播</text></view>
     <view class="stat"><text class="num">{{stats.audited}}</text><text class="label">试听到课</text></view>
     <view class="stat"><text class="num">{{stats.transferred}}</text><text class="label">调课到课</text></view>
     <view class="stat"><text class="num">{{stats.absent || 0}}</text><text class="label">未到课</text></view>
   </view>
-  <view class="banner half" wx:if="{{rows.length}}">实到人数含正常到课、试听到课和调课到课。请核对任课教师、具体课次和每位学员的点名情况。</view>
+  <view class="banner half" wx:if="{{rows.length}}">实到人数包含到课、试听和调课学员。请核对任课教师、具体课次和每位学员的点名情况。</view>
   <view class="banner done" wx:if="{{review.reviewStatus === '1'}}">✓ 已终审，本课次点名已锁定。</view>
   <view class="banner half" wx:elif="{{stageText && review.reviewStatus !== '2'}}">{{stageText}}；终审前为待核实统计。</view>
   <view class="banner exception" wx:elif="{{review.reviewStatus === '2'}}">审核异常：{{review.reviewReason}}。可为多位学员分别选择出勤状态并填写原因，点击“保存全部更正”后再审核确认。</view>
