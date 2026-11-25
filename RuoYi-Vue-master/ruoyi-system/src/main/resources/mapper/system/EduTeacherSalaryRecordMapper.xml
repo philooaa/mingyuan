@@ -10,6 +10,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="teacherName"          column="teacher_name" />
         <result property="salaryMonth"          column="salary_month" />
         <result property="baseSalary"           column="base_salary" />
+        <result property="specialClassCount" column="special_class_count" />
+        <result property="specialClassHours" column="special_class_hours" />
+        <result property="specialClassAmount" column="special_class_amount" />
         <result property="primaryClassCount"    column="primary_class_count" />
         <result property="primaryClassHours"    column="primary_class_hours" />
         <result property="primaryClassAmount"   column="primary_class_amount" />
@@ -43,6 +46,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectRecordVo">
         select record_id, teacher_id, teacher_name, salary_month, base_salary,
+               special_class_count, special_class_hours, special_class_amount,
                primary_class_count, primary_class_hours, primary_class_amount,
                jh_class_count, jh_class_hours, jh_class_amount,
                primary_1on1_count, primary_1on1_hours, primary_1on1_amount,
@@ -78,6 +82,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <insert id="insertRecord" parameterType="EduTeacherSalaryRecord" useGeneratedKeys="true" keyProperty="recordId">
         insert into edu_teacher_salary_record
         (teacher_id, teacher_name, salary_month, base_salary,
+         special_class_count, special_class_hours, special_class_amount,
          primary_class_count, primary_class_hours, primary_class_amount,
          jh_class_count, jh_class_hours, jh_class_amount,
          primary_1on1_count, primary_1on1_hours, primary_1on1_amount,
@@ -87,6 +92,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
          confirm_status, create_by, create_time, remark)
         values
         (#{teacherId}, #{teacherName}, #{salaryMonth}, #{baseSalary},
+         #{specialClassCount}, #{specialClassHours}, #{specialClassAmount},
          #{primaryClassCount}, #{primaryClassHours}, #{primaryClassAmount},
          #{jhClassCount}, #{jhClassHours}, #{jhClassAmount},
          #{primary1on1Count}, #{primary1on1Hours}, #{primary1on1Amount},
@@ -101,6 +107,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <trim prefix="SET" suffixOverrides=",">
             <if test="teacherName != null and teacherName != ''">teacher_name = #{teacherName},</if>
             <if test="baseSalary != null">base_salary = #{baseSalary},</if>
+            <if test="specialClassCount != null">special_class_count = #{specialClassCount},</if>
+            <if test="specialClassHours != null">special_class_hours = #{specialClassHours},</if>
+            <if test="specialClassAmount != null">special_class_amount = #{specialClassAmount},</if>
             <if test="primaryClassCount != null">primary_class_count = #{primaryClassCount},</if>
             <if test="primaryClassHours != null">primary_class_hours = #{primaryClassHours},</if>
             <if test="primaryClassAmount != null">primary_class_amount = #{primaryClassAmount},</if>
@@ -157,7 +166,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select coalesce(l.teacher_id,s.teacher_id) as teacherId,
                r.schedule_id as scheduleId,
                r.class_date as classDate,
-               s.class_mode as classMode,
+               s.class_mode as classMode, s.class_type as classType,
                case
                  when s.grade_name in ('初一','初二','初三') then 'junior'
                  when s.grade_name in ('高一','高二','高三') then 'senior'
@@ -172,7 +181,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         left join edu_attendance_lesson l on l.schedule_id=r.schedule_id and l.class_date=r.class_date and l.locked=1
         where r.del_flag = '0' and r.review_status = '1' and coalesce(l.teacher_id,s.teacher_id) is not null
           and date_format(r.class_date, '%Y-%m') = #{salaryMonth}
-        group by coalesce(l.teacher_id,s.teacher_id), r.schedule_id, r.class_date, s.class_mode, stage, coalesce(l.start_time,s.start_time), coalesce(l.end_time,s.end_time)
+        group by coalesce(l.teacher_id,s.teacher_id), r.schedule_id, r.class_date, s.class_mode, s.class_type, stage, coalesce(l.start_time,s.start_time), coalesce(l.end_time,s.end_time)
     </select>
     <!--
       薪资课时来源：寒假 / 春季排课（暑假、秋季为历史数据，不参与薪资计算）。
@@ -186,7 +195,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                s.grade_name as gradeName,
                s.class_pattern as classPattern, s.custom_dates as customDates,
                s.period_name as periodName,
-               s.class_mode as classMode,
+               s.class_mode as classMode, s.class_type as classType,
                s.start_time as startTime,
                s.end_time as endTime,
                s.start_date as startDate,

@@ -33,12 +33,13 @@
           <span class="amt">¥{{ scope.row.primaryClassAmount }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="初高班课" align="center">
+      <el-table-column label="初高中班课" align="center">
         <template slot-scope="scope">
           {{ scope.row.jhClassCount }}节 / {{ scope.row.jhClassHours }}h<br />
           <span class="amt">¥{{ scope.row.jhClassAmount }}</span>
         </template>
       </el-table-column>
+      <el-table-column label="特价课" align="center"><template slot-scope="scope">{{ scope.row.specialClassCount || 0 }}节 / {{ scope.row.specialClassHours || 0 }}h<br />¥{{ scope.row.specialClassAmount || 0 }}</template></el-table-column>
       <el-table-column label="小学一对一" align="center">
         <template slot-scope="scope">
           {{ scope.row.primary1on1Count }}人次 / {{ scope.row.primary1on1Hours }}h<br />
@@ -96,10 +97,11 @@
         <el-table-column label="小学班课" align="center">
           <template slot-scope="scope">{{ scope.row.primaryClassCount }}节/{{ scope.row.primaryClassHours }}h/¥{{ scope.row.primaryClassAmount }}</template>
         </el-table-column>
-        <el-table-column label="初高班课" align="center">
+        <el-table-column label="初高中班课" align="center">
           <template slot-scope="scope">{{ scope.row.jhClassCount }}节/{{ scope.row.jhClassHours }}h/¥{{ scope.row.jhClassAmount }}</template>
         </el-table-column>
-        <el-table-column label="小学一对一" align="center">
+        <el-table-column label="特价课" align="center"><template slot-scope="scope">{{ scope.row.specialClassCount || 0 }}节 / {{ scope.row.specialClassHours || 0 }}h<br />¥{{ scope.row.specialClassAmount || 0 }}</template></el-table-column>
+      <el-table-column label="小学一对一" align="center">
           <template slot-scope="scope">{{ scope.row.primary1on1Count }}人次/{{ scope.row.primary1on1Hours }}h/¥{{ scope.row.primary1on1Amount }}</template>
         </el-table-column>
         <el-table-column label="初中一对一" align="center">

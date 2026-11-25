@@ -43,6 +43,7 @@ public class EduTeacherSalaryConfigServiceImpl implements IEduTeacherSalaryConfi
     @Override
     public int insertConfig(EduTeacherSalaryConfig config)
     {
+        validateSpecialRate(config);
         EduTeacherSalaryConfig exist = configMapper.selectConfigByTeacherId(config.getTeacherId());
         if (exist != null)
         {
@@ -70,9 +71,15 @@ public class EduTeacherSalaryConfigServiceImpl implements IEduTeacherSalaryConfi
     @Override
     public int updateConfig(EduTeacherSalaryConfig config)
     {
+        validateSpecialRate(config);
         config.setUpdateTime(DateUtils.getNowDate());
         config.setUpdateBy(SecurityUtils.getUsername());
         return configMapper.updateConfig(config);
+    }
+
+    private void validateSpecialRate(EduTeacherSalaryConfig config) {
+        var rate=config.getRateSpecialClass();
+        if(rate!=null && (rate.signum()<0 || rate.stripTrailingZeros().scale()>2 || rate.compareTo(new java.math.BigDecimal("99999999.99"))>0)) throw new ServiceException("特价课时薪须为非负数且最多两位小数");
     }
 
     @Override

@@ -23,7 +23,8 @@ Page({
     detailLoading: false,
     // 薪资标准编辑弹层
     editVisible: false,
-    editForm: null
+    editForm: null,
+    attendanceMonth: "", attendanceInfo: null, attendanceInput: "", attendanceLoading: false, attendanceSaving: false, attendanceError: "", canAdjustAttendance: false
   },
 
   onShow() { this.load() },
@@ -131,6 +132,7 @@ Page({
         baseSalary: cfg ? cfg.baseSalary : '',
         ratePrimaryClass: cfg ? cfg.ratePrimaryClass : '',
         rateJhClass: cfg ? cfg.rateJhClass : '',
+        rateSpecialClass: cfg ? cfg.rateSpecialClass : '',
         ratePrimary1on1: cfg ? cfg.ratePrimary1on1 : '',
         rateJunior1on1: cfg ? cfg.rateJunior1on1 : '',
         rateSenior1on1: cfg ? cfg.rateSenior1on1 : '',
@@ -138,8 +140,41 @@ Page({
         remark: cfg ? (cfg.remark || '') : ''
       }
     })
+    const now=new Date()
+    const roles=typeof wx.getStorageSync==='function'?(wx.getStorageSync('roles') || []):[]
+    this.setData({attendanceMonth:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`,attendanceInfo:null,attendanceInput:'',attendanceError:'',attendanceSaving:false,canAdjustAttendance:roles.some(r=>['admin','business_admin'].includes(r))})
+    this.loadAttendance()
   },
-  closeEdit() { this.setData({ editVisible: false, editForm: null }) },
+  closeEdit() { this._attendanceRequest=(this._attendanceRequest || 0)+1; this.setData({ editVisible: false, editForm: null }) },
+  async loadAttendance() {
+    const f=this.data.editForm;if(!f)return
+    const serial=this._attendanceRequest=(this._attendanceRequest || 0)+1,id=f.teacherId,month=this.data.attendanceMonth
+    this.setData({attendanceLoading:true,attendanceInfo:null,attendanceError:''})
+    try {
+      const res=await request({url:`/system/salaryConfig/class-attendance/${id}`,data:{salaryMonth:month}})
+      if(serial!==this._attendanceRequest)return
+      this.setData({attendanceInfo:res.data,attendanceInput:String(res.data.count)})
+    } catch(e) {if(serial===this._attendanceRequest)this.setData({attendanceError:e.message || '人次加载失败，请重试'})}
+    finally {if(serial===this._attendanceRequest)this.setData({attendanceLoading:false})}
+  },
+  attendanceMonthChange(e) { if(this.data.attendanceSaving)return;this.setData({attendanceMonth:e.detail.value});this.loadAttendance() },
+  attendanceInputChange(e) {this.setData({attendanceInput:e.detail.value})},
+  saveAttendance() {return this.adjustAttendance(false)},
+  resetAttendance() {return this.adjustAttendance(true)},
+  async adjustAttendance(reset) {
+    if(!this.data.canAdjustAttendance || !this.data.editForm || !this.data.attendanceInfo || this.data.attendanceLoading || this.data.attendanceSaving)return
+    const value=String(this.data.attendanceInput).trim()
+    if(!reset && (!/^\d+$/.test(value) || Number(value)>1000000000)){wx.showToast({title:'人次须为0至10亿的整数',icon:'none'});return}
+    const id=this.data.editForm.teacherId,month=this.data.attendanceMonth,serial=this._attendanceRequest
+    this.setData({attendanceSaving:true})
+    try {
+      const res=await request({url:`/system/salaryConfig/class-attendance/${id}?salaryMonth=${month}`,method:'PUT',data:{count:reset?null:Number(value)}})
+      if(serial!==this._attendanceRequest)return
+      this.setData({attendanceInfo:res.data,attendanceInput:String(res.data.count)})
+      wx.showToast({title:reset?'已恢复自动统计':'人次已保存',icon:'success'})
+    } catch(e){wx.showToast({title:e.message || '保存失败',icon:'none'})}
+    finally{this.setData({attendanceSaving:false})}
+  },
   onEditInput(e) { this.setData({ [`editForm.${e.currentTarget.dataset.field}`]: e.detail.value }) },
 
   async saveEdit() {
@@ -150,7 +185,7 @@ Page({
       teacherName: f.saveName || f.teacherName,
       status: '0'
     }
-    const map = { baseSalary: 'baseSalary', ratePrimaryClass: 'ratePrimaryClass', rateJhClass: 'rateJhClass', ratePrimary1on1: 'ratePrimary1on1', rateJunior1on1: 'rateJunior1on1', rateSenior1on1: 'rateSenior1on1', classHoursPerSession: 'classHoursPerSession' }
+    const map = { baseSalary: 'baseSalary', ratePrimaryClass: 'ratePrimaryClass', rateJhClass: 'rateJhClass', rateSpecialClass: 'rateSpecialClass', ratePrimary1on1: 'ratePrimary1on1', rateJunior1on1: 'rateJunior1on1', rateSenior1on1: 'rateSenior1on1', classHoursPerSession: 'classHoursPerSession' }
     let hasVal = false
     Object.keys(map).forEach((k) => { if (f[k] !== '' && f[k] != null) { payload[map[k]] = num(f[k]); hasVal = true } })
     if (f.remark) payload.remark = f.remark
