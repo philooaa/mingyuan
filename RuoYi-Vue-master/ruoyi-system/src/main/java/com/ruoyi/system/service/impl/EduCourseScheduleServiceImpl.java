@@ -151,7 +151,7 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
             require(!ScheduleCalendar.CUSTOM_DATES.equals(effective.getClassPattern()), "请选择原有递推模式");
             effective.setScheduleRuleId(null); effective.setScheduleRuleName(null); effective.setScheduleRuleVersion(null); effective.setCustomDatesJson(null);
         } else if (ScheduleCalendar.CUSTOM_DATES.equals(current.getClassPattern())) {
-            require(input.getClassPattern() == null || ScheduleCalendar.CUSTOM_DATES.equals(input.getClassPattern()), "自定义规则课程请在网页端明确选择日期规则后修改");
+            require(input.getClassPattern() == null || ScheduleCalendar.CUSTOM_DATES.equals(input.getClassPattern()), "自定义规则课程请明确选择排课规则后修改");
             require(input.getStartDate() == null || Objects.equals(ScheduleCalendar.date(input.getStartDate()),ScheduleCalendar.date(current.getStartDate())), "请通过排课规则修改上课日期");
             require(input.getEndDate() == null || Objects.equals(ScheduleCalendar.date(input.getEndDate()),ScheduleCalendar.date(current.getEndDate())), "请通过排课规则修改上课日期");
         }

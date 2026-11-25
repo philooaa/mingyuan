@@ -247,6 +247,48 @@ public class ScheduleCrudTest {
     private EduCourseSchedule customCourse() {
         var s=course(); s.setClassMode("1");s.setApplyScheduleRule(true);s.setScheduleRuleId(7L);s.setScheduleRuleVersion(1L);return s;
     }
+    private com.ruoyi.system.controller.MiniAppStaffScheduleController miniapp() throws Exception {
+        var controller=new com.ruoyi.system.controller.MiniAppStaffScheduleController();
+        inject(controller,"schedules",service);
+        return controller;
+    }
+    @Test void miniappCanApplyWebRuleWithoutAssigningClassroomOrChangingBillingCount() throws Exception {
+        principal(23,"education");
+        var input=customCourse();input.setClassroomId(null);input.setRequestedLessonCount(12);
+        assertEquals(30L,miniapp().create(input).get("data"));
+        assertEquals("CUSTOM_DATES",captured.getClassPattern());assertNull(captured.getClassroomId());
+        assertEquals(List.of("2026-12-26","2027-01-02"),captured.getCustomDates());
+        assertEquals(12,captured.getRequestedLessonCount());
+    }
+    @Test void miniappCanExplicitlyReplaceOrClearDateRuleThroughSharedChecks() throws Exception {
+        current.setClassMode("1");
+        var input=new EduCourseSchedule();input.setScheduleId(10L);input.setApplyScheduleRule(true);input.setScheduleRuleId(7L);input.setScheduleRuleVersion(1L);
+        assertEquals(200,miniapp().edit(input,true).get("code"));
+        assertEquals("CUSTOM_DATES",captured.getClassPattern());
+        assertEquals("2027-01-02",ScheduleCalendar.date(captured.getEndDate()).toString());
+        current.setClassPattern("CUSTOM_DATES");current.setCustomDatesJson("[\"2026-12-26\"]");
+        var clear=new EduCourseSchedule();clear.setScheduleId(10L);clear.setClearScheduleRule(true);clear.setClassPattern("WEEKLY");
+        assertEquals(200,miniapp().edit(clear,true).get("code"));assertEquals("WEEKLY",captured.getClassPattern());
+    }
+    @Test void miniappRuleWritesRejectStaleDisabledEmptyOrConflictingRules() throws Exception {
+        var controller=miniapp();var input=customCourse();input.setClassroomId(null);input.setRequestedLessonCount(3);
+        input.setScheduleRuleVersion(2L);assertThrows(ServiceException.class,()->controller.create(input));
+        input.setScheduleRuleVersion(1L);db.ruleEnabled=false;assertThrows(ServiceException.class,()->controller.create(input));
+        db.ruleEnabled=true;db.ruleDates=List.of();assertThrows(ServiceException.class,()->controller.create(input));
+        db.ruleDates=List.of("2026-12-26");
+        db.conflicts=List.of(Map.of("scheduleId","40","startTime","09:00:00","endTime","10:00:00","startDate","2026-12-26","endDate","2026-12-26","classPattern","DAILY","periodName","一期"));
+        assertThrows(ServiceException.class,()->controller.create(input));assertNull(captured);
+    }
+    @Test void miniappOrdinaryEditKeepsSnapshotButExplicitReplacementHonorsHistory() throws Exception {
+        current.setClassMode("1");current.setClassPattern("CUSTOM_DATES");current.setCustomDatesJson("[\"2026-12-26\"]");
+        var controller=miniapp();var patch=new EduCourseSchedule();patch.setScheduleId(10L);patch.setCourseClassName("只改课程名");patch.setClassPattern("WEEKLY");patch.setStartDate(java.sql.Date.valueOf("2099-01-01"));
+        assertEquals(200,controller.edit(patch,true).get("code"));
+        assertEquals("CUSTOM_DATES",captured.getClassPattern());assertEquals("2026-12-26",ScheduleCalendar.date(captured.getStartDate()).toString());
+        assertEquals("[\"2026-12-26\"]",current.getCustomDatesJson());
+        patch.setApplyScheduleRule(true);patch.setScheduleRuleId(7L);patch.setScheduleRuleVersion(1L);captured=null;
+        db.attendance=1;assertThrows(ServiceException.class,()->controller.edit(patch,true));assertNull(captured);
+        db.attendance=0;db.materializedLesson=true;assertThrows(ServiceException.class,()->controller.edit(patch,true));assertNull(captured);
+    }
     @Test void rolloutGateRejectsCustomWritesUntilClientsAreUpgraded() throws Exception {
         inject(service, "customRulesEnabled", false);
         var error = assertThrows(ServiceException.class, () -> service.insertEduCourseSchedule(customCourse()));

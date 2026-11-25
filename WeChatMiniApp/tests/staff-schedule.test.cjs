@@ -178,9 +178,100 @@ test('custom-rule courses keep their date mode when edited in the miniapp',async
   const {p,requests}=setup();await p.load();p.add()
   Object.assign(p.data.form,{scheduleId:99,campusName:'万达',teacherId:'7',unitPrice:'100',courseClassName:'初一数学',termName:'秋季',periodName:'周六',timeSlot:'8:00-10:00',gradeName:'初一',subjectName:'数学',classPattern:'CUSTOM_DATES',startDate:'2026-12-26',endDate:'2027-01-02',customDates:['2026-12-26','2027-01-02']})
   p.setPeriodOptions(true);assert.equal(p.data.form.periodName,'周六')
-  p.choose({currentTarget:{dataset:{key:'classPattern'}},detail:{value:0}})
+  p.input({currentTarget:{dataset:{key:'remark'}},detail:{value:'只修改备注'}})
   assert.equal(p.data.form.classPattern,'CUSTOM_DATES')
   await p.save()
   const body=requests.find(r=>r.method==='PUT').data
   assert.equal(body.classPattern,'CUSTOM_DATES');assert.equal(body.startDate,'2026-12-26');assert.equal(body.endDate,'2027-01-02')
+  assert.notEqual(body.applyScheduleRule,true);assert.notEqual(body.clearScheduleRule,true)
+})
+
+const ruleList=[{ruleId:7,ruleName:'寒假三讲',status:'0',dateCount:3},{ruleId:8,ruleName:'春季规则',status:'0',dateCount:1},{ruleId:9,ruleName:'已停用',status:'1',dateCount:1}]
+const rule7={ruleId:7,ruleName:'寒假三讲',status:'0',version:2,dates:['2027-02-01','2027-01-27','2027-01-30','2027-01-27']}
+function rulesSetup(send) {
+  return setup(['education'],o=>{
+    if(send){const result=send(o);if(result!==undefined)return result}
+    if(o.url==='/system/schedule-rules')return {data:ruleList}
+    if(o.url==='/system/schedule-rules/7')return {data:rule7}
+    if(o.url==='/system/schedule-rules/8')return {data:{ruleId:8,ruleName:'春季规则',status:'0',version:1,dates:['2027-03-06']}}
+  })
+}
+const customMode=p=>p.choose({currentTarget:{dataset:{key:'classPattern'}},detail:{value:p.patternIndexOf('CUSTOM_DATES')}})
+const fillCourse=p=>Object.assign(p.data.form,{campusName:'万达',teacherId:'7',unitPrice:'220',courseClassName:'初一数学',termName:'寒假',periodName:'一期',timeSlot:'8:00-10:00',startTime:'08:00:00',endTime:'10:00:00',gradeName:'初一',subjectName:'数学'})
+
+test('staff apply enabled web rules with sorted dates, automatic bounds and independent billing',async()=>{
+  const {p,requests}=rulesSetup();await p.load();p.add();fillCourse(p);await customMode(p)
+  assert.deepEqual(Array.from(p.data.ruleChoices,r=>r.value),['','7','8'])
+  assert.equal(requests.find(r=>r.url==='/system/schedule-rules').data.enabledOnly,true)
+  await p.chooseRule({detail:{value:1}})
+  assert.equal(p.data.form.startDate,'2027-01-27');assert.equal(p.data.form.endDate,'2027-02-01')
+  assert.deepEqual(Array.from(p.data.form.customDates),['2027-01-27','2027-01-30','2027-02-01'])
+  assert.equal(p.data.form.requestedLessonCount,'3')
+  p.input({currentTarget:{dataset:{key:'requestedLessonCount'}},detail:{value:'12'}})
+  await p.applyRule();assert.equal(p.data.form.requestedLessonCount,'12')
+  p.date({currentTarget:{dataset:{key:'endDate'}},detail:{value:'2099-12-31'}})
+  assert.equal(p.data.form.endDate,'2027-02-01')
+  await p.save()
+  const body=requests.find(r=>r.method==='POST').data
+  assert.equal(body.scheduleRuleId,7);assert.equal(body.scheduleRuleVersion,2)
+  assert.equal(body.applyScheduleRule,true);assert.equal(body.clearScheduleRule,false);assert.equal(body.requestedLessonCount,12)
+})
+
+test('a custom schedule cannot save before rule selection or after a failed application',async()=>{
+  const {p,requests}=rulesSetup(o=>o.url==='/system/schedule-rules/7'?Promise.reject(new Error('规则已停用')):undefined)
+  await p.load();p.add();fillCourse(p);await customMode(p);await p.save()
+  assert.match(p.data.formError,/请选择.*规则/)
+  Object.assign(p.data.form,{customDates:['2027-01-01'],applyScheduleRule:true,requestedLessonCount:'1'})
+  await p.chooseRule({detail:{value:1}});await p.save()
+  assert.match(p.data.formError,/未成功应用/);assert.equal(requests.some(r=>r.method==='POST'),false)
+})
+
+test('disabled or deleted templates never replace an existing saved course snapshot',async()=>{
+  const saved={scheduleId:99,...rule7,scheduleRuleId:7,scheduleRuleName:'旧版规则',scheduleRuleVersion:1,classMode:'1',classPattern:'CUSTOM_DATES',customDates:['2026-12-26','2027-01-02'],startDate:'2026-12-26',endDate:'2027-01-02'}
+  const {p,requests}=rulesSetup(o=>o.url==='/system/schedule-rules'?{data:[]}:o.url==='/miniapp/staff/schedule/99'?{data:saved}:undefined)
+  await p.load();await p.edit({currentTarget:{dataset:{id:99}}});fillCourse(p)
+  assert.equal(p.data.patternIndex,p.patternIndexOf('CUSTOM_DATES'));assert.equal(p.data.selectedRuleId,'')
+  assert.equal(p.data.form.scheduleRuleVersion,1);assert.equal(p.data.form.startDate,'2026-12-26')
+  await p.save()
+  const body=requests.find(r=>r.method==='PUT').data
+  assert.equal(body.scheduleRuleVersion,1);assert.deepEqual(Array.from(body.customDates),['2026-12-26','2027-01-02'])
+  assert.equal(requests.some(r=>r.url==='/system/schedule-rules/7'),false)
+  assert.notEqual(body.applyScheduleRule,true)
+})
+
+test('changing an existing custom course to a legacy mode is explicit and keeps visible bounds',async()=>{
+  const {p,requests}=rulesSetup();await p.load();p.add();fillCourse(p);await customMode(p);await p.chooseRule({detail:{value:1}})
+  p.data.form.scheduleId=99
+  p.choose({currentTarget:{dataset:{key:'classPattern'}},detail:{value:p.patternIndexOf('DAILY')}})
+  assert.equal(p.data.form.clearScheduleRule,true);assert.equal(p.data.form.applyScheduleRule,false)
+  assert.equal(p.data.form.startDate,'2027-01-27');assert.equal(p.data.form.endDate,'2027-02-01')
+  assert.equal(p.data.form.customDates.length,0)
+  p.data.form.periodName='一期'
+  await p.save();assert.equal(requests.find(r=>r.method==='PUT').data.clearScheduleRule,true)
+})
+
+test('replacing or hiding a form prevents delayed rule responses from changing another selection',async()=>{
+  let finish
+  const {p}=rulesSetup(o=>o.url==='/system/schedule-rules/7'?new Promise(resolve=>{finish=resolve}):undefined)
+  await p.load();p.add();await customMode(p)
+  const older=p.chooseRule({detail:{value:1}})
+  await p.chooseRule({detail:{value:2}});finish({data:rule7});await older
+  assert.equal(p.data.form.scheduleRuleId,8);assert.equal(p.data.form.startDate,'2027-03-06')
+  const pending=p.chooseRule({detail:{value:1}})
+  p.onHide();finish({data:rule7});await pending
+  assert.equal(p.data.form.scheduleRuleId,8);assert.equal(p.data.ruleLoading,false)
+  assert.match(p.data.ruleError,/中断/)
+  p._visible=true;p.close();p.add()
+  assert.equal(p.data.form.classPattern,'WEEKLY');assert.equal(p.data.form.scheduleRuleId,undefined)
+})
+
+test('rule reads cannot apply after login changes and one-to-one cannot choose multi-date rules',async()=>{
+  let finish
+  const {p,storage,requests}=rulesSetup(o=>o.url==='/system/schedule-rules/7'?new Promise(resolve=>{finish=resolve}):undefined)
+  await p.load();p.add();await customMode(p)
+  const pending=p.chooseRule({detail:{value:1}});storage.token='other';finish({data:rule7});await pending
+  assert.equal(p.data.form.scheduleRuleId,null)
+  storage.token='staff-session';p.add();p.choose({currentTarget:{dataset:{key:'classMode'}},detail:{value:1}})
+  await customMode(p);assert.equal(p.data.form.classPattern,'WEEKLY')
+  assert.equal(requests.filter(r=>r.url==='/system/schedule-rules').length,1)
 })

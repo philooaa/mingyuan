@@ -2,17 +2,24 @@ const { request } = require('../../utils/request')
 const root = '/miniapp/staff/schedule'
 const staff = roles => (roles || []).some(r => ['admin', 'business_admin', 'education'].includes(r))
 const labels = rows => (rows || []).map(r => ({ value: r.value || r.dictLabel, label: r.label || r.dictLabel }))
+const rulesRoot = '/system/schedule-rules'
 
 Page({
   data: { loading: false, ready: false, error: '', list: [], total: 0, keyword: '', pageNum: 1, pageSize: 20,
     formOpen: false, saving: false, recognizing: false, formError: '', form: {}, campusOptions: [], teachers: [], fields: [], periods: [], classTypes: [], timeSlots: [], singleTimeSlots: [],
     modes: [{label:'班课',value:'1'},{label:'一对一',value:'2'}],
-    patterns:[{label:'每周一次',value:'WEEKLY'},{label:'连上无假期',value:'DAILY'},{label:'上5休1',value:'DAILY_5_1'},{label:'上6休1',value:'DAILY_6_1'},{label:'上5休2',value:'DAILY_5_2'},{label:'上4休1',value:'DAILY_4_1'},{label:'其他（暂不排课）',value:'OTHER'}],
+    patterns:[{label:'每周一次',value:'WEEKLY'},{label:'连上无假期',value:'DAILY'},{label:'上5休1',value:'DAILY_5_1'},{label:'上6休1',value:'DAILY_6_1'},{label:'上5休2',value:'DAILY_5_2'},{label:'上4休1',value:'DAILY_4_1'},{label:'其他（暂不排课）',value:'OTHER'},{label:'自定义日期规则',value:'CUSTOM_DATES'}],
+    ruleChoices:[], ruleChoiceIndex:0, selectedRuleId:'', rulesLoading:false, ruleLoading:false, rulesError:'', ruleError:'', customDateText:'',
     patternIndex:0, priceOptions:['220','250','280','手动填写'], priceChoice:'',
     recruitOptions:[{label:'开放报名',value:'0'},{label:'停止招生',value:'1'},{label:'已满',value:'2'}], statusOptions:[{label:'正常',value:'0'},{label:'停用',value:'1'}] },
   onLoad(options={}) { this._token=wx.getStorageSync('token');this._alive=true;this._editId=options.id || '';this._editOnLoad=!!this._editId },
   onShow() { this._visible=true;this.load() },
-  onHide() { this._visible=false;this._version=(this._version || 0)+1 },
+  onHide() {
+    this._visible=false;this._version=(this._version || 0)+1
+    this._ruleRequest=(this._ruleRequest || 0)+1;this._rulesRequest=(this._rulesRequest || 0)+1
+    if(this.data.ruleLoading)this.setData({ruleError:'规则读取已中断，请重新应用'})
+    this.setData({rulesLoading:false,ruleLoading:false})
+  },
   onUnload() { this.onHide();this._alive=false },
   current() { return this._alive && this._visible && this._token && this._token===wx.getStorageSync('token') && staff(wx.getStorageSync('roles')) },
   onPullDownRefresh() { this.load().finally(()=>wx.stopPullDownRefresh()) },
@@ -29,7 +36,10 @@ Page({
       const fields=[['termName','学期',d.terms],['periodName','期次或上课日',d.periods],['timeSlot','时段',d.timeSlots],['gradeName','年级',d.grades],['subjectName','学科',d.subjects]]
         .map(([key,label,options])=>({key,label,options:labels(options)}))
       this.setData({periods:labels(d.periods),classTypes:labels(d.classTypes),timeSlots:labels(d.timeSlots),singleTimeSlots:labels(d.singleTimeSlots),campusOptions:Object.keys(d.classrooms || {}).filter(c=>c!=='未分配校区'),teachers,fields,ready:true})
-      if(this.data.formOpen)this.setPeriodOptions()
+      if(this.data.formOpen) {
+        this.setPeriodOptions()
+        if(this.data.form.classPattern==='CUSTOM_DATES')await this.loadRules()
+      }
       await this.loadList(version)
       if(this._editOnLoad && this.current() && version===this._version) { this._editOnLoad=false;await this.edit({currentTarget:{dataset:{id:this._editId}}}) }
     } catch(e) { if(this.current() && version===this._version)this.setData({ready:false,list:[],error:e.message || '排课选项加载失败，请重试'}) }
@@ -47,25 +57,30 @@ Page({
     if(!this.current() || !this.data.ready || this.data.loading || this.data.saving)return
     this._automaticCourseName=null
     this._formVersion=(this._formVersion || 0)+1
+    this.resetRuleSelection()
     this.setSlotOptions('1')
     this.setData({priceChoice:'',form:{campusName:'',courseYear:String(new Date().getFullYear()),courseClassName:'',scheduleCode:'',termName:'',periodName:'',timeSlot:'',startTime:'',endTime:'',gradeName:'',subjectName:'',teacherId:'',teacherLabel:'',classType:'',classMode:'1',classPattern:'WEEKLY',startDate:'',endDate:'',unitPrice:'',enrollLimit:'',recruitStatus:'0',status:'0',remark:''},patternIndex:0,formOpen:true,formError:''})
     this.setPeriodOptions()
   },
   async edit(e) {
     if(!this.current() || !this.data.ready || this.data.saving)return
-    const id=String(e.currentTarget.dataset.id),version=this._version
+    const id=String(e.currentTarget.dataset.id),version=this._version,formVersion=this._formVersion=(this._formVersion || 0)+1
     if(!/^[1-9]\d*$/.test(id))return
     try {
       const res=await request({url:root+'/'+id})
-      if(!this.current() || version!==this._version)return
+      if(!this.current() || version!==this._version || formVersion!==this._formVersion)return
       const f=res.data || {}
       if(!f.classPattern)f.classPattern=/^周[一二三四五六日]$/.test(f.periodName || '')?'WEEKLY':'DAILY_5_1'
       const teacher=this.data.teachers.find(t=>t.value===String(f.teacherId))
       this._automaticCourseName=null
-      this._formVersion=(this._formVersion || 0)+1
+      this.resetRuleSelection()
       this.setSlotOptions(f.classMode)
       this.setData({priceChoice:f.unitPrice == null ? '' : [220,250,280].includes(Number(f.unitPrice)) ? String(Number(f.unitPrice)) : '手动填写',form:{...f,teacherId:String(f.teacherId || ''),teacherLabel:teacher?teacher.label:f.teacherName,startDate:(f.startDate || '').slice(0,10),endDate:(f.endDate || '').slice(0,10)},patternIndex:this.patternIndexOf(f.classPattern),formOpen:true,formError:''})
       this.setPeriodOptions()
+      if(f.classPattern==='CUSTOM_DATES') {
+        this.setData({selectedRuleId:String(f.scheduleRuleId || ''),customDateText:(f.customDates || []).join('、')})
+        await this.loadRules()
+      }
     } catch(e) { if(this.current() && version===this._version)wx.showToast({title:e.message || '课程加载失败',icon:'none'}) }
   },
   async editBillingCount() {
@@ -113,6 +128,50 @@ Page({
     finally { if(this._alive && this._token===wx.getStorageSync('token'))this.setData({saving:false});if(removed && this.current())await this.load() }
   },
   close() { if(!this.data.saving){this._formVersion=(this._formVersion || 0)+1;this.setData({formOpen:false,formError:''})} },
+  resetRuleSelection() {
+    this._ruleRequest=(this._ruleRequest || 0)+1
+    this._rulesRequest=(this._rulesRequest || 0)+1
+    this.setData({ruleChoices:[],ruleChoiceIndex:0,selectedRuleId:'',rulesLoading:false,ruleLoading:false,rulesError:'',ruleError:'',customDateText:''})
+  },
+  async loadRules() {
+    if(!this.current() || !this.data.formOpen || this.data.form.classPattern!=='CUSTOM_DATES')return
+    const serial=this._rulesRequest=(this._rulesRequest || 0)+1,formVersion=this._formVersion
+    const valid=()=>this.current() && this.data.formOpen && formVersion===this._formVersion && serial===this._rulesRequest && this.data.form.classPattern==='CUSTOM_DATES'
+    this.setData({rulesLoading:true,rulesError:''})
+    try {
+      const result=await request({url:rulesRoot,data:{enabledOnly:true}})
+      if(!valid())return
+      const choices=[{value:'',label:'请选择排课规则'},...(result.data || []).filter(r=>r.status==='0').map(r=>({value:String(r.ruleId),label:r.ruleName+'（'+r.dateCount+'次）'}))]
+      const index=choices.findIndex(r=>r.value===this.data.selectedRuleId)
+      this.setData({ruleChoices:choices,ruleChoiceIndex:index>0?index:0,selectedRuleId:index>0?this.data.selectedRuleId:''})
+    } catch(e) {if(valid())this.setData({rulesError:e.message || '排课规则加载失败，请重试'})}
+    finally {if(valid())this.setData({rulesLoading:false})}
+  },
+  chooseRule(e) {
+    if(!this.current() || this.data.saving || this.data.rulesLoading)return
+    const index=Number(e.detail.value),row=this.data.ruleChoices[index]
+    if(!row || !row.value)return
+    this.setData({selectedRuleId:row.value,ruleChoiceIndex:index})
+    return this.applyRule()
+  },
+  async applyRule() {
+    if(!this.current() || !this.data.formOpen || this.data.saving || this.data.form.classPattern!=='CUSTOM_DATES' || this.data.form.classMode==='2')return
+    const id=this.data.selectedRuleId
+    if(!id)return
+    const serial=this._ruleRequest=(this._ruleRequest || 0)+1,formVersion=this._formVersion
+    const valid=()=>this.current() && this.data.formOpen && formVersion===this._formVersion && serial===this._ruleRequest && this.data.form.classPattern==='CUSTOM_DATES'
+    this.setData({ruleLoading:true,ruleError:'',formError:''})
+    try {
+      const result=await request({url:rulesRoot+'/'+id})
+      if(!valid())return
+      const rule=result.data || {},dates=[...new Set(rule.dates || [])].sort()
+      if(String(rule.ruleId)!==id || rule.status!=='0' || !rule.version || !dates.length || dates.length>3661 || dates.some(d=>!/^\d{4}-\d{2}-\d{2}$/.test(d)))throw new Error('规则已停用或日期配置无效，请重新选择')
+      const change={'form.scheduleRuleId':rule.ruleId,'form.scheduleRuleName':rule.ruleName,'form.scheduleRuleVersion':rule.version,'form.customDates':dates,'form.startDate':dates[0],'form.endDate':dates[dates.length-1],'form.applyScheduleRule':true,'form.clearScheduleRule':false,customDateText:dates.join('、')}
+      if(!this.data.form.scheduleId && !String(this.data.form.requestedLessonCount || '').trim())change['form.requestedLessonCount']=String(dates.length)
+      this.setData(change)
+    } catch(e) {if(valid())this.setData({ruleError:e.message || '应用规则失败，请重试'})}
+    finally {if(valid())this.setData({ruleLoading:false})}
+  },
   input(e) { if(this.current() && !this.data.saving)this.setData({['form.'+e.currentTarget.dataset.key]:e.detail.value}) },
   async recognizeName() {
     if(!this.current() || !this.data.formOpen || this.data.saving || this.data.recognizing)return
@@ -156,7 +215,12 @@ Page({
   },
   setPeriodOptions(clearInvalid=false) {
     const weekly=this.data.form.classPattern==='WEEKLY'
-    if(this.data.form.classPattern==='CUSTOM_DATES') { this.setData({fields:this.data.fields.map(f=>f.key==='periodName'?{...f,options:[{value:this.data.form.periodName,label:this.data.form.periodName}]}:f)});return }
+    if(this.data.form.classPattern==='CUSTOM_DATES') {
+      const value=this.data.form.periodName,options=this.data.periods.slice()
+      if(value && !options.some(p=>p.value===value))options.push({value,label:value})
+      this.setData({fields:this.data.fields.map(f=>f.key==='periodName'?{...f,label:'期次或上课日',options}:f)})
+      return
+    }
     const options=this.data.periods.filter(p=>/^周[一二三四五六日]$/.test(p.value)===weekly)
     const change={fields:this.data.fields.map(f=>f.key==='periodName'?{...f,label:weekly?'上课星期':'期次',options}:f)}
     if(clearInvalid && !options.some(p=>p.value===this.data.form.periodName))change['form.periodName']=''
@@ -171,8 +235,8 @@ Page({
     if(!this.current() || this.data.saving)return
     const key=e.currentTarget.dataset.key, f=this.data.fields.find(f=>f.key===key)
     const options=f?f.options:({classType:this.data.classTypes,classMode:this.data.modes,classPattern:this.data.patterns,recruitStatus:this.data.recruitOptions,status:this.data.statusOptions})[key]
-    if(this.data.form.classPattern==='CUSTOM_DATES' && ['classPattern','classMode','periodName'].includes(key))return
     const row=options && options[Number(e.detail.value)];if(!row)return
+    if(key==='classPattern' && (this.data.form.classMode==='2' || row.value===this.data.form.classPattern))return
     const change={['form.'+key]:row.value}
     if(key==='classMode') {
       this.setSlotOptions(row.value)
@@ -181,7 +245,17 @@ Page({
         change['form.timeSlot']='';change['form.startTime']='';change['form.endTime']=''
       }
     }
-    if(key==='classPattern') change.patternIndex=Number(e.detail.value)
+    if(key==='classPattern') {
+      change.patternIndex=Number(e.detail.value)
+      this.resetRuleSelection()
+      Object.assign(change,{'form.applyScheduleRule':false,'form.clearScheduleRule':row.value!=='CUSTOM_DATES'})
+      if(row.value==='CUSTOM_DATES' || this.data.form.classPattern==='CUSTOM_DATES')Object.assign(change,{'form.scheduleRuleId':null,'form.scheduleRuleName':'','form.scheduleRuleVersion':null,'form.customDates':[]})
+      if(row.value==='CUSTOM_DATES')Object.assign(change,{'form.startDate':'','form.endDate':''})
+    }
+    if(key==='classMode' && row.value==='2' && this.data.form.classPattern==='CUSTOM_DATES') {
+      this.resetRuleSelection()
+      Object.assign(change,{'form.applyScheduleRule':false,'form.clearScheduleRule':true,'form.scheduleRuleId':null,'form.scheduleRuleName':'','form.scheduleRuleVersion':null,'form.customDates':[],'form.startDate':'','form.endDate':''})
+    }
     if(key==='classMode' && row.value==='2') {change['form.classPattern']='WEEKLY';change.patternIndex=0;change['form.periodName']=''}
     if(key==='timeSlot') {
       const times=row.value.split(/[-–—]/).map(t=>t.trim())
@@ -191,15 +265,21 @@ Page({
     if(key==='classPattern' || key==='classMode')this.setPeriodOptions(true)
     if(key==='classMode' && row.value==='2' && this.data.form.startDate)this.date({currentTarget:{dataset:{key:'startDate'}},detail:{value:this.data.form.startDate}})
     if(['gradeName','subjectName','classType'].includes(key))this.autoCourseName()
+    if(key==='classPattern' && row.value==='CUSTOM_DATES')return this.loadRules()
   },
   date(e) {
-    if(this.data.saving)return
+    if(!this.current() || this.data.saving || this.data.form.classPattern==='CUSTOM_DATES')return
     this.setData({['form.'+e.currentTarget.dataset.key]:e.detail.value})
     if(this.data.form.classMode==='2')this.setData({'form.startDate':e.detail.value,'form.endDate':e.detail.value,'form.classPattern':'WEEKLY','patternIndex':0,'form.periodName':['周日','周一','周二','周三','周四','周五','周六'][new Date(e.detail.value.replace(/-/g,'/')+' 12:00:00').getDay()]})
   },
   async save() {
     if(!this.current() || !this.data.ready || this.data.saving)return
     const f=this.data.form
+    if(f.classPattern==='CUSTOM_DATES') {
+      if(this.data.ruleLoading){this.setData({formError:'正在读取排课规则，请稍候'});return}
+      if(this.data.ruleError){this.setData({formError:'排课规则未成功应用，请重新选择或重试'});return}
+      if(!f.customDates || !f.customDates.length || (!f.scheduleId && !f.applyScheduleRule)){this.setData({formError:'请选择并应用排课规则'});return}
+    }
     if (!f.scheduleId && (!/^\d+(\.\d{1,2})?$/.test(String(f.unitPrice).trim()) || Number(f.unitPrice) <= 0)) { this.setData({formError:'课时单价须大于0且最多保留两位小数'}); return }
     if(f.classPattern==='WEEKLY' && !/^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:f.classMode==='2'?'请选择一对一上课日期':'请选择上课星期'});return}
     if(f.classPattern!=='CUSTOM_DATES' && f.classPattern!=='WEEKLY' && /^周[一二三四五六日]$/.test(f.periodName || '')){this.setData({formError:'请选择期次'});return}
