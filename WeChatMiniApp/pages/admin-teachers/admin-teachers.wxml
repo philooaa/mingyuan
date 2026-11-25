@@ -57,17 +57,20 @@
       <view class="form-item"><text class="form-label">高中一对一(元/h)</text><input class="form-input" type="digit" bindinput="onEditInput" data-field="rateSenior1on1" value="{{editForm.rateSenior1on1}}" placeholder="0"/></view>
       <view class="form-item"><text class="form-label">每节课时数</text><input class="form-input" type="digit" bindinput="onEditInput" data-field="classHoursPerSession" value="{{editForm.classHoursPerSession}}" placeholder="如 1.5、2"/></view>
       <view class="form-item"><text class="form-label">备注</text><input class="form-input" bindinput="onEditInput" data-field="remark" value="{{editForm.remark}}" placeholder="选填"/></view>
-      <button class="btn-primary" bindtap="saveEdit">保存薪资标准</button>
-      <view class="section-title" style="margin-top:32rpx;font-weight:bold">班课人次提成（人次）</view>
+      <view class="section-title" style="margin-top:32rpx;font-weight:bold">班课人次提成</view>
+      <view class="form-item"><text class="form-label">每人次单价</text><input class="form-input" type="digit" bindinput="onEditInput" data-field="classAttendanceUnitPrice" value="{{editForm.classAttendanceUnitPrice}}" placeholder="元/人次，0表示不计提成"/></view>
+      <view class="row-sub">单价随薪资标准保存，适用于该教师；下方按月独立保存人次。</view>
       <picker mode="date" fields="month" value="{{attendanceMonth}}" bindchange="attendanceMonthChange" disabled="{{attendanceSaving}}"><view class="info">统计月份：{{attendanceMonth}} ▾</view></picker>
       <view wx:if="{{attendanceLoading}}" class="info">人次加载中…</view>
       <view wx:elif="{{attendanceError}}" class="info" bindtap="loadAttendance">{{attendanceError}}，点击重试</view>
       <block wx:elif="{{attendanceInfo}}">
         <view class="info">自动统计：{{attendanceInfo.automaticCount}} 人次 · {{attendanceInfo.manual ? '已手动调整' : '自动生成'}}</view>
         <view class="form-item"><text class="form-label">班课人次</text><input class="form-input" type="number" value="{{attendanceInput}}" bindinput="attendanceInputChange" disabled="{{!canAdjustAttendance || attendanceSaving}}"/></view>
-        <view class="row-sub">按终审通过的班课到课人数累计，含试听和调课；一对一不计。仅记录人次，不参与工资金额计算。</view>
+        <view class="info"><text class="info-k">总提成（元）</text><text class="info-v">{{attendanceTotal}}</text></view>
+        <view class="row-sub">总提成 = 班课人次 × 每人次单价。按终审通过的班课到课人数累计，含试听和调课；一对一不计。以保存后的单价和人次生成工资，已确认工资不自动重算。</view>
         <view wx:if="{{canAdjustAttendance}}"><button size="mini" bindtap="saveAttendance" loading="{{attendanceSaving}}" disabled="{{attendanceSaving}}">保存人次</button><button size="mini" bindtap="resetAttendance" disabled="{{attendanceSaving || !attendanceInfo.manual}}">恢复自动统计</button></view>
       </block>
+      <button class="btn-primary" bindtap="saveEdit">保存薪资标准</button>
     </view>
   </view>
 </view>

@@ -92,7 +92,7 @@ Page({
         if (detail.canPay && allowed.collect && !pending) await this.refreshQuote(true)
       } else {
         const statuses = ['', 'PENDING_PRICE', 'OPEN', 'HISTORY_PENDING', 'CLOSED']
-        const res = await t.request({ url: `${t.adminUrl}/list`, data: { pageNum, pageSize: 20, billingStatus: this.data.confirmationOnly ? '' : statuses[this.data.filterIndex] || '', studentName: this.data.searchText.trim(), gradeStage:this.data.confirmationOnly ? ['', 'PRIMARY','JUNIOR','SENIOR','UNKNOWN'][this.data.gradeStageIndex] : '', paymentStage: this.data.confirmationOnly || this.data.filterIndex === 5 ? 'WAIT_ADMIN' : this.data.filterIndex === 6 ? 'SUCCESS' : '' } })
+        const res = await t.request({ url: `${t.adminUrl}/list`, data: { pageNum, pageSize: 20, sortBy: 'WORKFLOW', billingStatus: this.data.confirmationOnly ? '' : statuses[this.data.filterIndex] || '', studentName: this.data.searchText.trim(), gradeStage:this.data.confirmationOnly ? ['', 'PRIMARY','JUNIOR','SENIOR','UNKNOWN'][this.data.gradeStageIndex] : '', paymentStage: this.data.confirmationOnly || this.data.filterIndex === 5 ? 'WAIT_ADMIN' : this.data.filterIndex === 6 ? 'SUCCESS' : '' } })
         if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ rows: (reset ? [] : this.data.rows).concat((res.rows || []).map(row => progress(t.bill(row)))), total: res.total || 0, pageNum })
       }
     } catch (error) { if (this._active && visit === this._visit && sequence === this._loadSequence) this.setData({ error: error.message }) }

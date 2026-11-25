@@ -78,6 +78,7 @@ public class EduTeacherSalaryConfigServiceImpl implements IEduTeacherSalaryConfi
     }
 
     private void validateSpecialRate(EduTeacherSalaryConfig config) {
+        com.ruoyi.system.service.TeacherClassAttendanceService.unitPrice(config.getClassAttendanceUnitPrice());
         var rate=config.getRateSpecialClass();
         if(rate!=null && (rate.signum()<0 || rate.stripTrailingZeros().scale()>2 || rate.compareTo(new java.math.BigDecimal("99999999.99"))>0)) throw new ServiceException("特价课时薪须为非负数且最多两位小数");
     }

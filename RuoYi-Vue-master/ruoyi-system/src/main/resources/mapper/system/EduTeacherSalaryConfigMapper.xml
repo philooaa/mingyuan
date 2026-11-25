@@ -17,6 +17,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="rateSenior1on1"      column="rate_senior_1on1" />
         <result property="classHoursPerSession" column="class_hours_per_session" />
         <result property="commissionAmount"      column="commission_amount" />
+        <result property="classAttendanceUnitPrice" column="class_attendance_unit_price" />
         <result property="status"              column="status" />
         <result property="delFlag"             column="del_flag" />
         <result property="createBy"            column="create_by" />
@@ -32,7 +33,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectConfigVo">
         select config_id, teacher_id, teacher_name, base_salary, rate_primary_class, rate_jh_class, rate_special_class,
                rate_primary_1on1, rate_junior_1on1, rate_senior_1on1, class_hours_per_session,
-               commission_amount,
+               commission_amount, class_attendance_unit_price,
                status, del_flag, create_by, create_time, update_by, update_time, remark
         from edu_teacher_salary_config
     </sql>
@@ -63,7 +64,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                coalesce(nullif(trim(u.user_name), ''), u.nick_name) as teacher_name,
                c.config_id, c.base_salary, c.rate_primary_class, c.rate_jh_class, c.rate_special_class,
                c.rate_primary_1on1, c.rate_junior_1on1, c.rate_senior_1on1,
-               c.class_hours_per_session, c.commission_amount, c.status, c.del_flag,
+               c.class_hours_per_session, c.commission_amount, c.class_attendance_unit_price, c.status, c.del_flag,
                c.create_by, c.create_time, c.update_by, c.update_time, c.remark,
                (select count(distinct s.course_class_name) from edu_course_schedule s
                  where s.teacher_id = u.user_id and s.del_flag = '0' and s.status = '0'
@@ -118,6 +119,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rateSenior1on1 != null">rate_senior_1on1,</if>
             <if test="classHoursPerSession != null">class_hours_per_session,</if>
             <if test="commissionAmount != null">commission_amount,</if>
+            <if test="classAttendanceUnitPrice != null">class_attendance_unit_price,</if>
             <if test="status != null and status != ''">status,</if>
             <if test="createBy != null">create_by,</if>
             <if test="remark != null">remark,</if>
@@ -135,6 +137,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rateSenior1on1 != null">#{rateSenior1on1},</if>
             <if test="classHoursPerSession != null">#{classHoursPerSession},</if>
             <if test="commissionAmount != null">#{commissionAmount},</if>
+            <if test="classAttendanceUnitPrice != null">#{classAttendanceUnitPrice},</if>
             <if test="status != null and status != ''">#{status},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="remark != null">#{remark},</if>
@@ -156,6 +159,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="rateSenior1on1 != null">rate_senior_1on1 = #{rateSenior1on1},</if>
             <if test="classHoursPerSession != null">class_hours_per_session = #{classHoursPerSession},</if>
             <if test="commissionAmount != null">commission_amount = #{commissionAmount},</if>
+            <if test="classAttendanceUnitPrice != null">class_attendance_unit_price = #{classAttendanceUnitPrice},</if>
             <if test="status != null and status != ''">status = #{status},</if>
             <if test="delFlag != null and delFlag != ''">del_flag = #{delFlag},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
