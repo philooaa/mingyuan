@@ -446,14 +446,14 @@ public class EduTimetableController extends BaseController
 
     /**
      * 删除排课
-     * 权限：仅教务、管理员可删除无报名或历史关联的排课。
+     * 权限：仅教务、管理员可操作；确认删除保留报名和财务历史。
      */
     @PreAuthorize("@ss.hasAnyRoles('admin,education')")
     @Log(title = "可视化课表-删除", businessType = BusinessType.DELETE)
     @DeleteMapping("/{scheduleIds}")
-    public AjaxResult remove(@PathVariable Long[] scheduleIds)
+    public AjaxResult remove(@PathVariable Long[] scheduleIds, @RequestParam(defaultValue="false") boolean force)
     {
-        return toAjax(scheduleService.deleteEduCourseScheduleByScheduleIds(scheduleIds));
+        return toAjax(force ? scheduleService.removeConfirmedSchedules(scheduleIds) : scheduleService.deleteEduCourseScheduleByScheduleIds(scheduleIds));
     }
 
     /**

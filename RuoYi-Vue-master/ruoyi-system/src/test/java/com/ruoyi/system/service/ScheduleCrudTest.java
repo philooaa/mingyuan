@@ -180,6 +180,34 @@ public class ScheduleCrudTest {
         assertEquals("1",captured.getStatus());assertEquals("1",captured.getRecruitStatus());
         assertNull(deleted);assertNull(captured.getEnrolledCount());
     }
+    @Test void retiredTeacherCourseCanBeStoppedButCannotBeReactivatedOrNewlyAssigned() {
+        principal(23,"education");db.teacherEnabled=false;db.activeEnrollments=1;
+        current.setClassMode("1");current.setTeacherName("离职教师");
+        var stop=new EduCourseSchedule();stop.setScheduleId(10L);stop.setStatus("1");
+        assertEquals(1,service.updateEduCourseSchedule(stop,true));
+        assertEquals("离职教师",captured.getTeacherName());assertEquals(current.getTeacherId(),captured.getTeacherId());
+        current.setStatus("1");captured=null;stop.setStatus("0");
+        assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(stop,true));assertNull(captured);
+        var fresh=course();fresh.setStatus("1");assertThrows(ServiceException.class,()->service.insertEduCourseSchedule(fresh));
+        stop.setStatus("1");stop.setTeacherId(22L);assertThrows(ServiceException.class,()->service.updateEduCourseSchedule(stop,true));
+    }
+    @Test void confirmedRemovalDoesNotRequireAnEnabledTeacherAndChecksWholeBatchBeforeWriting() {
+        principal(23,"education");db.teacherEnabled=false;db.activeEnrollments=1;db.attendance=1;db.references=1;
+        db.makeupScheduleId=20L;
+        assertThrows(ServiceException.class,()->service.removeConfirmedSchedules(new Long[]{10L,20L}));assertNull(captured);
+        db.makeupScheduleId=null;
+        assertEquals(2,service.removeConfirmedSchedules(new Long[]{20L,10L,10L}));
+        assertEquals("1",captured.getDelFlag());assertEquals("1",captured.getStatus());assertEquals("1",captured.getRecruitStatus());assertNull(deleted);
+    }
+    @Test void webDeletionExplicitConfirmationUsesArchivalPathWithoutWeakeningLegacyDelete() throws Exception {
+        principal(23,"education");db.teacherEnabled=false;db.activeEnrollments=1;
+        var web=new com.ruoyi.system.controller.EduCourseScheduleController();inject(web,"eduCourseScheduleService",service);
+        assertThrows(ServiceException.class,()->web.remove(new Long[]{10L},false));
+        assertEquals(200,web.remove(new Long[]{10L},true).get("code"));assertNull(deleted);
+        var grid=new com.ruoyi.system.controller.EduTimetableController();inject(grid,"scheduleService",service);
+        assertThrows(ServiceException.class,()->grid.remove(new Long[]{10L},false));
+        assertEquals(200,grid.remove(new Long[]{10L},true).get("code"));assertNull(deleted);
+    }
     @Test void teacherCannotUseConfirmedOperations() {
         principal(21,"teacher");
         var input=new EduCourseSchedule();input.setScheduleId(10L);
@@ -352,17 +380,17 @@ public class ScheduleCrudTest {
     static void inject(Object target, String field, Object value) throws Exception { var f = target.getClass().getDeclaredField(field); f.setAccessible(true); f.set(target,value); }
     @SuppressWarnings("unchecked") static <T> T proxy(Class<T> type, InvocationHandler handler) { return (T) Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},handler); }
     static class FakeDb extends ShopRepository {
-        boolean materializedLesson; boolean ruleEnabled=true; List<String> ruleDates=List.of("2026-12-26","2027-01-02");
+        boolean materializedLesson; boolean ruleEnabled=true; boolean teacherEnabled=true; Long makeupScheduleId; List<String> ruleDates=List.of("2026-12-26","2027-01-02");
         long attendance, references, activeEnrollments; boolean makeupSession, canceledEnrollment, activeEnrollment, enrollmentArrivesOnLock;
         List<Map<String,Object>> conflicts = List.of(); List<String> locks = new ArrayList<>();
         FakeDb() { super(new DriverManagerDataSource()); }
         @Override public List<Map<String,Object>> rows(String sql,Object... args) {
-            if (sql.contains("FROM edu_attendance_makeup_session")) return makeupSession ? List.of(Map.of("scheduleId",10)) : List.of();
+            if (sql.contains("FROM edu_attendance_makeup_session")) return makeupSession || Objects.equals(makeupScheduleId,args[0]) ? List.of(Map.of("scheduleId",10)) : List.of();
             if (sql.contains("SELECT lesson_id FROM edu_attendance_lesson")) return materializedLesson && !sql.contains("locked=1") ? List.of(Map.of("lessonId",1)) : List.of();
             if (sql.contains("FROM edu_schedule_rule WHERE")) return ruleEnabled?List.of(Map.of("ruleName","测试规则","version",1L)):List.of();
             if (sql.contains("FROM edu_schedule_rule_date")) return ruleDates.stream().map(d->Map.<String,Object>of("classDate",d)).toList();
             if (sql.contains("SELECT DISTINCT campus_name")) return "万达".equals(args[0]) ? List.of(Map.of("campusName","万达")) : List.of();
-            if (sql.contains("SELECT u.nick_name")) return List.of(Map.of("nickName","Teacher A","userName","teacher21"));
+            if (sql.contains("SELECT u.nick_name")) return teacherEnabled?List.of(Map.of("nickName","Teacher A","userName","teacher21")):List.of();
             if (sql.contains("information_schema")) return List.of(Map.of("tableName","edu_homework"));
             if (sql.contains("FROM edu_course_schedule") && sql.contains("start_time")) return conflicts;
             if (sql.contains("FROM edu_schedule_adjustment")) return List.of();

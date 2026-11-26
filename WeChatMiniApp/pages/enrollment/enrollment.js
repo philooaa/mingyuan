@@ -50,7 +50,10 @@ Page(childContext.page({
       this._scheduleDirty = false
       return this.loadPage()
     }
-    if (this._hasLoadedAccounts && this.current()) return this.loadLessonAccounts()
+    if (this._hasLoadedAccounts && this.current()) {
+      if(this.data.submitting || this.data.showSheet)return this.loadLessonAccounts()
+      return Promise.all([this.loadSchedules(),this.loadLessonAccounts()]).catch(error=>wx.showToast({title:error.message || '课程加载失败，请刷新',icon:'none'}))
+    }
   },
 
   onUnload() { this._unloaded = true },

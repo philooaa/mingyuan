@@ -26,6 +26,16 @@ test('booking balance and package shortcut use only the selected child and refre
  p.setData({scopeAccountId:'999'});await p.loadLessonAccounts();assert.equal(p.data.creditAccount,null)
  p.purchasePackage();assert.equal(routes.length,1)
 })
+
+test('returning to enrollment refreshes retired courses without interrupting an open enrollment form',async()=>{
+ let available=true
+ const {p,calls}=harness(async o=>({data:o.url.endsWith('/schedules') && available?[courses[3]]:[]}))
+ p.data.courseTypeIndex=0
+ await p.loadSchedules();await p.loadLessonAccounts();assert.equal(p.data.schedules.length,1)
+ available=false;await p.onShow();assert.equal(p.data.schedules.length,0)
+ const reads=calls.filter(o=>o.url.endsWith('/schedules')).length
+ p.data.showSheet=true;await p.onShow();assert.equal(calls.filter(o=>o.url.endsWith('/schedules')).length,reads)
+})
 test('balance query failure clears stale balance and prevents purchasing against stale child data',async()=>{
  let fail=false;const {p,routes}=harness(async()=>{if(fail)throw Error('offline');return {data:[{accountId:'22',availableCredits:12}]}})
  p.setData({scopeAccountId:'22',selectedChildId:'22'});await p.loadLessonAccounts();fail=true;await p.loadLessonAccounts()
