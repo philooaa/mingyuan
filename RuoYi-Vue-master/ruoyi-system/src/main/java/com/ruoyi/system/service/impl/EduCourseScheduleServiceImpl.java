@@ -221,20 +221,31 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public int removeConfirmedSchedule(Long id) {
+        return removeConfirmedSchedules(new Long[]{id});
+    }
+
+    @Override @Transactional(rollbackFor = Exception.class)
+    public int removeConfirmedSchedules(Long[] ids) {
         requirePlanningStaff();
-        requireOrdinarySchedule(id);
-        EduCourseSchedule before = selectEduCourseScheduleByScheduleId(id);
-        lockResources(List.of(before));
-        EduCourseSchedule current = eduCourseScheduleMapper.lockSchedule(id);
-        own(current);
-        require(Objects.equals(before.getTeacherId(), current.getTeacherId())
-            && Objects.equals(before.getClassroomId(), current.getClassroomId()), "排课已被其他人调整，请刷新后重试");
+        require(ids!=null && ids.length>0 && Arrays.stream(ids).noneMatch(Objects::isNull),"请选择要删除的排课");
+        var courses=Arrays.stream(ids).distinct().sorted().map(this::selectEduCourseScheduleByScheduleId).toList();
+        lockResources(courses);
+        for(var before:courses) {
+            requireOrdinarySchedule(before.getScheduleId());
+            var current=eduCourseScheduleMapper.lockSchedule(before.getScheduleId());
+            own(current);
+            require(Objects.equals(before.getTeacherId(),current.getTeacherId()) && Objects.equals(before.getClassroomId(),current.getClassroomId()),"排课已被其他人调整，请刷新后重试");
+        }
         // 保留主键及全部历史关联，避免物理删除造成财务、报名记录失联。
-        EduCourseSchedule removed = new EduCourseSchedule();
-        removed.setScheduleId(id); removed.setDelFlag("1");
-        removed.setStatus("1"); removed.setRecruitStatus("1");
-        removed.setUpdateBy(SecurityUtils.getUsername()); removed.setUpdateTime(DateUtils.getNowDate());
-        return eduCourseScheduleMapper.updateEduCourseSchedule(removed);
+        int changed=0;
+        for(var course:courses) {
+            EduCourseSchedule removed=new EduCourseSchedule();
+            removed.setScheduleId(course.getScheduleId());removed.setDelFlag("1");
+            removed.setStatus("1");removed.setRecruitStatus("1");
+            removed.setUpdateBy(SecurityUtils.getUsername());removed.setUpdateTime(DateUtils.getNowDate());
+            changed+=eduCourseScheduleMapper.updateEduCourseSchedule(removed);
+        }
+        return changed;
     }
 
     /**
@@ -256,6 +267,13 @@ public class EduCourseScheduleServiceImpl implements IEduCourseScheduleService {
             input.setTeacherId(SecurityUtils.getUserId());
         } else if (input.getTeacherId() == null && current != null) {
             input.setTeacherId(current.getTeacherId());
+        }
+        // Existing courses must remain removable from service after a teacher leaves.
+        // New assignments and reactivation still require an enabled teacher account.
+        if(current!=null && Objects.equals(input.getTeacherId(),current.getTeacherId())
+            && "1".equals(input.getStatus()==null?current.getStatus():input.getStatus())) {
+            input.setTeacherName(current.getTeacherName());
+            return;
         }
         if (input.getTeacherId() == null) {
             require(current != null && Objects.equals(input.getTeacherName(), current.getTeacherName()), "请选择明确的教师账号，不能仅填写姓名");

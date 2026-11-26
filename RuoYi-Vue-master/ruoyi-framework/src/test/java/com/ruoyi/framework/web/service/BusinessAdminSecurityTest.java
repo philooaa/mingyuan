@@ -116,14 +116,15 @@ class BusinessAdminSecurityTest
     {
         var controller = new com.ruoyi.system.controller.EduTimetableController();
         inject(controller, "scheduleService", proxy(com.ruoyi.system.service.IEduCourseScheduleService.class, (name, args) -> {
-            if ("deleteEduCourseScheduleByScheduleIds".equals(name)) return 1;
+            if ("deleteEduCourseScheduleByScheduleIds".equals(name) || "removeConfirmedSchedules".equals(name)) return 1;
             if ("selectEduCourseScheduleByScheduleId".equals(name)) {
                 var schedule = new com.ruoyi.system.domain.EduCourseSchedule();
                 schedule.setScheduleId(10L); schedule.setTeacherId(99L); return schedule;
             }
             throw new AssertionError(name);
         }));
-        assertEquals(200, controller.remove(new Long[] {10L}).get("code"));
+        assertEquals(200, controller.remove(new Long[] {10L},false).get("code"));
+        assertEquals(200, controller.remove(new Long[] {10L},true).get("code"));
     }
 
     @Test void businessAdminMayReadOtherTeachersHomeworkStats() throws Exception

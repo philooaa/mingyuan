@@ -24,7 +24,8 @@ class ScheduleCampusMysqlTest {
             fixture.runMigration("20261028_schedule_campus_first.sql");
             var cfg=new Configuration(new Environment("test",new JdbcTransactionFactory(),fixture.db.jdbc().getDataSource()));
             cfg.getTypeAliasRegistry().registerAlias("EduCourseSchedule",EduCourseSchedule.class);
-            for(String mapper:List.of("EduCourseScheduleMapper","MiniAppParentMapper")) {
+            cfg.setLocalCacheScope(LocalCacheScope.STATEMENT);
+            for(String mapper:List.of("EduCourseScheduleMapper","MiniAppParentMapper","MiniAppAdminEnrollmentMapper")) {
                 String name="mapper/system/"+mapper+".xml";
                 try(InputStream in=getClass().getResourceAsStream('/'+name)) {new XMLMapperBuilder(in,cfg,name,cfg.getSqlFragments()).parse();}
             }
@@ -53,6 +54,23 @@ class ScheduleCampusMysqlTest {
                 var bill=fixture.db.one("SELECT fee_title_snapshot,campus_name_snapshot FROM edu_enrollment WHERE enrollment_id=?",enrollment);
                 assertEquals("校区待分配教室班",bill.get("feeTitleSnapshot"));
                 assertEquals("测试校区",bill.get("campusNameSnapshot"));
+                var admin=session.getMapper(MiniAppAdminEnrollmentMapper.class);
+                assertTrue(admin.selectSchedules(null,null,null,null,null,null,null).stream().anyMatch(r->String.valueOf(course.getScheduleId()).equals(String.valueOf(r.get("scheduleId")))));
+                var history=fixture.db.one("SELECT * FROM edu_enrollment WHERE enrollment_id=?",enrollment);
+                var stop=new EduCourseSchedule();stop.setScheduleId(course.getScheduleId());stop.setRecruitStatus("1");schedules.updateEduCourseSchedule(stop);session.commit();
+                assertFalse(admin.selectSchedules(null,null,null,null,null,null,null).stream().anyMatch(r->String.valueOf(course.getScheduleId()).equals(String.valueOf(r.get("scheduleId")))));
+                assertFalse(parent.selectAvailableSchedules(2L,null,null,null,null,null).stream().anyMatch(r->String.valueOf(course.getScheduleId()).equals(String.valueOf(r.get("scheduleId")))));
+                assertEquals(0,parent.countScheduleAvailable(course.getScheduleId()));assertNotNull(admin.selectSchedule(course.getScheduleId()));
+                assertEquals(history,fixture.db.one("SELECT * FROM edu_enrollment WHERE enrollment_id=?",enrollment));
+                stop.setRecruitStatus("0");schedules.updateEduCourseSchedule(stop);session.commit();
+                assertTrue(admin.selectSchedules(null,null,null,null,null,null,null).stream().anyMatch(r->String.valueOf(course.getScheduleId()).equals(String.valueOf(r.get("scheduleId")))));
+                stop.setStatus("1");schedules.updateEduCourseSchedule(stop);session.commit();
+                assertFalse(admin.selectSchedules(null,null,null,null,null,null,null).stream().anyMatch(r->String.valueOf(course.getScheduleId()).equals(String.valueOf(r.get("scheduleId")))));
+                assertFalse(parent.selectAvailableSchedules(2L,null,null,null,null,null).stream().anyMatch(r->String.valueOf(course.getScheduleId()).equals(String.valueOf(r.get("scheduleId")))));
+                assertEquals(0,parent.countScheduleAvailable(course.getScheduleId()));assertNotNull(admin.selectSchedule(course.getScheduleId()));
+                stop.setDelFlag("1");stop.setRecruitStatus("1");schedules.updateEduCourseSchedule(stop);session.commit();
+                assertFalse(admin.selectSchedules(null,null,null,null,null,null,null).stream().anyMatch(r->String.valueOf(course.getScheduleId()).equals(String.valueOf(r.get("scheduleId")))));
+                assertEquals(history,fixture.db.one("SELECT * FROM edu_enrollment WHERE enrollment_id=?",enrollment));
             }
         } finally {fixture.cleanup();}
     }

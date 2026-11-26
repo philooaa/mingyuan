@@ -37,9 +37,10 @@ export function updateSchedule(data, force = false) {
 }
 
 // 删除课程排课
-export function delSchedule(scheduleId) {
+export function delSchedule(scheduleId, force = false) {
   return request({
     url: '/system/schedule/' + scheduleId,
-    method: 'delete'
+    method: 'delete',
+    params: { force }
   })
 }

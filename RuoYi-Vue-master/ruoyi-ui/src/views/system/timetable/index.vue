@@ -1384,8 +1384,8 @@ export default {
         return
       }
       try {
-        await this.$confirm(`确认删除「${sch.gradeName || ''}${sch.subjectName || ''} ${this.teacherNameMap[sch.teacherName] || sch.teacherName || ''}」？`, '提示', { type: 'warning' })
-        await delTimetableSchedule(sch.scheduleId)
+        await this.$confirm(`确认删除「${sch.gradeName || ''}${sch.subjectName || ''} ${this.teacherNameMap[sch.teacherName] || sch.teacherName || ''}」？已有报名、考勤和收费历史保留，不会自动退款，请先与学员沟通。`, '提示', { type: 'warning' })
+        await delTimetableSchedule(sch.scheduleId, true)
         this.$message.success('删除成功')
         this.handleQuery()
       } catch (e) { /* 取消不提示 */ }

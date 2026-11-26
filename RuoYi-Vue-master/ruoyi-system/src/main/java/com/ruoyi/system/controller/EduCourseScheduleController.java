@@ -98,8 +98,8 @@ public class EduCourseScheduleController extends BaseController
     @PreAuthorize("@ss.hasPermi('system:schedule:remove')")
     @Log(title = "课程排课", businessType = BusinessType.DELETE)
 	@DeleteMapping("/{scheduleIds}")
-    public AjaxResult remove(@PathVariable Long[] scheduleIds)
+    public AjaxResult remove(@PathVariable Long[] scheduleIds, @RequestParam(defaultValue="false") boolean force)
     {
-        return toAjax(eduCourseScheduleService.deleteEduCourseScheduleByScheduleIds(scheduleIds));
+        return toAjax(force ? eduCourseScheduleService.removeConfirmedSchedules(scheduleIds) : eduCourseScheduleService.deleteEduCourseScheduleByScheduleIds(scheduleIds));
     }
 }

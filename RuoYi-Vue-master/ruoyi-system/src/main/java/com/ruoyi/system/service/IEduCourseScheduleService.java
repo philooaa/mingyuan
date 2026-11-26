@@ -56,6 +56,8 @@ public interface IEduCourseScheduleService
 
     /** 逻辑删除并保留报名、财务等历史关联。 */
     public int removeConfirmedSchedule(Long id);
+    /** 用户明确确认后的批量逻辑删除，整个批次统一提交。 */
+    public int removeConfirmedSchedules(Long[] ids);
 
     /**
      * 批量删除课程排课

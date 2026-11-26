@@ -50,10 +50,11 @@ export function updateTimetableSchedule(data, force = false) {
   })
 }
 
-export function delTimetableSchedule(scheduleIds) {
+export function delTimetableSchedule(scheduleIds, force = false) {
   return request({
     url: '/system/courseTimetable/' + scheduleIds,
-    method: 'delete'
+    method: 'delete',
+    params: { force }
   })
 }
 

@@ -638,8 +638,8 @@ export default {
       const selected = row.scheduleId ? [row] : this.scheduleList.filter(s => this.ids.includes(s.scheduleId))
       if (selected.some(s => s.classMode === '2')) { this.$modal.msgWarning('一对一请在“一对一管理”中撤回，预约和考勤历史将保留'); return }
       const scheduleIds = row.scheduleId || this.ids
-      this.$modal.confirm('是否确认删除课程排课编号为"' + scheduleIds + '"的数据项？').then(function() {
-        return delSchedule(scheduleIds)
+      this.$modal.confirm('确认删除所选课程？课程将从排课和报名列表移除，已有报名、考勤和收费历史保留，不会自动退款，请先与学员沟通。').then(function() {
+        return delSchedule(scheduleIds, true)
       }).then(() => {
         this.getList()
         this.$modal.msgSuccess("删除成功")
