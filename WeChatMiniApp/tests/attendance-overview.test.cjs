@@ -18,6 +18,16 @@ test('education shares the complete read-only attendance overview while teacher 
 test('teacher statistics labels do not treat missing attendance as absence or invent a completed review',()=>{
  const r=visual.row(child);assert.equal(r.cells[0].reviewText,'待复核');assert.equal(r.cells[1].text,'—');assert.equal(r.cells[1].reviewText,'');assert.equal(r.phoneHint,'家长尾号 8901');assert.equal(visual.filter([r],'6789').length,1);assert.equal(visual.filter([r],'不同姓名').length,0)
 })
+test('a name-only roster member appears before any attendance is recorded',async()=>{
+ const offline={studentKey:'S:3',studentName:'补录学员',linked:true,temporary:false,stats:{attended:0,leave:0},cells:[child.cells[1],child.cells[1]]}
+ const {p,routes}=harness(()=>Promise.resolve({data:{...grid,rows:[offline]}}),'education')
+ p.data.courseId='10'
+ await p.loadOverview()
+ assert.equal(p.data.shownStudents[0].studentName,'补录学员')
+ assert.equal(p.data.shownStudents[0].cells[0].text,'—')
+ p.openCell({currentTarget:{dataset:{key:'S:3',date:'2030-10-12'}}})
+ assert.equal(routes.length,0)
+})
 test('changing courses discards old grids even if the original request returns last',async()=>{
  const waits=[];const {p}=harness(()=>new Promise(resolve=>waits.push(resolve)));p.data.courseId='10';const first=p.loadOverview();p.data.courseId='20';const second=p.loadOverview();waits[1]({data:{...grid,course:{...course,scheduleId:'20'}}});await second;waits[0]({data:{...grid,rows:[]}});await first;assert.equal(p.data.students.length,2);assert.equal(p.data.courseId,'20')
 })

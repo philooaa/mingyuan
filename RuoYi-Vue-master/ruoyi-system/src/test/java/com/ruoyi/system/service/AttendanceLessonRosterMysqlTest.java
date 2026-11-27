@@ -151,6 +151,27 @@ public class AttendanceLessonRosterMysqlTest {
         assertTrue(tx(() -> service.roster(3, offlineFirst)).stream().noneMatch(row -> id(row,"studentId")==studentId));
         assertTrue(tx(() -> service.roster(3, offlineThird)).stream().anyMatch(row -> id(row,"studentId")==studentId));
         assertNull(db.one("SELECT parent_id FROM edu_student WHERE student_id=?",studentId).get("parentId"));
+        db.jdbc().execute("ALTER TABLE edu_course_schedule ADD COLUMN teacher_name VARCHAR(64)");
+        db.jdbc().execute("ALTER TABLE edu_class_sign_in ADD COLUMN sign_status CHAR(1)");
+        var signs = new com.ruoyi.system.service.impl.EduClassSignInServiceImpl();
+        LessonCreditMysqlTest.inject(signs, "singleDb", db);
+        LessonCreditMysqlTest.inject(signs, "rosterService", service);
+        String firstDate = offlineLessons.get(0).get("classDate").toString();
+        String thirdDate = offlineLessons.get(2).get("classDate").toString();
+        var beforeEntry = tx(() -> signs.attendanceOverview(3L, firstDate, firstDate));
+        assertEquals(List.of(), beforeEntry.get("rows"));
+        var overview = tx(() -> signs.attendanceOverview(3L, thirdDate, thirdDate));
+        assertEquals(1L, overview.get("plannedExpectedCount"));
+        var students = (List<?>) overview.get("rows");
+        assertEquals(1, students.size());
+        var student = (Map<?,?>) students.get(0);
+        assertEquals("仅姓名学生", student.get("studentName"));
+        assertEquals(false, student.get("temporary"));
+        assertEquals(false, ((Map<?,?>) ((List<?>) student.get("cells")).get(0)).get("recorded"));
+        var detail = tx(() -> signs.attendanceStudent(3L, "S:" + studentId, false, thirdDate, thirdDate, 1));
+        assertEquals("仅姓名学生", ((Map<?,?>) detail.get("student")).get("studentName"));
+        assertEquals(0, detail.get("total"));
+        assertThrows(ServiceException.class, () -> tx(() -> signs.attendanceStudent(course, "S:" + studentId, false, null, null, 1)));
         tx(() -> {
             service.bindOfflineStudent(studentId, new AttendanceLessonRosterService.ParentBindingRequest("13800000000"));
             return null;

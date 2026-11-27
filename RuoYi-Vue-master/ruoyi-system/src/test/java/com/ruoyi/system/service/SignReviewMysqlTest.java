@@ -286,7 +286,8 @@ class SignReviewMysqlTest {
         finally {jdbc.update("UPDATE edu_course_schedule SET teacher_id=10,start_time=NULL,end_time=NULL WHERE schedule_id=1");}
     }
     @Test void plannedOverviewSeparatesFormalExpectedFromUnsubmittedAndPendingCategories() throws Exception {
-        inject("rosterService",new AttendanceLessonRosterService(null){@Override public List<Map<String,Object>> courseOverviewLessons(long id,String from,String to) {
+        inject("rosterService",new AttendanceLessonRosterService(null){@Override public List<Map<String,Object>> courseOverviewLessons(long id,String from,String to,
+                java.util.function.Consumer<Map<String,Object>> membershipStudent) {
             return List.of(Map.of("lessonNo",1,"classDate","2026-10-19","expectedCount",5,"reviewStage",review().get("reviewStage")),Map.of("lessonNo",2,"classDate","2026-10-20","expectedCount",3,"reviewStage","UNSUBMITTED"));
         }});
         try {

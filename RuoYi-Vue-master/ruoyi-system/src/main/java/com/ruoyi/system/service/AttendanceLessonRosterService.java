@@ -413,12 +413,20 @@ public class AttendanceLessonRosterService {
         return !db.rows("SELECT enrollment_id FROM edu_enrollment WHERE schedule_id=? AND del_flag='0' AND enrollment_status='1' AND class_date IS NOT NULL AND (? IS NULL OR class_date>=?) AND (? IS NULL OR class_date<=?) LIMIT 1",schedule,first,first,last,last).isEmpty();
     }
     @Transactional public List<Map<String,Object>> courseOverviewLessons(long schedule,String from,String to) {
+        return courseOverviewLessons(schedule, from, to, student -> {});
+    }
+    @Transactional public List<Map<String,Object>> courseOverviewLessons(long schedule,String from,String to,
+            java.util.function.Consumer<Map<String,Object>> membershipStudent) {
         staff();LocalDate first=from==null||from.isBlank()?null:ScheduleCalendar.date(from),last=to==null||to.isBlank()?null:ScheduleCalendar.date(to);
         require((from==null||from.isBlank()||first!=null)&&(to==null||to.isBlank()||last!=null)&&(first==null||last==null||!first.isAfter(last)),"日期范围无效");
         var result=new ArrayList<Map<String,Object>>();
         for(var row:sync(schedule)) {
             LocalDate day=ScheduleCalendar.date(row.get("classDate"));if(yes(row.get("cancelled"))||day==null||(first!=null&&day.isBefore(first))||(last!=null&&day.isAfter(last)))continue;
-            row.put("expectedCount",rosterFor(db.one("SELECT * FROM edu_attendance_lesson WHERE lesson_id=?",row.get("lessonId"))).size());row.put("reviewStage",reviewStage(schedule,row.get("classDate")));result.add(row);
+            var roster = rosterFor(db.one("SELECT * FROM edu_attendance_lesson WHERE lesson_id=?", row.get("lessonId")));
+            for (var student : roster) {
+                if (student.get("membershipId") != null) membershipStudent.accept(student);
+            }
+            row.put("expectedCount",roster.size());row.put("reviewStage",reviewStage(schedule,row.get("classDate")));result.add(row);
         }
         return result;
     }
