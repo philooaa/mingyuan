@@ -332,10 +332,11 @@ public class EduClassSignInServiceImpl implements IEduClassSignInService
         return r.get("studentId")!=null?"S:"+r.get("studentId"):r.get("enrollmentId")!=null?"E:"+r.get("enrollmentId"):"R:"+r.get("signInId");
     }
     private String displayName(Map<String,Object> r) {
-        for(String key:List.of("currentName","enrolledName","recordedName"))if(r.get(key)!=null&&!r.get(key).toString().isBlank())return r.get(key).toString();return "未填写姓名";
+        for(String key:List.of("currentName","enrolledName","recordedName","studentName"))if(r.get(key)!=null&&!r.get(key).toString().isBlank())return r.get(key).toString();return "未填写姓名";
     }
     private Map<String,Object> studentRow(Map<String,Object> source) {
-        var row=new LinkedHashMap<String,Object>();row.put("studentKey",studentKey(source));row.put("studentName",displayName(source));row.put("parentPhone",source.get("parentPhone"));row.put("linked",source.get("studentId")!=null);row.put("temporary",source.get("enrollmentId")==null);row.put("stats",emptyStats());return row;
+        boolean membership = source.get("membershipId") != null;
+        var row=new LinkedHashMap<String,Object>();row.put("studentKey",studentKey(source));row.put("studentName",displayName(source));row.put("parentPhone",source.get(membership ? "contactPhone" : "parentPhone"));row.put("linked",source.get("studentId")!=null);row.put("temporary",!membership && source.get("enrollmentId")==null);row.put("stats",emptyStats());return row;
     }
     private Map<String,Long> emptyStats() {
         var stats=new LinkedHashMap<String,Long>();for(String key:List.of("expectedCount","recorded","attended","normal","video","leave","trial","transfer","absent","approved","pending","returned","conflicts"))stats.put(key,0L);return stats;
@@ -367,11 +368,17 @@ public class EduClassSignInServiceImpl implements IEduClassSignInService
     @Override @Transactional(isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     @SuppressWarnings("unchecked") public Map<String,Object> attendanceOverview(Long scheduleId,String from,String to) {
         attendanceAdmin();attendanceRange(from,to);var course=attendanceCourse(scheduleId);var args=new ArrayList<Object>();args.add(scheduleId);var records=overviewRecords("r.schedule_id=?",args,from,to);
-        var plannedLessons=rosterService==null?List.<Map<String,Object>>of():rosterService.courseOverviewLessons(scheduleId,from,to);
+        var membershipStudents = new LinkedHashMap<String,Map<String,Object>>();
+        var plannedLessons=rosterService==null?List.<Map<String,Object>>of():rosterService.courseOverviewLessons(scheduleId,from,to,
+                student -> membershipStudents.putIfAbsent(studentKey(student), student));
         var allDates=new java.util.TreeSet<String>();for(var record:records)allDates.add(record.get("classDate").toString());for(var lesson:plannedLessons)allDates.add(lesson.get("classDate").toString());
         var dates=new ArrayList<>(allDates);if(dates.size()>120)throw new ServiceException("课次超过120天，请选择日期范围");
         var roster=singleDb.rows("SELECT e.enrollment_id,st.student_id,st.parent_id,st.student_name current_name,e.student_name enrolled_name,p.phonenumber parent_phone FROM edu_enrollment e LEFT JOIN edu_student st ON st.student_id=e.student_id AND st.parent_id=e.parent_id LEFT JOIN sys_user p ON p.user_id=e.parent_id WHERE e.schedule_id=? AND (e.del_flag='0' OR EXISTS(SELECT 1 FROM edu_class_sign_in r WHERE r.enrollment_id=e.enrollment_id AND r.schedule_id=e.schedule_id AND r.del_flag='0')) ORDER BY e.enrollment_id",scheduleId);
         var students=new LinkedHashMap<String,Map<String,Object>>();for(var r:roster)students.putIfAbsent(studentKey(r),studentRow(r));for(var r:records)students.putIfAbsent(studentKey(r),studentRow(r));
+        membershipStudents.forEach((key, member) -> {
+            var row = students.computeIfAbsent(key, ignored -> studentRow(member));
+            row.put("temporary", false);
+        });
         if((long)students.size()*dates.size()>8000)throw new ServiceException("总览较大，请缩小日期范围后查看");
         var grouped=new LinkedHashMap<String,Map<String,List<Map<String,Object>>>>();for(var r:records)grouped.computeIfAbsent(studentKey(r),key->new LinkedHashMap<>()).computeIfAbsent(r.get("classDate").toString(),key->new ArrayList<>()).add(r);
         var totals=emptyStats();for(var entry:students.entrySet()) {
@@ -404,6 +411,12 @@ public class EduClassSignInServiceImpl implements IEduClassSignInService
         Map<String,Object> student;
         if(found.isEmpty()&&!key.startsWith("R:")) {
             var enrolled=singleDb.rows("SELECT e.enrollment_id,st.student_id,st.parent_id,st.student_name current_name,e.student_name enrolled_name,p.phonenumber parent_phone FROM edu_enrollment e LEFT JOIN edu_student st ON st.student_id=e.student_id AND st.parent_id=e.parent_id LEFT JOIN sys_user p ON p.user_id=e.parent_id WHERE e.schedule_id=? AND "+(key.startsWith("S:")?"st.student_id":"e.enrollment_id")+"=? AND e.del_flag='0' LIMIT 1",scheduleId,id);
+            if (enrolled.isEmpty() && key.startsWith("S:") && rosterService != null) {
+                enrolled = singleDb.rows("SELECT m.membership_id,st.student_id,st.student_name,u.phonenumber contact_phone "
+                        + "FROM edu_attendance_membership m JOIN edu_student st ON st.student_id=m.student_id "
+                        + "LEFT JOIN sys_user u ON u.user_id=st.parent_id WHERE m.schedule_id=? AND st.student_id=? LIMIT 1",
+                        scheduleId,id);
+            }
             if(enrolled.isEmpty())throw new ServiceException("学生不属于所选课程");student=studentRow(enrolled.get(0));
         } else {if(found.isEmpty())throw new ServiceException("学生记录不属于所选课程");student=studentRow(found.get(0));}
         if(!key.equals(student.get("studentKey")))throw new ServiceException("学生身份已关联，请刷新总览");
