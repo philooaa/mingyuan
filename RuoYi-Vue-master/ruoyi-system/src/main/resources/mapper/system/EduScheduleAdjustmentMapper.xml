@@ -81,7 +81,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="termName != null">term_name = #{termName},</if>
             <if test="periodName != null">period_name = #{periodName},</if>
             <if test="originalDate != null">original_date = #{originalDate},</if>
-            <if test="adjustedDate != null">adjusted_date = #{adjustedDate},</if>
+            <!-- 留空表示停课，编辑时必须清除原来的调课目标日期。 -->
+            adjusted_date = #{adjustedDate,jdbcType=DATE},
             <if test="courseCount != null">course_count = #{courseCount},</if>
             <if test="reason != null">reason = #{reason},</if>
             <if test="createBy != null">create_by = #{createBy},</if>
