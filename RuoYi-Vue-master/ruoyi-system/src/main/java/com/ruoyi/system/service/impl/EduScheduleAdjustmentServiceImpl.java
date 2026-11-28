@@ -119,7 +119,8 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         requireUnsubmitted(eduScheduleAdjustment.getScheduleId(),null,null,eduScheduleAdjustment.getOriginalDate(),null);
         eduScheduleAdjustment.setCreateTime(DateUtils.getNowDate());
         int count = eduScheduleAdjustmentMapper.insertEduScheduleAdjustment(eduScheduleAdjustment);
-        checkResult(eduScheduleAdjustment.getScheduleId());
+        // 停课只释放资源，不因课程其他日期已有的冲突阻止取消。
+        if (eduScheduleAdjustment.getAdjustedDate() != null) checkResult(eduScheduleAdjustment.getScheduleId());
         return count;
     }
 
@@ -148,7 +149,12 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
         requireUnsubmitted(current.getScheduleId(),null,null,eduScheduleAdjustment.getOriginalDate(),null);
         eduScheduleAdjustment.setUpdateTime(DateUtils.getNowDate());
         int count = eduScheduleAdjustmentMapper.updateEduScheduleAdjustment(eduScheduleAdjustment);
-        checkResult(current.getScheduleId());
+        // 改动原日期会恢复旧课次，即便新记录表示停课，也必须复核恢复后的占用。
+        boolean onlyCancel = eduScheduleAdjustment.getAdjustedDate() == null
+                && java.util.Objects.equals(
+                    com.ruoyi.system.service.ScheduleCalendar.date(current.getOriginalDate()),
+                    com.ruoyi.system.service.ScheduleCalendar.date(eduScheduleAdjustment.getOriginalDate()));
+        if (!onlyCancel) checkResult(current.getScheduleId());
         return count;
     }
 
@@ -359,7 +365,9 @@ public class EduScheduleAdjustmentServiceImpl implements IEduScheduleAdjustmentS
             }
         }
 
-        for (var s : schedules) checkResult(((Number)s.get("scheduleId")).longValue());
+        if (!"CANCEL".equals(mode)) {
+            for (var s : schedules) checkResult(((Number)s.get("scheduleId")).longValue());
+        }
         return count;
     }
 
